@@ -119,6 +119,16 @@ def _args(tmp_path):
                    "claim_boundary": "external boundary"}
     values["aes"] = closed_loop
     values["jpeg"] = closed_loop
+    values["rtl_repair"] = {
+        "status": "passed",
+        "rows": [{
+            "design": "gcd", "frozen_attempt": 5, "frozen_status": "failed",
+            "frozen_failure": "compiler rejection", "repair": "bounded compiler-feedback repair",
+            "rerun_status": "passed", "pipeline_status": "baseline_succeeded",
+            "compiler_repair_rounds": 1, "rerun_path": str(tmp_path / "repair-rerun"),
+        }],
+        "claim_boundary": "repair does not rewrite frozen statistics",
+    }
     paths = {}
     for name, value in values.items():
         path = tmp_path / f"{name}.json"
@@ -131,15 +141,18 @@ def test_paper_report_renders_all_evidence_sections(tmp_path):
     document, ledger, summary = build(_args(tmp_path))
 
     assert "生成 RTL 与隐藏参考 RTL" in document
+    assert "冻结后工程修复回归" in document
+    assert "repair does not rewrite frozen statistics" in document
     assert "全部 40 个 design×seed" in document
     assert "十二组跨设计因果复验" in document
     assert "分设计拆开看" in document
     assert "低于阈值正波动" in document
-    assert len(ledger) == 8
+    assert len(ledger) == 9
     assert summary["headline"]["rtl_iterative_rescues"] == 3
     assert summary["headline"]["parameter_mean_bo_minus_random"] == .02
     assert {row["study"] for row in summary["records"]} == {
-        "parameter", "learning", "rtl-generation", "edair-qa", "rtl-hidden-reference"}
+        "parameter", "learning", "rtl-generation", "edair-qa", "rtl-hidden-reference",
+        "rtl-engineering-regression"}
 
 
 def test_completed_checkpoint_without_any_feasible_vector_is_not_reported_as_success():

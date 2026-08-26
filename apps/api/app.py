@@ -789,20 +789,38 @@ class ApiState:
             feedback = _optional_string(payload.get("verification_feedback"))
             generated = (_codex_testbench_draft(spec, feedback=feedback)
                          if feedback else _codex_testbench_draft(spec))
-            if not generated["structural_floor_passed"]:
+            # A compiler diagnostic is evidence for the independent verifier,
+            # not a reason to ask a human to hand-edit the oracle.  Give the
+            # verifier a bounded repair budget and freeze only the first draft
+            # that passes both structural and dual-compiler preflight.  The
+            # failed drafts remain visible in the Agent trace metrics.
+            repair_errors: list[str] = []
+            for _repair_index in range(3):
+                if generated["structural_floor_passed"]:
+                    break
+                repair_errors.append(
+                    str(generated.get("structural_floor_error") or "unknown error")
+                )
                 generated = _codex_testbench_draft(
                     spec,
                     feedback=(
-                        "RTLScout protocol preflight rejected the previous draft: "
-                        + str(generated.get("structural_floor_error") or "unknown error")
-                        + ". The replacement must declare exactly `module tb`, instantiate "
-                          "the DUT as `dut`, and emit `TB_SUMMARY total=<N> errors=<M>` "
-                          "before PASS."
+                        "RTLScout protocol/dual-compiler preflight rejected the previous draft. "
+                        "Fix the exact diagnostic below and return a complete replacement; do not "
+                        "weaken or delete functional checks. Avoid indexing unsized or based "
+                        "literal constants directly (for example, do not write 8'hA5[0]); assign "
+                        "the value to a typed variable first. Diagnostic:\n"
+                        + repair_errors[-1]
+                        + "\nThe replacement must declare exactly `module tb`, instantiate the "
+                          "DUT as `dut`, and emit `TB_SUMMARY total=<N> errors=<M>` before PASS."
                     ),
                 )
             if not generated["structural_floor_passed"]:
                 raise ValueError(generated.get("structural_floor_error") or "verification-agent structural gate failed")
-            trace.finish_tool(step, ok=True, metrics={"structural_floor": True},
+            trace.finish_tool(step, ok=True, metrics={
+                                  "structural_floor": True,
+                                  "compiler_repair_rounds": len(repair_errors),
+                                  "rejected_draft_errors": repair_errors,
+                              },
                               detail="独立 Testbench 已生成并通过 DUT/self-check/PASS 结构检查")
             trace.add("evaluate", "冻结验证包", status="ok",
                       detail="内容哈希固定；后续 RTL 候选只能接受这个验证包")

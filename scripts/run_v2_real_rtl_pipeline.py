@@ -111,7 +111,12 @@ def main() -> int:
                 followup = (
                     "Resolve remaining ambiguity conservatively from the original specification. "
                     "Use synthesizable synchronous RTL, exact declared ports and widths, active-low "
-                    "reset when rst_n is named, and no undocumented protocol behavior. Questions: "
+                    "reset when rst_n is named. Treat an omitted target platform as nangate45. "
+                    "For finite input encodings whose behavior is not assigned, mark them reserved "
+                    "and define a deterministic zero/no-op result; record every such choice as an "
+                    "assumption instead of asking a human. Do not invent new ports or protocol "
+                    "transactions. Clear missing_fields and clarification_questions only after the "
+                    "resulting behavior is explicit and executable. Questions: "
                     + " | ".join(str(item) for item in questions)
                 )
                 session = state.add_spec_turn(session["session_id"], {"message": followup})

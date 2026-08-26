@@ -99,6 +99,8 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict], dict]:
     rtl = load(args.rtl); edair = load(args.edair); agent = load(args.agent)
     reference = load(args.references)
     aes = load(args.aes); jpeg = load(args.jpeg)
+    rtl_repair_path = getattr(args, "rtl_repair", None)
+    rtl_repair = load(rtl_repair_path) if rtl_repair_path else None
     aes_effective = closed_loop_effective(aes); jpeg_effective = closed_loop_effective(jpeg)
     p = parameter["primary"]; ci = p["bootstrap_median_95_ci"]
     eda_kpi, eda_typed = edair["totals"]["kpi_only"], edair["totals"]["typed_edair"]
@@ -216,6 +218,12 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict], dict]:
         {"study": "JPEG external smoke", "unit": "full ORFS flow", "planned": 4,
          "observed": len(jpeg["runtime_runs"]), "status": jpeg_effective["status"]},
     ]
+    if rtl_repair:
+        experiment_ledger.append({
+            "study": "RTL post-freeze engineering regression",
+            "unit": "retained failure rerun", "planned": 2,
+            "observed": len(rtl_repair["rows"]), "status": rtl_repair["status"],
+        })
     detailed_ledger: list[dict[str, object]] = []
     for row in parameter["cells"]:
         for arm in ("bo_gp", "seeded_random"):
@@ -278,6 +286,19 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict], dict]:
             "evidence_ref": ",".join(row["run_ids"]),
             "claim_boundary": reference["claim_boundary"],
         })
+    if rtl_repair:
+        for row in rtl_repair["rows"]:
+            detailed_ledger.append({
+                "study": "rtl-engineering-regression",
+                "record_id": f"{row['design']}-frozen-attempt-{int(row['frozen_attempt']):02d}-rerun",
+                "design": row["design"], "arm": "post_freeze_bugfix_rerun",
+                "seed_or_repeat": row["frozen_attempt"], "planned_runs": 1,
+                "observed_runs": 1, "status": row["rerun_status"],
+                "primary_value": row.get("pipeline_status"),
+                "failure_count": 0 if row["rerun_status"] == "passed" else 1,
+                "evidence_ref": row["rerun_path"],
+                "claim_boundary": rtl_repair["claim_boundary"],
+            })
     refs = [
         ("EDA-Aware RTL Generation (DATE 2025)", "EDA 反馈进入 RTL 生成评价，而非只做语法生成", "写/审分离、完整质量门和 GDS 条件 PPA", "doi:10.23919/DATE64628.2025.10992789"),
         ("VeriOpt (ICCAD 2025)", "多角色 LLM 与 PPA-aware RTL 生成", "Spec/Verification/RTLScout 独立角色与隐藏参考", "doi:10.1109/ICCAD66269.2025.11240771"),
@@ -314,6 +335,11 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict], dict]:
 <h3>3.2 变异测试和多样性为什么要单列</h3>
 <p>普通仿真通过，只能说明 RTL 通过了当前 testbench。变异测试会故意破坏 RTL，再看 testbench 能不能抓住错误。报告同时列唯一 RTL/TB 哈希与被迭代挡住的修订数，避免把重复输出包装成五个独立设计，也避免只展示一个漂亮的 mutation 分数而隐藏候选演化。</p>
 <p class='boundary'>{esc(rtl['claim_boundary'])}</p></section>
+{("<section><h2>3.3 冻结后工程修复回归：不改写 18/20</h2>" +
+  "<p>20 次主实验已经冻结。下面两行只回答：暴露出的工程缺陷修好以后，原失败样本能否在新目录重新走完整链路。原失败仍留在主账本，重跑不进入成功率或显著性。</p>" +
+  table(("设计","原冻结尝试","原状态","原失败层次","修复内容","重跑状态","重跑链路终态","TB编译自修轮数"),
+        [(x['design'],x['frozen_attempt'],x['frozen_status'],x['frozen_failure'],x['repair'],x['rerun_status'],x['pipeline_status'],x['compiler_repair_rounds']) for x in rtl_repair['rows']]) +
+  "<p class='boundary'>" + esc(rtl_repair['claim_boundary']) + "</p></section>") if rtl_repair else ""}
 <section><h2>4. 参数探索：BO/GP 是否比同预算随机搜索更好</h2>
 <p>每个 design×policy-seed 都包含 1 个 baseline 和 3 个候选向量，每个向量用 3 个真实且配对的 OpenROAD seed。两种策略预算完全一样。主指标是满足 timing/DRC 硬约束后的 balanced 相对效用。</p>
 <div class='cards'><article><b>{num(p['mean_paired_difference'])}</b><span>BO − random 平均配对差</span></article><article><b>{num(p['median_paired_difference'])}</b><span>中位配对差</span></article><article><b>[{num(ci['lower'])}, {num(ci['upper'])}]</b><span>bootstrap 95% CI</span></article><article><b>p={num(p['sign_flip']['p_value'])}</b><span>双侧 sign-flip 检验</span></article></div>
@@ -393,6 +419,7 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict], dict]:
             "learning": learning["claim_boundary"], "edair": edair["claim_boundary"],
             "agent": agent["claim_boundary"], "references": reference["claim_boundary"],
             "aes": aes["claim_boundary"], "jpeg": jpeg["claim_boundary"],
+            **({"rtl_repair": rtl_repair["claim_boundary"]} if rtl_repair else {}),
         },
         "records": detailed_ledger,
     }
@@ -409,6 +436,7 @@ def main() -> int:
     parser.add_argument("--references", type=Path, required=True)
     parser.add_argument("--aes", type=Path, required=True)
     parser.add_argument("--jpeg", type=Path, required=True)
+    parser.add_argument("--rtl-repair", type=Path)
     parser.add_argument("--html", type=Path, required=True)
     parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--json", type=Path, required=True)
@@ -422,7 +450,10 @@ def main() -> int:
             "failure_count", "evidence_ref", "claim_boundary"))
         writer.writeheader(); writer.writerows(summary["records"])
     sources = {}
-    for name in ("parameter", "learning", "rtl", "edair", "agent", "references", "aes", "jpeg"):
+    source_names = ["parameter", "learning", "rtl", "edair", "agent", "references", "aes", "jpeg"]
+    if args.rtl_repair:
+        source_names.append("rtl_repair")
+    for name in source_names:
         path = getattr(args, name).expanduser().resolve()
         sources[name] = {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
     summary["sources"] = sources

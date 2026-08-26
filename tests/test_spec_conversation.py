@@ -73,6 +73,7 @@ def test_codex_provider_is_ephemeral_read_only_and_schema_validated(tmp_path, mo
     def fake_run(command, **kwargs):
         captured["command"] = command
         captured["cwd"] = Path(kwargs["cwd"])
+        captured["prompt"] = kwargs["input"]
         Path(command[command.index("--output-last-message") + 1]).write_text(
             json.dumps(output), encoding="utf-8"
         )
@@ -87,6 +88,7 @@ def test_codex_provider_is_ephemeral_read_only_and_schema_validated(tmp_path, mo
     assert "--ephemeral" in captured["command"]
     assert captured["command"][captured["command"].index("--sandbox") + 1] == "read-only"
     assert captured["command"][captured["command"].index("--model") + 1] == "gpt-5.6-terra"
+    assert "reserved zero/no-op behavior" in captured["prompt"]
 
 
 def test_provider_rejects_legacy_generated_rtl():

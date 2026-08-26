@@ -179,6 +179,50 @@ def test_automatic_dual_agent_entry_creates_independent_oracle(tmp_path, monkeyp
     assert '"origin": "independent_verifier_agent"' in receipt.read_text()
 
 
+def test_automatic_verifier_repairs_compiler_rejected_draft_before_freeze(tmp_path, monkeypatch):
+    """Compiler evidence triggers bounded Agent repair; no human edits the TB."""
+    from apps.api.app import ApiState
+
+    state = ApiState(tmp_path / "platform.db", tmp_path / "uploads", tmp_path / "orfs",
+                     design_root=tmp_path / "designs", legacy_root=tmp_path / "legacy",
+                     yosys_bin=tmp_path / "missing-yosys", runtime_db_path=tmp_path / "runtime.db")
+    spec = SpecIR("specir-repair", "repair", "generated_top", "identity", "functional",
+                  (PortSpec("a", "input", 2), PortSpec("y", "output", 2)),
+                  acceptance_criteria=("output matches input",))
+    state.rtl_frontend.add_spec(spec)
+    state.rtlscout_readiness = {"ready": True, "reason": "fixture"}
+    calls = []
+
+    def fake_draft(_spec, *, feedback=None):
+        calls.append(feedback)
+        if len(calls) == 1:
+            return {
+                "draft": {}, "draft_sha256": "a" * 64,
+                "structural_floor_passed": False,
+                "structural_floor_error": "Verilator rejected 8'hA5[0]",
+            }
+        return {
+            "draft": {"testbench_source": SELF_CHECKING_TB, "testbench_top": "tb"},
+            "draft_sha256": "b" * 64, "structural_floor_passed": True,
+        }
+
+    monkeypatch.setattr("apps.api.app._codex_testbench_draft", fake_draft)
+    monkeypatch.setattr(state, "submit_rtlscout_spec", lambda *args, **kwargs: {
+        "testbench_sha256": "b" * 64, "run": {"run": {"run_id": "run-repaired"}},
+    })
+    result = state.submit_automated_rtlscout(spec.spec_id, {})
+
+    assert len(calls) == 2
+    assert calls[0] is None
+    assert "8'hA5[0]" in calls[1]
+    assert "typed variable" in calls[1]
+    assert result["automation"]["human_required"] is False
+    trace = state.agent_traces.list(limit=10)[0]
+    tool_step = next(step for step in trace["steps"] if step["kind"] == "tool_call")
+    assert tool_step["metrics"]["compiler_repair_rounds"] == 1
+    assert tool_step["metrics"]["rejected_draft_errors"] == ["Verilator rejected 8'hA5[0]"]
+
+
 def test_codex_rtlscout_bridge_judges_an_absolute_candidate_path(tmp_path, monkeypatch):
     """Regression: run_eval resolves its positional RTL file before --workdir."""
     import hashlib
