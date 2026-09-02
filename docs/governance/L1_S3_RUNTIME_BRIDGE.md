@@ -15,6 +15,8 @@ Evidence: `tests/test_l1_runtime_bridge.py` includes a bounded
 `WorkflowRuntime -> ProcessAdapter -> registered artifact` smoke and terminal
 timeout/lost trace assertions.
 
-Rollback: revert commits `8198c72`, `676f2b9`, `7c2ade0`, `7cb2679`,
-`6f43f59`, `27568da`, `576e044`, `be7b5e1`, `7d857b9`, `5a64a11`, and
-`7445e8a`; this removes only S3 bridge/policy/test/docs changes.
+Rollback: revert S3 commits in reverse order: this documentation commit,
+`993682e`, `27ece51`, `7445e8a`, `5a64a11`, `7d857b9`, `be7b5e1`,
+`576e044`, `27568da`, `6f43f59`, `7cb2679`, `7c2ade0`, `676f2b9`, and
+`8198c72`. This removes only S3 bridge/policy/test/docs changes while the
+net content of `runtime.py` remains identical to its pre-S3 baseline.
