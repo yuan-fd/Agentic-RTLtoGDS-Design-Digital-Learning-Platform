@@ -87,6 +87,7 @@ def test_runtime_rejects_adapter_that_tampers_orfs_protocol_receipt(tmp_path):
     runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([manifest]), workspace_root=tmp_path / "work")
     run = runtime.submit(task, capability="test.orfs")
     assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+    assert not runtime.describe(run.run_id)["stages"][0]["attempts"][0]["artifacts"]
 
 
 def test_runtime_rejects_adapter_claiming_its_reserved_receipt_artifact(tmp_path):
