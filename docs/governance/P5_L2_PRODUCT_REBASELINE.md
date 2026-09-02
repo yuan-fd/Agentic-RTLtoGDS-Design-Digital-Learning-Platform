@@ -28,10 +28,12 @@ integration、script 和 test 多个边界，不能把未知归属的改动连�
   `orfs-agent / optimizer.l2.propose`。
 - `docs/governance/LEGACY_CLEANUP_INVENTORY.md`：AgenticPD 是 `INVALID`，
   限于 source audit。
-- `integrations/orfs_agent/source.lock.json`：ORFS-Agent 已锁定
-  `730f1fa11f9c17c0aaac332412af2b2538f42e9b`、BSD-3-Clause 与原生入口；
-  其入场状态是 bounded Runtime smoke，不是性能结论。
-- `git status --short`：ORFS-Agent 原型及其依赖当前尚未进入提交历史。
+- 当前主工作树的未提交 ORFS-Agent 原型包含 source lock、adapter、script 和
+  test；这些内容**不在本提交的 Git tree 中**，因此不能作为当前产品准入、
+  可执行插件或 bounded Runtime smoke 的证据。
+- `git status --short`：ORFS-Agent 原型及其依赖当前尚未进入提交历史；在形成
+  单独的实现提交前，已提交 inventory 对未来 ORFS-Agent intake 的分类仍是
+  `UNKNOWN`。
 
 ## Required next implementation slice
 
@@ -44,8 +46,10 @@ integration、script 和 test 多个边界，不能把未知归属的改动连�
    和恢复。
 3. 每个 proposed candidate 必须经参数 allowlist 和冻结协议后，才由 Runtime
    创建 ORFS `TaskSpec`；预测/提案与受保护 evaluator 的观测 QoR 严格分开。
-4. 用 clean pinned ORFS-Agent external worktree（不使用有未跟踪文件的 checkout）
-   做 bounded smoke，保留原始 logs、候选、Runtime snapshot 和所有失败。
+4. 先将 upstream URL、固定 commit、license、native entrypoint、依赖/安全审查
+   和最小 adapter 映射提交为 intake lock；再用 clean pinned ORFS-Agent external
+   worktree（不使用有未跟踪文件的 checkout）做 bounded smoke，保留原始 logs、
+   候选、Runtime snapshot 和所有失败。
 5. 对比只在 RTL hash、PDK、toolchain、SDC、seed policy、search space、预算和
    evaluator version 冻结一致时报告；smoke 不声明 QoR 优越性或论文复现。
 
