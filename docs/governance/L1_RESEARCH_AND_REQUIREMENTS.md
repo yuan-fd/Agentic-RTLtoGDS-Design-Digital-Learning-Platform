@@ -1,6 +1,6 @@
 # L1 natural-language EDA interaction: research, reuse decision, and requirements
 
-Status: ACTIVE design baseline (2026-09-02)  
+Status: ACTIVE design baseline (2026-09-02)
 Scope: L1 only. This is not an L2 optimizer, a white-box repair system, or a UI implementation.
 
 ## Decision
@@ -83,10 +83,10 @@ registered by this document.
 
 | Requirement | Existing state | Required slice |
 | --- | --- | --- |
-| `DesignGoal`, `DesignState`, `SemanticToolCall`, `ToolReceipt` | Present in `packages/contracts`; no reverse runtime/plugin imports. | Preserve, add only versioned missing fields through a compatibility migration. |
-| 12-tool tutorial surface | 11 names exist; `create_experiment` and L2 `propose_search_policy` are present, but `get_design_summary`, `query_stage_metrics`, and `run_full_flow` are missing; current handlers are not all Runtime-backed. | L1-S1/S3. |
-| Clarification-aware natural-language compiler | Historical regex compiler only; no GoalDraft/Question/LLM adapter. | L1-S1 then L1-S5. |
-| Policy-visible schemas and pre/postconditions | Semantic policy validates arguments, but registry definitions lack the full public contract and capability negotiation. | L1-S1. |
+| `DesignGoal`, `DesignState`, `SemanticToolCall`, `ToolReceipt` | Not in the committed L1 baseline. Similar uncommitted working-tree material is not treated as an available platform capability. | L1-S1: introduce/review dependency-free contracts deliberately, then add missing fields by compatibility migration. |
+| 12-tool tutorial surface | No committed canonical L1 registry. `create_experiment`/search-policy names in uncommitted historical material do not satisfy the tutorial surface. | L1-S1/S3. |
+| Clarification-aware natural-language compiler | `GoalDraft`/typed questions begin in L1-S1; there is no finalizer or LLM adapter. | L1-S1 then L1-S5. |
+| Policy-visible schemas and pre/postconditions | No committed canonical semantic registry/capability negotiation. | L1-S1. |
 | Durable trace | No canonical append-only L1 trace store, event schema, replay endpoint, or state hash lineage. | L1-S2. |
 | Runtime-backed query/execute tools | Partial in-process L1 bridge; process-local state is explicitly non-product. | L1-S3. |
 | Plan/validate/execute/observe loop | No durable orchestrator or reducer. | L1-S4. |

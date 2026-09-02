@@ -29,6 +29,7 @@ class ClarificationField(str, Enum):
     TOOLCHAIN = "toolchain"
     OBJECTIVE = "objective"
     CONSTRAINTS = "constraints"
+    CLOCK_SDC_POLICY = "clock_sdc_policy"
     CHANGE_SCOPE = "change_scope"
     BUDGET = "budget"
 
@@ -122,12 +123,20 @@ class GoalDraft:
         _text("request_text", self.request_text, maximum=8000)
         if not isinstance(self.intent, GoalIntent):
             raise ValueError("goal draft intent must be typed")
+        if not isinstance(self.questions, tuple):
+            raise ValueError("goal draft questions must be a tuple")
         for item in self.questions:
+            if not isinstance(item, ClarificationQuestion):
+                raise ValueError("goal draft questions must contain ClarificationQuestion values")
             item.validate()
         if len({item.question_id for item in self.questions}) != len(self.questions):
             raise ValueError("goal draft question ids must be unique")
         known = {item.question_id: item.field for item in self.questions}
+        if not isinstance(self.answers, tuple):
+            raise ValueError("goal draft answers must be a tuple")
         for item in self.answers:
+            if not isinstance(item, ClarificationAnswer):
+                raise ValueError("goal draft answers must contain ClarificationAnswer values")
             item.validate()
             if known.get(item.question_id) is not item.field:
                 raise ValueError("clarification answer does not match a draft question")
