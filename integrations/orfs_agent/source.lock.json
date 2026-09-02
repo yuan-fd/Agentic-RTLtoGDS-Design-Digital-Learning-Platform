@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orfs-agent",
+  "plugin_version": "2025.1",
+  "repository": "https://github.com/ABKGroup/ORFS-Agent.git",
+  "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
+  "cache_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
+  "license": "BSD-3-Clause",
+  "paper": {
+    "title": "ORFS-Agent: Tool-Using Agents for Chip Design Optimization",
+    "venue": "MLCAD 2025",
+    "arxiv": "2506.08332"
+  },
+  "upstream_entrypoints": {
+    "full_campaign": "maindriver.sh",
+    "autotuner_bridge": "AutoTuner-integration/ORFS-with-AutoTuner/orfs_agent.py",
+    "data_parser": "AutoTuner-integration/ORFS-with-AutoTuner/parser.py",
+    "analyst": "AutoTuner-integration/ORFS-with-AutoTuner/analyst_agent_workbench.py"
+  },
+  "integration_class": "external-source-with-runtime-adapter",
+  "admission_status": "admitted-bounded-runtime-smoke-no-performance-claim",
+  "known_upstream_assumptions": [
+    "The full campaign script mutates a Makefile and assumes specific ORFS revisions and design files.",
+    "The full campaign launcher invokes named remote hosts over SSH.",
+    "The analyst workbench uses the Anthropic SDK and an ANTHROPIC_API_KEY.",
+    "The platform adapter does not copy or modify upstream source; it materializes the upstream data contract in an isolated Runtime workspace."
+  ]
+}

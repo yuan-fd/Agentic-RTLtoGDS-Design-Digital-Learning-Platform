@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orfs-agent",
+  "lock_purpose": "auditable-isolated-plugin-environment",
+  "created_at": "2026-08-30",
+  "source": {
+    "repository": "https://github.com/ABKGroup/ORFS-Agent.git",
+    "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
+    "checkout_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
+    "license": {
+      "spdx": "BSD-3-Clause",
+      "license_sha256": "243601633b171278cd98f9ea495cbfc74aad9d7fc062c6e7c81e20d1fc44a22f"
+    },
+    "upstream_requirements": {
+      "path": "AutoTuner-integration/ORFS-with-AutoTuner/requirements.txt",
+      "sha256": "9bcb98047678ce0ec84a4f7195cbf1d82f51d40b9f192d7a68dd1fb37196364e",
+      "declared_unpinned_packages": [
+        "anthropic",
+        "pandas",
+        "numpy",
+        "python-dotenv",
+        "scikit-optimize",
+        "scikit-learn"
+      ]
+    },
+    "algorithm_files": {
+      "AutoTuner-integration/ORFS-with-AutoTuner/orfs_agent.py": "ad1213b93eb668315cec2e1a607503110ec833e57c3d800ec5026f8102a33e5c",
+      "AutoTuner-integration/ORFS-with-AutoTuner/analyst_agent_workbench.py": "be44cdc27ab106ded5b2a0661c283da06a5a7908f4ee2296dd36e1669e840738"
+    }
+  },
+  "python_environment": {
+    "isolation": "dedicated-venv",
+    "interpreter": ".tools/venvs/orfs-agent/bin/python",
+    "python_version": "3.9.9",
+    "algorithm_critical_packages": {
+      "numpy": "2.0.2",
+      "pandas": "2.3.3",
+      "scikit-learn": "1.6.1",
+      "scikit-optimize": "0.10.2",
+      "scipy": "1.13.1",
+      "anthropic": "0.125.0"
+    },
+    "credential_policy": "No user-supplied provider key is accepted by the Platform. The upstream Anthropic analyst path is source-audited but not used in the deterministic GP/EI parity path. Any model-substituted policy must be labeled as an adaptation, not an exact upstream-model reproduction."
+  },
+  "physical_design_toolchain": {
+    "orfs_checkout": "var/toolchains/orfs-51ad1231-clean",
+    "orfs_commit": "51ad1231a231ee85234c06db807688d029b85c35",
+    "openroad_version": "26Q1-1961-g63ed2e0fe5",
+    "yosys_version": "0.63 (git sha1 d3e297fcd)",
+    "clean_worktree_required_for_paper_comparison": true,
+    "current_status": "not-paper-identical; the checkout has pre-existing local changes and generated design directories, so it may run an adapted platform campaign but may not support an exact upstream-paper PPA claim"
+  },
+  "reproduction_boundary": {
+    "native_algorithm_core": "eligible after same-input/same-seed parity evidence",
+    "platform_runtime_loop": "eligible after repeated feasible baseline, warm-up, GP/EI candidates, and independent confirmation",
+    "upstream_full_launcher": "blocked: its scripts assume named SSH hosts, remote paths, and an Anthropic credentialed analyst",
+    "paper_published_numbers": "not comparable until the paper ORFS commit, exact design/PDK assets, toolchain, and full protocol are separately admitted"
+  },
+  "change_rule": "Any source, dependency, or toolchain change creates a new lock file and a new campaign fingerprint; it never rewrites this lock or an existing campaign."
+}
