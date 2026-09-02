@@ -96,6 +96,10 @@ class L1RuntimeBridge:
         run_id = call.arguments.get("run_id")
         if call.tool is not ToolName.STOP_OR_ESCALATE or not isinstance(run_id, str) or not run_id:
             raise ValueError("stop_or_escalate requires a Runtime run_id")
+        view = self._runtime.describe(run_id)
+        labels = view.get("run", {}).get("task_spec", {}).get("labels", {})
+        if labels.get("l1_goal_id") != goal.goal_id:
+            raise ValueError("Runtime run is not owned by this DesignGoal")
         request_cancel = getattr(self._runtime, "request_cancel", None)
         if not callable(request_cancel):
             raise ValueError("Runtime does not expose controlled cancellation")
@@ -125,10 +129,10 @@ class L1RuntimeBridge:
         views = {run_id: self._runtime.describe(run_id) for run_id in run_ids}
         result: dict[str, Any] = {"run_ids": run_ids, "view": self._bounded(views)}
         if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
-            artifact_id = call.arguments["artifact_id"]
-            artifacts = [artifact for stage in views[run_ids[0]].get("stages", ()) for attempt in stage.get("attempts", ()) for artifact in attempt.get("artifacts", ()) if artifact.get("artifact_id") == artifact_id]
-            if len(artifacts) != 1: raise ValueError("artifact is not registered in the specified Runtime run")
-            result = {"run_id": run_ids[0], "artifact": artifacts[0], "offset": call.arguments.get("offset", 0), "max_bytes": call.arguments["max_bytes"], "excerpt_available": False}
+            read = getattr(self._runtime, "read_artifact_excerpt", None)
+            if not callable(read): raise ValueError("Runtime does not expose controlled artifact reads")
+            result = {"run_id": run_ids[0], **read(run_ids[0], call.arguments["artifact_id"],
+                                                    offset=call.arguments.get("offset", 0), max_bytes=call.arguments["max_bytes"])}
         elif call.tool is ToolName.COMPARE_RUNS:
             metric_names = call.arguments["metrics"]
             summary = {run_id: self._metrics(view) for run_id, view in views.items()}
@@ -141,16 +145,17 @@ class L1RuntimeBridge:
         view = self._runtime.describe(run_id); run = view["run"]
         if run.get("status") not in {"succeeded", "failed", "cancelled", "timed_out", "lost"}:
             raise ValueError("Runtime observation requires a terminal run")
-        attempts = [attempt for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())]
-        if not attempts:
+        candidates = [(stage, attempt) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())
+                      if (run["status"] == "succeeded" and stage.get("successful_attempt_id") == attempt.get("attempt_id"))
+                      or (run["status"] != "succeeded" and attempt.get("status") == run["status"])]
+        if len(candidates) != 1:
             raise ValueError("Runtime run has no attempt observation")
-        attempt = attempts[-1]; metrics = {item["name"]: float(item["value"]) for item in attempt.get("metrics", ())
+        stage_view, attempt = candidates[0]; metrics = {item["name"]: float(item["value"]) for item in attempt.get("metrics", ())
                                             if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
         evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
         if not evidence:
             evidence = (_evidence(f"runtime:{run_id}", view),)
-        stage = next((item.get("stage_key") for item in view.get("stages", ()) if item.get("successful_attempt_id") == attempt["attempt_id"]), None)
-        return RuntimeObservation(run_id, attempt["attempt_id"], stage, run["status"], metrics, evidence)
+        return RuntimeObservation(run_id, attempt["attempt_id"], stage_view.get("stage_key"), run["status"], metrics, evidence)
 
     def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
                          *, run_id: str, next_state_id: str) -> DesignState:
