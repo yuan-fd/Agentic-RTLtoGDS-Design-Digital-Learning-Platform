@@ -8,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState, SemanticToolCall, ToolName, ToolReceipt
@@ -27,9 +28,10 @@ def _evidence(ref: str, value: object) -> EvidencePointer:
 
 class L1RuntimeBridge:
     """Translate typed calls to Runtime facts and immutable capability tasks."""
-    def __init__(self, runtime: Any, base_task: TaskSpec, factory: RTLToGDSFactory) -> None:
+    def __init__(self, runtime: Any, base_task: TaskSpec, factory: RTLToGDSFactory, *, cancel_port=None) -> None:
         base_task.validate(); factory.validate_task(base_task)
         self._runtime, self._base_task, self._factory = runtime, base_task, factory
+        self._cancel_port = cancel_port
 
     @staticmethod
     def _binding(goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> None:
@@ -104,10 +106,9 @@ class L1RuntimeBridge:
         labels = view.get("run", {}).get("task_spec", {}).get("labels", {})
         if labels.get("l1_goal_id") != goal.goal_id:
             raise ValueError("Runtime run is not owned by this DesignGoal")
-        request_cancel = getattr(self._runtime, "request_cancel", None)
-        if not callable(request_cancel):
+        if not callable(self._cancel_port):
             raise ValueError("Runtime does not expose controlled cancellation")
-        request_cancel(run_id)
+        self._cancel_port(run_id)
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
                            {"run_id": run_id, "action": "cancel_requested"}, (), None)
 
@@ -135,9 +136,7 @@ class L1RuntimeBridge:
             self._require_owned_run(goal, view)
         result: dict[str, Any] = {"run_ids": run_ids, "view": self._bounded(views)}
         if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
-            read = getattr(self._runtime, "read_artifact_excerpt", None)
-            if not callable(read): raise ValueError("Runtime does not expose controlled artifact reads")
-            result = {"run_id": run_ids[0], **read(run_ids[0], call.arguments["artifact_id"],
+            result = {"run_id": run_ids[0], **self._read_excerpt(views[run_ids[0]], call.arguments["artifact_id"],
                                                     offset=call.arguments.get("offset", 0), max_bytes=call.arguments["max_bytes"])}
         elif call.tool is ToolName.COMPARE_RUNS:
             metric_names = call.arguments["metrics"]
@@ -180,6 +179,18 @@ class L1RuntimeBridge:
     @staticmethod
     def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
         return {item["name"]: float(item["value"]) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ()) for item in attempt.get("metrics", ()) if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
+
+    @staticmethod
+    def _read_excerpt(view: Mapping[str, Any], artifact_id: str, *, offset: int, max_bytes: int) -> dict:
+        matches = [(attempt, artifact) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())
+                   for artifact in attempt.get("artifacts", ()) if artifact.get("artifact_id") == artifact_id]
+        if len(matches) != 1: raise ValueError("artifact is not registered in the specified Runtime run")
+        attempt, artifact = matches[0]; workspace = Path(attempt["workspace"]).resolve(); path = (workspace / artifact["store_key"]).resolve()
+        try: path.relative_to(workspace)
+        except ValueError as exc: raise ValueError("registered artifact escapes Runtime workspace") from exc
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != artifact["sha256"]: raise ValueError("registered artifact content hash mismatch")
+        return {"artifact_id": artifact_id, "sha256": artifact["sha256"], "offset": offset, "bytes": raw[offset:offset + max_bytes].decode("utf-8", errors="replace")}
 
     @staticmethod
     def _require_owned_run(goal: DesignGoal, view: Mapping[str, Any]) -> None:

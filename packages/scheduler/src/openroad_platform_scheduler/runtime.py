@@ -221,29 +221,6 @@ class WorkflowRuntime:
     def describe(self, run_id: str) -> dict:
         return self.store.describe_run(run_id)
 
-    def request_cancel(self, run_id: str) -> None:
-        """Expose cancellation as a Runtime authority, never as Store reach-through."""
-        self.store.request_cancel(run_id)
-
-    def read_artifact_excerpt(self, run_id: str, artifact_id: str, *, offset: int, max_bytes: int) -> dict:
-        """Read a registered attempt artifact after re-checking its content hash."""
-        view = self.describe(run_id)
-        matches = [(attempt, artifact) for stage in view["stages"] for attempt in stage["attempts"]
-                   for artifact in attempt["artifacts"] if artifact["artifact_id"] == artifact_id]
-        if len(matches) != 1:
-            raise ValueError("artifact is not registered in the specified Runtime run")
-        attempt, artifact = matches[0]
-        workspace = Path(attempt["workspace"]).resolve()
-        candidate = (workspace / artifact["store_key"]).resolve()
-        try:
-            candidate.relative_to(workspace)
-        except ValueError as exc:
-            raise ValueError("registered artifact escapes Runtime workspace") from exc
-        raw = candidate.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != artifact["sha256"]:
-            raise ValueError("registered artifact content hash mismatch")
-        return {"artifact_id": artifact_id, "sha256": artifact["sha256"], "offset": offset,
-                "bytes": raw[offset:offset + max_bytes].decode("utf-8", errors="replace")}
 
 
 class _LeasePulse:

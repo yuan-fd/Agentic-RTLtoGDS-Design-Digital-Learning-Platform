@@ -104,5 +104,6 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
     receipt = bridge.submit(goal, state, SemanticToolCall("call-smoke", "goal-1", "state-1", ToolName.RUN_FULL_FLOW, {}, "planner"))
     runtime.execute_once(receipt.result["run_id"])
-    excerpt = runtime.read_artifact_excerpt(receipt.result["run_id"], runtime.describe(receipt.result["run_id"])["stages"][0]["attempts"][0]["artifacts"][0]["artifact_id"], offset=0, max_bytes=64)
-    assert "bytes" in excerpt and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
+    artifact_id = runtime.describe(receipt.result["run_id"])["stages"][0]["attempts"][0]["artifacts"][0]["artifact_id"]
+    excerpt = bridge.execute(goal, state, SemanticToolCall("call-excerpt", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": receipt.result["run_id"], "artifact_id": artifact_id, "max_bytes": 64}, "planner"))
+    assert "bytes" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
