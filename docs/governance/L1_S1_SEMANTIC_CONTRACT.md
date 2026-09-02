@@ -54,6 +54,7 @@ or artifact migration is present. Roll back with the following newest-first
 commands (do not reset a dirty worktree):
 
 ```bash
+git revert --no-edit f390891
 git revert --no-edit 65b99df
 git revert --no-edit 683d008
 git revert --no-edit 264a544
