@@ -3,9 +3,24 @@
 Status: passed (bounded integration smoke; not a QoR superiority claim)
 Date: 2026-09-02
 
-Provenance status: historical working-tree smoke. It predates the final P2
-atomic commit and is not used as commit-level acceptance evidence; a clean
-worktree rerun is required before merge approval.
+Provenance status: the earlier working-tree smoke below is historical only.
+Commit-level acceptance is the clean-worktree rerun recorded in the next
+section.
+
+## Commit-level clean rerun
+
+- platform commit: `b1cfffa69476c4f4c108caf9c73b2dc62718c011`;
+- worktree: detached clean worktree at that exact commit (`git status
+  --porcelain` empty before execution);
+- output: `/tmp/openroad-platform-p2-clean-smoke.TwlV4o`;
+- elapsed time: 237.268 seconds; `accepted=true`; terminal status `succeeded`;
+- summary SHA-256:
+  `f95ec22199ee6ae52c3c8574cc46283991ce2558a6224645468258dfd5944494`;
+- all six ORFS stages succeeded; 19 artifact records were hash-verified;
+- shared toolchain before/after snapshot was equal;
+- focused clean-worktree regression after the run:
+  `tests/test_orfs_intake_gate.py`, `tests/test_orfs_plugin.py`, and
+  `tests/test_orfs_runner.py`: 15 passed.
 
 ## Runtime and toolchain
 
