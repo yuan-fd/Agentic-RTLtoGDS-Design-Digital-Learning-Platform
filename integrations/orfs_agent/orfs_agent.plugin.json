@@ -7,7 +7,7 @@
   "supported_arch": ["aarch64", "x86_64"],
   "input_schema": {
     "type": "object",
-    "required": ["design", "platform", "objective", "observations"]
+    "required": ["design", "platform", "objective", "observations", "parameter_domain"]
   },
   "output_schema": {
     "type": "object",

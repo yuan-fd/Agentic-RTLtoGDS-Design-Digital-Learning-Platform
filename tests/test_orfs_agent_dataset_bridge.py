@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from openroad_platform_contracts.platform import PluginManifest
+from openroad_platform_execution.orfs_agent_domain import ORFSAgentDomain
+from openroad_platform_execution.orfs_agent_task import build_orfs_agent_dataset_task
 
 
 ROOT = Path(__file__).parents[1]
@@ -53,6 +55,40 @@ def test_dataset_manifest_does_not_admit_an_optimizer_capability():
         "optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock", "report", "log"}
 
 
+def _domain() -> ORFSAgentDomain:
+    return ORFSAgentDomain.create(
+        platform="asap7", search_parameter_names=("core_utilization_pct", "enable_dpo"),
+        admissible_values={"core_utilization_pct": (40, 50), "enable_dpo": (0, 1)},
+        fixed_parameters={"tns_end_percent": 100, "global_placement_padding": 2,
+                          "detail_placement_padding": 1, "place_density_lb_addon": .2,
+                          "cts_cluster_size": 20, "cts_cluster_diameter": 90},
+    )
+
+
+def test_typed_domain_is_complete_and_keeps_timing_constraints_frozen():
+    domain = _domain().to_dict()
+    assert set(domain["search_parameter_names"]) | set(domain["fixed_parameters"]) == {
+        "core_utilization_pct", "tns_end_percent", "global_placement_padding",
+        "detail_placement_padding", "enable_dpo", "place_density_lb_addon",
+        "cts_cluster_size", "cts_cluster_diameter"}
+    assert domain["frozen_constraints"] == ["clock_period_ns", "clock_uncertainty", "io_delay"]
+    with pytest.raises(ValueError, match="padding relation"):
+        ORFSAgentDomain.create(platform="asap7", search_parameter_names=(
+            "core_utilization_pct", "global_placement_padding", "detail_placement_padding"),
+            admissible_values={"core_utilization_pct": (40, 50), "global_placement_padding": (1, 2),
+                               "detail_placement_padding": (0, 1)},
+            fixed_parameters={"tns_end_percent": 100, "enable_dpo": 1, "place_density_lb_addon": .2,
+                              "cts_cluster_size": 20, "cts_cluster_diameter": 90})
+
+
+def test_task_builder_carries_the_immutable_domain_not_an_optimizer_request():
+    task = build_orfs_agent_dataset_task(project_id="p5", design_id="ibex", objective="ECP_final",
+                                         observations=[{"parameters": {}, "metrics": {}}], domain=_domain(),
+                                         task_id="orfs-agent-domain-test")
+    assert task.inputs["parameter_domain"]["domain_sha256"]
+    assert task.expected_artifacts == ("optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock")
+
+
 def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch, tmp_path):
     source = tmp_path / "upstream"
     source.mkdir()
@@ -74,7 +110,7 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
             "design": "ibex", "platform": "asap7", "objective": "ECP_final", "observations": [{
                 "run_id": "run-001", "parameters": {"clock_period_ns": 1.0},
                 "metrics": {"setup_wns_ns": -.1}, "artifact_refs": ["runtime:run-001:qor"], "feasible": True,
-            }],
+            }], "parameter_domain": _domain().to_dict(),
         },
     }}), encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["bridge", "--request", str(request), "--result", str(result)])

@@ -125,10 +125,19 @@ def main() -> int:
             raise ValueError("task inputs must be an object")
         design, platform, objective = (str(inputs.get(name) or "") for name in ("design", "platform", "objective"))
         observations = inputs.get("observations")
+        parameter_domain = inputs.get("parameter_domain")
         if not design or not platform or not objective or not isinstance(observations, list) or not observations:
             raise ValueError("design, platform, objective, and non-empty observations are required")
         if not all(isinstance(item, Mapping) for item in observations):
             raise ValueError("observations must be objects")
+        if not isinstance(parameter_domain, Mapping) or parameter_domain.get("platform") != platform:
+            raise ValueError("a typed parameter_domain for the requested platform is required")
+        expected_domain_hash = parameter_domain.get("domain_sha256")
+        domain_without_hash = {key: value for key, value in parameter_domain.items() if key != "domain_sha256"}
+        actual_domain_hash = hashlib.sha256(json.dumps(
+            domain_without_hash, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if not isinstance(expected_domain_hash, str) or expected_domain_hash != actual_domain_hash:
+            raise ValueError("parameter_domain hash is invalid")
         upstream = _checked_source(_load_lock())
         rows = [_row(item, design=design, platform=platform) for item in observations]
         workspace = args.result.parent
@@ -138,6 +147,7 @@ def main() -> int:
         _write(manifest, {"schema_version": 1, "kind": "orfs-agent-dataset-bridge", "task_id": task["task_id"],
                           "design": design, "platform": platform, "objective": objective, "record_count": len(rows),
                           "dataset_sha256": _sha256(dataset), "upstream": upstream,
+                          "parameter_domain": dict(parameter_domain),
                           "preserved_fields": ["platform_observation_id", "platform_artifact_refs", "platform_feasible"]})
         _write(source_lock, _load_lock())
         artifacts = [{"kind": "optimizer_dataset", "path": dataset.name},
