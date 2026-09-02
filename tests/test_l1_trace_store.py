@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 from pathlib import Path
 
@@ -38,4 +40,22 @@ def test_store_rejects_non_append_and_tampered_event(tmp_path: Path) -> None:
     with sqlite3.connect(database) as connection:
         connection.execute("UPDATE l1_trace_event SET event_json = ?", ("{}",))
     with pytest.raises(ValueError, match="digest mismatch"):
+        store.read("trace-1")
+
+
+@pytest.mark.parametrize("column", ["event_json", "parent_event_id", "sequence"])
+def test_store_rejects_rehashed_or_relinked_history(tmp_path: Path, column: str) -> None:
+    database = tmp_path / "trace.sqlite"; store = L1TraceStore(database)
+    store.append(_event(0, None)); store.append(_event(1, "event-0"))
+    with sqlite3.connect(database) as connection:
+        if column == "event_json":
+            replacement = _event(0, None).to_dict(); replacement["facts"] = {"wns": 99.0}
+            payload = json.dumps(replacement, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+            digest = hashlib.sha256(("\n" + payload).encode("utf-8")).hexdigest()
+            connection.execute("UPDATE l1_trace_event SET event_json=?, event_sha256=? WHERE sequence=0", (payload, digest))
+        elif column == "parent_event_id":
+            connection.execute("UPDATE l1_trace_event SET parent_event_id=? WHERE sequence=1", ("wrong-parent",))
+        else:
+            connection.execute("UPDATE l1_trace_event SET sequence=? WHERE sequence=1", (7,))
+    with pytest.raises(ValueError):
         store.read("trace-1")

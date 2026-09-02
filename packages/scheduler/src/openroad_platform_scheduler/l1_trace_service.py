@@ -14,6 +14,7 @@ from openroad_platform_contracts.l1_observation import RuntimeObservation
 from openroad_platform_contracts.l1_trace import L1TraceEvent, TraceEventKind
 
 from .l1_trace_store import L1TraceStore
+from .l1_state_reducer import L1StateReducer
 
 
 def _hash(value: object) -> str:
@@ -71,6 +72,9 @@ class L1TraceService:
 
     def record_policy(self, trace_id: str, state: DesignState, call: SemanticToolCall, *, verdict: str,
                       summary: str) -> L1TraceEvent:
+        state.validate(); call.validate()
+        if call.goal_id != state.goal_id or call.state_id != state.state_id:
+            raise ValueError("policy call does not match trace state")
         if verdict not in {"allow", "deny", "needs_clarification"}:
             raise ValueError("trace policy verdict is unsupported")
         return self._append(trace_id, kind=TraceEventKind.POLICY_DECIDED, goal_id=state.goal_id,
@@ -89,9 +93,13 @@ class L1TraceService:
 
     def record_observation(self, trace_id: str, before: DesignState, after: DesignState,
                            observation: RuntimeObservation) -> L1TraceEvent:
+        before.validate(); after.validate()
         observation.validate()
         if after.parent_state_id != before.state_id or after.goal_id != before.goal_id:
             raise ValueError("observation state lineage is invalid")
+        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
+        if after != expected:
+            raise ValueError("observation successor state is not the canonical reducer result")
         return self._append(trace_id, kind=TraceEventKind.STATE_TRANSITION, goal_id=before.goal_id,
                             state_before=before, state_after=after, facts={"run_id": observation.run_id,
                             "attempt_id": observation.attempt_id, "terminal_status": observation.terminal_status,
