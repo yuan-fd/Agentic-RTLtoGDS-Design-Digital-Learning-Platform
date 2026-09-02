@@ -7,7 +7,8 @@ GP/EI, measure QoR, or support a performance claim.
 
 ## Immutable identities
 
-- Platform commit: `90671899653bdb746170185bed023dfc32d2a7cd`
+- Platform implementation commit exercised: `90671899653bdb746170185bed023dfc32d2a7cd`
+- Evidence-record commit: `bd4c4feb466928e4c8c182b8f86b6c2f4aedcbf3`
 - Upstream: `https://github.com/ABKGroup/ORFS-Agent.git`
 - Upstream commit: `730f1fa11f9c17c0aaac332412af2b2538f42e9b`
 - Upstream source state before/after: clean detached checkout (empty porcelain
