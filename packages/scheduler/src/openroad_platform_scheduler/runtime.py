@@ -221,6 +221,10 @@ class WorkflowRuntime:
     def describe(self, run_id: str) -> dict:
         return self.store.describe_run(run_id)
 
+    def request_cancel(self, run_id: str) -> None:
+        """Expose cancellation as a Runtime authority, never as Store reach-through."""
+        self.store.request_cancel(run_id)
+
 
 class _LeasePulse:
     def __init__(

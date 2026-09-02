@@ -15,6 +15,7 @@ from openroad_platform_contracts.l1_observation import RuntimeObservation
 from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_contracts.platform import TaskSpec
 from openroad_platform_contracts.task_factory import RTLToGDSFactory
+from .l1_semantic_policy import L1SemanticToolPolicy
 
 
 def _evidence(ref: str, value: object) -> EvidencePointer:
@@ -30,9 +31,7 @@ class L1RuntimeBridge:
 
     @staticmethod
     def _binding(goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> None:
-        goal.validate(); state.validate(); call.validate()
-        if state.goal_id != goal.goal_id or call.goal_id != goal.goal_id or call.state_id != state.state_id:
-            raise ValueError("call does not bind the supplied goal/state")
+        L1SemanticToolPolicy.validate(goal, state, call)
 
     @staticmethod
     def supported_tools() -> frozenset[ToolName]:
@@ -58,7 +57,7 @@ class L1RuntimeBridge:
             parameters["target_stage"] = stage
         task = dataclasses.replace(self._base_task, task_id=f"l1-{call.call_id}", parameters=parameters,
                                    labels={**self._base_task.labels, "l1_goal_id": goal.goal_id, "l1_call_id": call.call_id})
-        task.validate()
+        task.validate(); self._factory.validate_task(task)
         run = self._runtime.submit(task, capability=self._factory.capability)
         run_id = getattr(run, "run_id", None)
         if not isinstance(run_id, str) or not run_id:
@@ -95,10 +94,10 @@ class L1RuntimeBridge:
         run_id = call.arguments.get("run_id")
         if call.tool is not ToolName.STOP_OR_ESCALATE or not isinstance(run_id, str) or not run_id:
             raise ValueError("stop_or_escalate requires a Runtime run_id")
-        store = getattr(self._runtime, "store", None)
-        if store is None or not hasattr(store, "request_cancel"):
+        request_cancel = getattr(self._runtime, "request_cancel", None)
+        if not callable(request_cancel):
             raise ValueError("Runtime does not expose controlled cancellation")
-        store.request_cancel(run_id)
+        request_cancel(run_id)
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
                            {"run_id": run_id, "action": "cancel_requested"}, (), None)
 
@@ -122,12 +121,24 @@ class L1RuntimeBridge:
         if not run_ids:
             raise ValueError("Runtime read tool requires a typed run identifier")
         views = {run_id: self._runtime.describe(run_id) for run_id in run_ids}
+        result: dict[str, Any] = {"run_ids": run_ids, "view": self._bounded(views)}
+        if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
+            artifact_id = call.arguments["artifact_id"]
+            artifacts = [artifact for stage in views[run_ids[0]].get("stages", ()) for attempt in stage.get("attempts", ()) for artifact in attempt.get("artifacts", ()) if artifact.get("artifact_id") == artifact_id]
+            if len(artifacts) != 1: raise ValueError("artifact is not registered in the specified Runtime run")
+            result = {"run_id": run_ids[0], "artifact": artifacts[0], "offset": call.arguments.get("offset", 0), "max_bytes": call.arguments["max_bytes"], "excerpt_available": False}
+        elif call.tool is ToolName.COMPARE_RUNS:
+            metric_names = call.arguments["metrics"]
+            summary = {run_id: self._metrics(view) for run_id, view in views.items()}
+            result = {"left_run_id": run_ids[0], "right_run_id": run_ids[1], "metrics": {name: {run_id: summary[run_id].get(name) for run_id in run_ids} for name in metric_names}}
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
-                           {"run_ids": run_ids, "view": self._bounded(views)},
+                           result,
                            tuple(_evidence(f"runtime:{run_id}", view) for run_id, view in views.items()))
 
     def observation(self, run_id: str) -> RuntimeObservation:
         view = self._runtime.describe(run_id); run = view["run"]
+        if run.get("status") not in {"succeeded", "failed", "cancelled", "timed_out", "lost"}:
+            raise ValueError("Runtime observation requires a terminal run")
         attempts = [attempt for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())]
         if not attempts:
             raise ValueError("Runtime run has no attempt observation")
@@ -142,3 +153,7 @@ class L1RuntimeBridge:
     @staticmethod
     def _bounded(value: Mapping[str, Any]) -> dict[str, Any]:
         return {key: value[key] for key in sorted(value)[:8]}
+
+    @staticmethod
+    def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
+        return {item["name"]: float(item["value"]) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ()) for item in attempt.get("metrics", ()) if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}

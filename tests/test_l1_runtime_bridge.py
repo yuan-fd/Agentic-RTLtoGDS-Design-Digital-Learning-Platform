@@ -9,7 +9,9 @@ from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge
 
 
 class _Runtime:
+    def __init__(self): self.cancelled = []
     def submit(self, task, *, capability): self.task, self.capability = task, capability; return SimpleNamespace(run_id="run-1")
+    def request_cancel(self, run_id): self.cancelled.append(run_id)
     def describe(self, run_id): return {"run": {"status": "succeeded"}, "stages": [{"stage_key": "route", "successful_attempt_id": "attempt-1", "attempts": [{"attempt_id": "attempt-1", "metrics": [{"name": "setup_wns_ns", "value": -0.1}], "artifacts": [{"artifact_id": "report-1"}]}]}]}
 
 
@@ -34,3 +36,15 @@ def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_cont
     assert patch.result["parameter_patch"]["core_utilization_pct"] == 30
     assert not hasattr(bridge, "_experiments") and not hasattr(bridge, "_states")
     assert bridge.supported_tools() == TUTORIAL_L1_TOOLS
+
+
+def test_runtime_bridge_enforces_goal_policy_and_runtime_artifact_read_contract(tmp_path):
+    import pytest
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime(); bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    goal = DesignGoal("goal-1", "p1", "top", "nangate45", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("core_utilization_pct",), AgentBudget(2, 2, 60), allowed_tools=(ToolName.QUERY_TIMING, ToolName.QUERY_ARTIFACT_EXCERPT))
+    state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
+    with pytest.raises(ValueError, match="not allowed"):
+        bridge.execute(goal, state, SemanticToolCall("call-4", "goal-1", "state-1", ToolName.GET_DESIGN_SUMMARY, {}, "planner"))
+    with pytest.raises(ValueError, match="registered"):
+        bridge.execute(goal, state, SemanticToolCall("call-5", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": "run-1", "artifact_id": "wrong", "max_bytes": 10}, "planner"))
