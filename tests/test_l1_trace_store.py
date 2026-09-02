@@ -17,7 +17,7 @@ def _event(sequence: int, parent: str | None) -> L1TraceEvent:
     return L1TraceEvent(
         trace_id="trace-1", event_id=f"event-{sequence}", sequence=sequence,
         parent_event_id=parent, kind=TraceEventKind.TOOL_RECEIPT, goal_id="goal-1",
-        occurred_at="2026-09-02T12:00:00+00:00", state_before_sha256="a" * 64,
+        occurred_at="2026-09-02T12:00:00+00:00", state_before_sha256=("a" if sequence == 0 else "b") * 64,
         state_after_sha256="b" * 64, planner_summary="Read verified timing.",
         tool=ToolName.QUERY_TIMING, policy_verdict="allow", facts={"wns": -0.1},
         hypotheses={}, evidence=(EvidencePointer("artifact:timing", "c" * 64),),
@@ -41,6 +41,14 @@ def test_store_rejects_non_append_and_tampered_event(tmp_path: Path) -> None:
         connection.execute("UPDATE l1_trace_event SET event_json = ?", ("{}",))
     with pytest.raises(ValueError, match="digest mismatch"):
         store.read("trace-1")
+
+
+def test_store_rejects_state_hash_discontinuity(tmp_path: Path) -> None:
+    store = L1TraceStore(tmp_path / "trace.sqlite")
+    store.append(_event(0, None))
+    broken = L1TraceEvent(**{**_event(1, "event-0").__dict__, "state_before_sha256": "c" * 64})
+    with pytest.raises(ValueError, match="state does not continue"):
+        store.append(broken)
 
 
 @pytest.mark.parametrize("column", ["event_json", "parent_event_id", "sequence"])

@@ -59,7 +59,7 @@ class L1TraceStore:
         payload = _canonical(event)
         with self._connect() as connection:
             last = connection.execute(
-                "SELECT event_id, sequence, event_sha256 FROM l1_trace_event WHERE trace_id = ? ORDER BY sequence DESC LIMIT 1",
+                "SELECT event_id, sequence, event_sha256, event_json FROM l1_trace_event WHERE trace_id = ? ORDER BY sequence DESC LIMIT 1",
                 (event.trace_id,),
             ).fetchone()
             if last is None:
@@ -70,6 +70,9 @@ class L1TraceStore:
                     raise ValueError("trace event sequence is not append-only")
                 if event.parent_event_id != last["event_id"]:
                     raise ValueError("trace event parent does not match previous event")
+                predecessor_event = L1TraceEvent.from_dict(json.loads(last["event_json"]))
+                if event.state_before_sha256 is not None and predecessor_event.state_after_sha256 is not None and event.state_before_sha256 != predecessor_event.state_after_sha256:
+                    raise ValueError("trace event state does not continue predecessor state")
             predecessor = last["event_sha256"] if last is not None else None
             digest = _digest(payload, predecessor)
             try:
@@ -102,6 +105,8 @@ class L1TraceStore:
             event = L1TraceEvent.from_dict(json.loads(row["event_json"]))
             if event.event_id != row["event_id"] or event.sequence != row["sequence"] or event.parent_event_id != row["parent_event_id"]:
                 raise ValueError("stored L1 trace event columns disagree with payload")
+            if previous is not None and event.state_before_sha256 is not None and previous.state_after_sha256 is not None and event.state_before_sha256 != previous.state_after_sha256:
+                raise ValueError("stored L1 trace event state does not continue predecessor state")
             result.append(event)
             previous = event
             previous_digest = row["event_sha256"]
