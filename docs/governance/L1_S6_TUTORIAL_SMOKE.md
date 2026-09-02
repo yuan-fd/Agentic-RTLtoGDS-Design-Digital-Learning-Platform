@@ -40,5 +40,6 @@ The captured artifact directory contains `RESULT.txt` and `MANIFEST.sha256`
 with terminal status and file hashes.  Runtime, protected evaluator, external
 optimizer algorithms, RTL/PDK/SDC and historical evidence are unchanged.
 
-Rollback: run `git revert fdcf8a9`, then `git revert ae28c14`.  It has no
-database schema migration and no external side effect.
+Rollback: run `git revert aabd838`, then `git revert fdcf8a9`, then
+`git revert ae28c14`.  It has no database schema migration and no external
+side effect.
