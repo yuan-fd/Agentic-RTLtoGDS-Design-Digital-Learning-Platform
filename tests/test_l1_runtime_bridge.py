@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 import platform
 import sys
+import threading
+import time
 from pathlib import Path
 
 from openroad_platform_contracts.agent_control import AgentBudget, DesignGoal, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
@@ -126,3 +128,31 @@ def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):
     runtime.execute_once(plan["run_id"])
     successor=loop.observe("trace-loop",state,plan["plan_id"],next_state_id="state-2")
     assert successor.diagnosis["runtime_run_id"] == plan["run_id"]
+
+
+def test_durable_loop_stop_observes_runtime_cancellation_and_traces_stopped(tmp_path):
+    fixture = Path(__file__).parent / "fixtures" / "sleep_adapter.py"
+    manifest = PluginManifest("sleeper", "1.0.0", (sys.executable, str(fixture)), ("eda.rtl_to_gds",), (platform.machine(),),
+                              {"type": "object"}, {"type": "object"}, (), 40)
+    store = RuntimeStore(tmp_path / "runtime.sqlite")
+    runtime = WorkflowRuntime(store, PluginRegistry([manifest]), workspace_root=tmp_path / "work",
+                              adapter=ProcessAdapter(ProcessGuardian(poll_interval=0.01, terminate_grace=0.1)))
+    task = TaskSpec("sleep-base", "p1", "top", plugin_id="sleeper", inputs={}, timeout_seconds=35,
+                    labels={"l1_goal_id": "goal-1"})
+    run = runtime.submit(task, capability="eda.rtl_to_gds")
+    worker = threading.Thread(target=runtime.execute_once, args=(run.run_id,)); worker.start()
+    deadline = time.monotonic() + 2
+    while not store.list_attempts(store.list_stages(run.run_id)[0].stage_run_id):
+        if time.monotonic() >= deadline: raise AssertionError("Runtime did not start attempt")
+        time.sleep(0.01)
+    bridge = L1RuntimeBridge(runtime, task, _FixtureFactory(), cancel_port=store.request_cancel)
+    policy = TrustedPolicyIdentity("policy-1","v1","platform",EvidencePointer("artifact:policy","d"*64))
+    goal = DesignGoal("goal-1","p1","top","platform-1","pdk-1","toolchain-1",EvidencePointer("artifact:rtl","a"*64),GoalPreference.BALANCED,(QoRConstraint("setup_wns_ns",">=",0),),("route",),("density",),AgentBudget(2,2,60),allowed_tools=(ToolName.STOP_OR_ESCALATE,),labels={"l1_policy_id":"policy-1","l1_policy_version":"v1","l1_policy_issuer":"platform","l1_policy_provenance":"artifact:policy","l1_policy_provenance_sha256":"d"*64})
+    state = DesignState("state-1","goal-1",0,"running",None,{},AgentBudget(2,2,60))
+    trace = L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")); trace.record_goal("trace-stop", goal)
+    loop = L1DurableLoop(L1LoopStore(tmp_path / "loop.sqlite"), bridge, trace)
+    plan = loop.plan_validate_execute("trace-stop", goal, state, SemanticToolCall("call-stop","goal-1","state-1",ToolName.STOP_OR_ESCALATE,{"run_id":run.run_id,"reason":"bounded smoke cancellation"},"planner"), policy, planner_summary="stop bounded run")
+    worker.join(timeout=3); assert not worker.is_alive()
+    successor = loop.observe("trace-stop", state, plan["plan_id"], next_state_id="state-2")
+    assert successor.status == "stopped"
+    assert [event.kind.value for event in trace.store.read("trace-stop")][-2:] == ["state_transition", "stopped"]

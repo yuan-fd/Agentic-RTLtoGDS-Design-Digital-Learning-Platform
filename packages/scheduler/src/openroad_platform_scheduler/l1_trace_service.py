@@ -162,3 +162,18 @@ class L1TraceService:
         )
         self.store.append_state_transition(event, before=before, after=after, observation=observation)
         return event
+
+    def record_stopped(self, trace_id: str, state: DesignState, *, run_id: str, reason: str) -> L1TraceEvent:
+        """Record the terminal cancellation fact after Runtime observation.
+
+        This is not a model conclusion: it is a durable projection of the
+        Runtime terminal fact and the typed user/agent stop reason.
+        """
+        if state.status != "stopped":
+            raise ValueError("STOPPED trace fact requires a cancelled Runtime successor")
+        if not isinstance(run_id, str) or not run_id or not isinstance(reason, str) or not reason.strip():
+            raise ValueError("stopped trace fact is invalid")
+        self._require_current_state(trace_id, state)
+        return self._append(trace_id, kind=TraceEventKind.STOPPED, goal_id=state.goal_id,
+                            state_before=state, state_after=state,
+                            facts={"run_id": run_id, "reason": reason}, evidence=state.evidence)

@@ -15,7 +15,9 @@ class L1StateReducer:
         observation.validate()
         if state.status in {"failed", "stopped", "completed"}:
             raise ValueError("terminal DesignState cannot be advanced")
-        next_status = "observed" if observation.terminal_status == "succeeded" else "failed"
+        next_status = ("observed" if observation.terminal_status == "succeeded"
+                       else "stopped" if observation.terminal_status == "cancelled"
+                       else "failed")
         result = replace(
             state, state_id=next_state_id, parent_state_id=state.state_id,
             revision=state.revision + 1, status=next_status,

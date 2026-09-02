@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "plugin": {
+    "plugin_id": "sleeper",
+    "plugin_version": "1.0.0"
+  },
+  "task": {
+    "task_id": "sleep-base",
+    "project_id": "p1",
+    "design_id": "top",
+    "plugin_id": "sleeper",
+    "workflow_id": null,
+    "inputs": {},
+    "parameters": {},
+    "resources": {},
+    "timeout_seconds": 35,
+    "max_attempts": 1,
+    "expected_artifacts": [],
+    "labels": {
+      "l1_goal_id": "goal-1"
+    },
+    "schema_version": 1
+  }
+}

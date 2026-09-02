@@ -1,0 +1,7 @@
+S4 bounded Runtime smoke: PASS
+
+2026-09-03: two real WorkflowRuntime → ProcessAdapter smokes passed.
+- durable submit / execute / observe: Runtime terminal status succeeded
+- controlled cancellation / observe: Runtime terminal status cancelled; L1 state stopped; trace ends STATE_TRANSITION, STOPPED
+
+This is integration evidence, not a QoR or optimizer-quality claim.

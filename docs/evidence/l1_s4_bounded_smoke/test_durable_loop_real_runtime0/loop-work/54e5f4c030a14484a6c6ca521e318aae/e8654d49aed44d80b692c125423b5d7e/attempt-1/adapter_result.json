@@ -1,0 +1,1 @@
+{"schema_version": 1, "status": "succeeded", "exit_code": 0, "started_at": "2026-09-02T16:51:42.883438+00:00", "ended_at": "2026-09-02T16:51:42.887582+00:00", "metrics": [{"name": "messages", "value": 1, "unit": "count"}], "artifacts": [{"kind": "report", "path": "report.json"}], "failure": null, "provenance": {"adapter": "echo-fixture"}}
