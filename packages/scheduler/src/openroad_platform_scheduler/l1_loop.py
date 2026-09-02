@@ -13,7 +13,7 @@ class L1DurableLoop:
         self.store, self.bridge, self.trace = store, bridge, trace
     def plan_validate_execute(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall, policy: TrustedPolicyIdentity, *, planner_summary: str) -> dict:
         L1SemanticToolPolicy.validate(goal, state, call)
-        plan_id = f"plan-{uuid4().hex}"; self.store.propose(plan_id, goal.goal_id, state.state_id, call.to_dict())
+        plan_id = f"plan-{uuid4().hex}"; self.store.propose(plan_id, trace_id, goal.goal_id, state.state_id, call.to_dict())
         self.trace.record_call(trace_id, state, call, planner_summary=planner_summary)
         self.trace.record_policy(trace_id, goal, state, call, policy, verdict="allow", summary="typed policy accepted call")
         receipt = self.bridge.execute(goal, state, call); self.trace.record_receipt(trace_id, state, receipt)
@@ -22,5 +22,5 @@ class L1DurableLoop:
     def observe(self, trace_id: str, state: DesignState, plan_id: str, *, next_state_id: str) -> DesignState:
         plan = self.store.get(plan_id)
         if plan["status"] != "submitted" or not plan["run_id"]: raise ValueError("plan has no Runtime submission to observe")
-        if plan["state_id"] != state.state_id: raise ValueError("plan does not bind current state")
+        if plan["trace_id"] != trace_id or plan["goal_id"] != state.goal_id or plan["state_id"] != state.state_id: raise ValueError("plan does not bind current trace/goal/state")
         return self.bridge.reduce_and_trace(self.trace, trace_id, state, run_id=plan["run_id"], next_state_id=next_state_id)
