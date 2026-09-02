@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from openroad_platform_contracts import RuntimeStatus, TaskSpec
+from openroad_platform_contracts.protected_evaluation import ProtectedEvaluator
 from openroad_platform_execution import PluginRegistry, ProcessAdapter
 
 from .runtime_store import RuntimeRun, RuntimeStore
@@ -27,6 +28,7 @@ class WorkflowRuntime:
         worker_id: str | None = None,
         lease_seconds: int = 30,
         environment_resolver: Callable[[RuntimeRun], dict[str, str]] | None = None,
+        protected_evaluator: ProtectedEvaluator | None = None,
     ):
         if lease_seconds <= 0:
             raise ValueError("lease_seconds must be positive")
@@ -38,6 +40,7 @@ class WorkflowRuntime:
         self.worker_id = worker_id or f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
         self.lease_seconds = lease_seconds
         self.environment_resolver = environment_resolver
+        self.protected_evaluator = protected_evaluator
 
     def submit(
         self,
@@ -109,7 +112,18 @@ class WorkflowRuntime:
                 environment=environment,
             )
             if execution.result.status is RuntimeStatus.SUCCEEDED:
-                self.store.register_artifacts(attempt.attempt_id, execution.artifacts)
+                evaluator_artifacts: tuple[dict, ...] = ()
+                if self.protected_evaluator is not None:
+                    evaluator_artifacts = self.adapter.validate_additional_artifacts(
+                        workspace, manifest,
+                        self.protected_evaluator.evaluate(
+                            manifest=manifest, task=run.task_spec,
+                            workspace=str(workspace),
+                        ),
+                    )
+                self.store.register_artifacts(
+                    attempt.attempt_id, (*execution.artifacts, *evaluator_artifacts)
+                )
                 self.store.register_metrics(attempt.attempt_id, execution.result.metrics)
             self.store.finish_attempt(
                 attempt.attempt_id,
