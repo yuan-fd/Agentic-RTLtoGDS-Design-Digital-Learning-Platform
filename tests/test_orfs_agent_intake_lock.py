@@ -14,6 +14,11 @@ def test_orfs_agent_intake_lock_pins_source_license_and_execution_boundary():
     assert source["repository"] == "https://github.com/ABKGroup/ORFS-Agent.git"
     assert source["commit"] == "730f1fa11f9c17c0aaac332412af2b2538f42e9b"
     assert source["license"] == "BSD-3-Clause"
+    assert source["redistribution_conclusion"].startswith("Green:")
+    assert source["maintainer_identity"].startswith("ABKGroup")
+    assert source["architecture_needs"] == ["x86_64", "aarch64"]
+    assert source["network_and_credential_needs"].startswith("Dataset bridge:")
+    assert source["adapter_boundary"]["source_access"].startswith("Explicit clean detached")
     assert source["integration_class"] == "external-source-with-runtime-adapter"
     assert source["cache_path_status"].startswith("source-audit cache")
     assert source["execution_source_policy"].startswith("Runtime must receive")

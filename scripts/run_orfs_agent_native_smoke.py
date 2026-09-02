@@ -18,6 +18,8 @@ from pathlib import Path
 
 
 COMMIT = "730f1fa11f9c17c0aaac332412af2b2538f42e9b"
+ROOT = Path(__file__).resolve().parents[1]
+LOCK_PATH = ROOT / "integrations/orfs_agent/source.lock.json"
 
 
 def _sha256(path: Path) -> str:
@@ -32,6 +34,23 @@ def _command(*args: str) -> str:
     return completed.stdout.strip()
 
 
+def _require_admitted_source(source: Path) -> None:
+    lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    audit_cache = (ROOT / str(lock["cache_path"])).resolve()
+    if source == audit_cache:
+        raise ValueError("source-audit cache is not an admitted execution source")
+    if _command("git", "-C", str(source), "rev-parse", "HEAD") != COMMIT:
+        raise ValueError("source commit does not match the admitted lock")
+    branch = subprocess.run(
+        ("git", "-C", str(source), "symbolic-ref", "-q", "--short", "HEAD"),
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if branch.returncode == 0:
+        raise ValueError("native smoke requires a detached source checkout")
+    if _command("git", "-C", str(source), "status", "--porcelain=v1", "--untracked-files=all"):
+        raise ValueError("native smoke requires a clean detached source checkout")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
@@ -41,16 +60,15 @@ def main() -> int:
     workbench_dir = source / "AutoTuner-integration/ORFS-with-AutoTuner"
     if args.output.exists():
         raise FileExistsError(args.output)
-    if _command("git", "-C", str(source), "rev-parse", "HEAD") != COMMIT:
-        raise ValueError("source commit does not match the admitted lock")
-    if _command("git", "-C", str(source), "status", "--porcelain=v1", "--untracked-files=all"):
-        raise ValueError("native smoke requires a clean detached source checkout")
+    _require_admitted_source(source)
     if os.environ.get("ANTHROPIC_API_KEY"):
         raise ValueError("native smoke must not receive an Anthropic credential")
     if not (workbench_dir / "analyst_agent_workbench.py").is_file():
         raise FileNotFoundError("upstream workbench is missing")
 
     # The unmodified upstream function reads constraints.json from CWD.
+    sys.dont_write_bytecode = True
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
     os.chdir(workbench_dir)
     sys.path.insert(0, str(workbench_dir))
     import numpy as np
@@ -80,6 +98,7 @@ def main() -> int:
     suggestions = result.get("suggested_configurations") if isinstance(result, dict) else None
     if not isinstance(suggestions, list) or len(suggestions) != 1:
         raise RuntimeError(f"upstream GP/EI produced no suggestion: {result!r}")
+    _require_admitted_source(source)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({
         "schema_version": 1,

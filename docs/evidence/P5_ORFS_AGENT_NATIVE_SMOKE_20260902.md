@@ -7,11 +7,11 @@ Command (with no Anthropic credential):
 ```bash
 env -u ANTHROPIC_API_KEY .tools/venvs/orfs-agent/bin/python \
   scripts/run_orfs_agent_native_smoke.py \
-  --source /tmp/orfs-agent-p5-source.EJSdUC/repo \
-  --output /tmp/orfs-agent-native-smoke.LYNb5z.json
+  --source /tmp/orfs-agent-native-clean.PiTzoI \
+  --output /tmp/orfs-agent-native-final.yesymY.json
 ```
 
-The source was a clean detached checkout at
+The source was a clean detached checkout before and after execution at
 `730f1fa11f9c17c0aaac332412af2b2538f42e9b`; its BSD-3-Clause license SHA-256
 was `243601633b171278cd98f9ea495cbfc74aad9d7fc062c6e7c81e20d1fc44a22f`.
 The upstream `analyst_agent_workbench.py` hash was

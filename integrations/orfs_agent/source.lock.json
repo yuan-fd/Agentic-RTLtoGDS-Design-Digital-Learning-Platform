@@ -8,6 +8,15 @@
   "cache_path_status": "source-audit cache only; never an admitted execution source",
   "execution_source_policy": "Runtime must receive an explicit clean detached checkout at this commit; untracked files, a branch checkout, or a cache-only path are rejected.",
   "license": "BSD-3-Clause",
+  "redistribution_conclusion": "Green: BSD-3-Clause permits this internal adapter integration; upstream source is not vendored or redistributed.",
+  "maintainer_identity": "ABKGroup / ORFS-Agent upstream project on GitHub",
+  "architecture_needs": ["x86_64", "aarch64"],
+  "network_and_credential_needs": "Dataset bridge: no network or credential. Native GP/EI smoke: no network or credential. Full upstream launcher/Anthropic path: denied.",
+  "adapter_boundary": {
+    "input": "Typed Runtime observations plus design/platform/objective and an explicitly complete allowlisted parameter domain.",
+    "output": "Dataset, input manifest, source lock, and—only in native mode—upstream candidate/trace artifacts declared to Runtime.",
+    "source_access": "Explicit clean detached checkout only; source-audit cache is never executable."
+  },
   "paper": {
     "title": "ORFS-Agent: Tool-Using Agents for Chip Design Optimization",
     "venue": "MLCAD 2025",
