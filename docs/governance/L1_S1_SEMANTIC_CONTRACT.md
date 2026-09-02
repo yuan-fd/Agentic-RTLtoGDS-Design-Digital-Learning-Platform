@@ -54,6 +54,7 @@ or artifact migration is present. Roll back with the following newest-first
 commands (do not reset a dirty worktree):
 
 ```bash
+git revert --no-edit 65b99df
 git revert --no-edit 683d008
 git revert --no-edit 264a544
 git revert --no-edit c4c0729
@@ -62,3 +63,6 @@ git revert --no-edit f6ce287
 git revert --no-edit 3df763d
 git revert --no-edit 2697f71
 ```
+
+`5c3639f` and `6551e45` are L1-S2 trace commits and are intentionally outside
+this S1 rollback sequence.

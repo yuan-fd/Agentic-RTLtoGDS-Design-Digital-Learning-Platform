@@ -29,11 +29,10 @@ def test_registry_requires_all_and_only_tutorial_tools() -> None:
 
 def test_definition_rejects_shell_surface() -> None:
     definition = _definition(ToolName.RUN_STAGE)
-    with pytest.raises(ValueError, match="forbidden executable"):
-        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"shell": "string"}}).validate()
-    with pytest.raises(ValueError, match="forbidden executable"):
-        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": {"shell_command": "string"}}}).validate()
-    with pytest.raises(ValueError, match="forbidden executable"):
-        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"shellCommand": "string"}}).validate()
-    with pytest.raises(ValueError, match="forbidden executable"):
-        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": [{"credentialToken": "string"}]}}).validate()
+    forbidden = (
+        "shell", "shell_command", "shellCommand", "cmd", "exec", "program", "argv",
+        "credentialToken", "privateKey", "secret", "authorization", "accessKey",
+    )
+    for key in forbidden:
+        with pytest.raises(ValueError, match="forbidden executable"):
+            SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": [[{key: "string"}]]}}).validate()

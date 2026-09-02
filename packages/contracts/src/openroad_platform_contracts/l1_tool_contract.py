@@ -19,8 +19,9 @@ TUTORIAL_L1_TOOLS = frozenset({
 
 
 _FORBIDDEN_SCHEMA_TERMS = frozenset({
-    "command", "shell", "script", "executable", "path", "cwd", "env",
-    "environment", "credential", "api_key", "token", "password",
+    "command", "cmd", "shell", "script", "executable", "exec", "program", "argv",
+    "path", "cwd", "env", "environment", "credential", "api_key", "access_key",
+    "private_key", "secret", "authorization", "token", "password",
 })
 
 
@@ -44,12 +45,15 @@ def _schema(name: str, value: Mapping[str, Any]) -> None:
         forbidden_compact = {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS}
         if snake_case in _FORBIDDEN_SCHEMA_TERMS or compact in forbidden_compact or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
             raise ValueError(f"{name} contains forbidden executable field {key!r}")
-        if isinstance(item, Mapping):
-            _schema(name, item)
-        elif isinstance(item, (tuple, list)):
-            for child in item:
-                if isinstance(child, Mapping):
-                    _schema(name, child)
+        _schema_value(name, item)
+
+
+def _schema_value(name: str, value: Any) -> None:
+    if isinstance(value, Mapping):
+        _schema(name, value)
+    elif isinstance(value, (tuple, list)):
+        for child in value:
+            _schema_value(name, child)
 
 
 @dataclass(frozen=True)
