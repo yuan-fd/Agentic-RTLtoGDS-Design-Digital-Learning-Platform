@@ -2,7 +2,7 @@
   "schema_version": 1,
   "profile": "taiwei-official-3d",
   "architecture": "aarch64",
-  "captured_at": "2026-08-05",
+  "captured_at": "2026-09-02",
   "source": {
     "taiwei_commit": "db20136711ed8c0cdfed67a6123d059875764abd",
     "orfs_research_commit": "568eb04da9173695d6bfc1b10ba868e0b6b8a9fa",
@@ -72,7 +72,7 @@
     "klayout_pya": "0.30.6"
   },
   "binary_sha256": {
-    "openroad": "24bc0b35d59335e7a4226d3fb588b9379b91d78670b27e7d8e93337fc5f86367",
+    "openroad": "2afa12900d362a4276317b0aedcb0af3de232a87ca897a1b7b53d13a8cd800d7",
     "yosys": "35b740da40cf8a415825662d0ab2f363a8f186569ec25dc0a77e1dc08b65d530",
     "yosys_slang_plugin": "4779c5f6ecca91a6b4e83f4e871264feafe13a3b64c37e7082c6c32967cd600c",
     "cmake": "a1e6fc5fccea306249da20795e71a0c7896beb958d31efac95dad67c75ec9e7d",
@@ -84,6 +84,11 @@
     "gcc12_libgcc_sha256": "2da101f956ecfd2fc25768ac6644f3e9850565a9b589b64d41cfc2ae4b13559a",
     "glibc_rpm": "glibc-2.34-143.oe2203sp3.aarch64",
     "library_path_order": [".tools/taiwei-official-3d/dependencies/lib", ".tools/taiwei-official-3d/dependencies/lib64", "/opt/openEuler/gcc-toolset-12/root/usr/lib64"]
+  },
+  "rebaseline": {
+    "reason": "The server-local GCC12 rebuild has the pinned OpenROAD source commit but a different binary hash from the 2026-08-05 capture.",
+    "native_smoke": "2026-09-02: with dependencies/lib, dependencies/lib64, and GCC12 lib64 in LD_LIBRARY_PATH, OpenROAD reported pinned commit 305d3ba2 and Yosys reported pinned commit 77005b69.",
+    "scope": "Environment/source compatibility only; no TaiWei 3D GDS/QoR claim. P8 retains the bounded 3D functional smoke gate."
   },
   "input_tree_sha256": {
     "asap7_and_asap7_3d_platforms": "9724b896d42f87541e1a018d8486fe1c64f4186d4615a645d5ad742d376c44c2",
