@@ -50,10 +50,12 @@ def test_frontend_and_backend_follow_the_reference_task_sequence() -> None:
     assert 'id="backendDesignChips"' in html
     assert ".task-panel .stage" in css and "grid-template-columns: 18px 95px 1fr 55px" in css
     assert "attempt.metrics" in javascript
-    assert 'post("/api/v2/closed-loops", base)' in javascript
+    assert 'post("/api/v2/external-optimizer-loops", base)' in javascript
     assert "repetitions: 3" not in javascript and "stall_window: 3" not in javascript
     assert "max_transitions: 64" not in javascript
-    assert 'run-to-boundary`, {})' in javascript
+    assert 'api(`/api/v2/external-optimizer-loops/${encodeURIComponent(pipelineId)}`)' in javascript
+    assert "setTimeout(() => pollClosedLoop(pipelineId), 5000)" in javascript
+    assert "run-to-boundary" not in javascript
     assert 'id="flowUtil"' not in html
     assert 'id="flowDensity"' not in html
     assert 'id="flowPeriod"' not in html
@@ -68,6 +70,10 @@ def test_frontend_and_backend_follow_the_reference_task_sequence() -> None:
     assert "physicalRuns[0]" not in javascript
     assert "Design\", \"设计" in javascript and "Run\", \"任务" in javascript
     assert "runtime_worker_ready" in javascript
+    assert "dse_controller_ready" in javascript
+    assert 'api("/api/v2/external-optimizer-loops")' in javascript
+    assert "restoreActiveClosedLoop" in javascript
+    assert "v=20260828d" in html
     assert "renderBackendEvidence" in javascript
     assert "paintDensityHeatmap" in javascript
     api_source = (ROOT / "apps/api/app.py").read_text(encoding="utf-8")
@@ -120,6 +126,8 @@ def test_product_state_exposes_only_the_autonomous_bogp_business_path(tmp_path: 
     assert all(not hasattr(state, name) for name in removed)
     assert hasattr(state, "start_bayesian_closed_loop")
     assert hasattr(state, "run_bayesian_closed_loop_to_boundary")
+    assert hasattr(state, "start_external_optimizer_loop")
+    assert hasattr(state, "advance_external_optimizer_loop")
 
     # The autonomous Agent trace uses one stable vocabulary shared by the
     # dashboard, experiment exporter and paper figures.
@@ -128,7 +136,7 @@ def test_product_state_exposes_only_the_autonomous_bogp_business_path(tmp_path: 
     assert '"phase": "validation"' not in source
 
     api_source = source
-    assert 'path == "/api/v2/closed-loops"' in api_source
+    assert 'path == "/api/v2/external-optimizer-loops"' in api_source
     assert "/api/campaigns/stage-aware" not in api_source
     assert "/api/four-gate/" not in api_source
     assert "/api/providers" not in api_source

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
@@ -22,8 +23,8 @@ def test_public_manifest_is_replayable_traceable_and_not_observed(tmp_path):
     assert all(item["license_id"] and item["content_sha256"]
                for item in registry.list_sources())
     sources = {item["source_id"]: item for item in registry.list_sources()}
-    assert sources["ptpt-paper"]["doi"] == "10.1109/TCAD.2022.3167858"
-    assert sources["ptpt-paper"]["title"].startswith("PTPT: Physical Design Tool")
+    assert sources["ptpt-paper-20260825"]["doi"] == "10.1109/TCAD.2022.3167858"
+    assert sources["ptpt-paper-20260825"]["title"].startswith("PTPT: Physical Design Tool")
     assert sources["orfs-agent-2025"]["year"] == 2025
     assert sources["agenticpd-2026"]["arxiv_id"] == "2607.04758v2"
     assert sources["edatracer-2026"]["content_kind"] == "bibliographic_metadata"
@@ -81,3 +82,37 @@ def test_unreviewed_prompt_injection_claim_is_never_retrieved(tmp_path):
                                      prompt_injection_reviewed=False))
     assert registry.search("OpenROAD secrets", platform="nangate45", toolchain="x",
                            stage="finish", design_class="digital") == []
+
+
+def test_versioned_source_ids_coexist_but_same_identity_cannot_change(tmp_path):
+    manifest = load_public_manifest("knowledge/public-corpus.lock.json")
+    current = KnowledgeSource(**next(item for item in manifest["sources"]
+                                     if item["source_id"] == "ptpt-paper-20260825"))
+    legacy = dataclasses.replace(current, source_id="ptpt-paper")
+    registry = PublicKnowledgeRegistry(tmp_path / "public.db")
+    registry.add_source(legacy)
+    registry.add_source(current)
+    assert {item["source_id"] for item in registry.list_sources()} == {
+        "ptpt-paper", "ptpt-paper-20260825",
+    }
+    with pytest.raises(ValueError, match="identity conflict"):
+        registry.add_source(dataclasses.replace(current, notes="conflicting same-version payload"))
+
+
+def test_legacy_source_payload_without_optional_schema_fields_is_idempotent(tmp_path):
+    registry = PublicKnowledgeRegistry(tmp_path / "public.db")
+    source = KnowledgeSource("legacy", "Legacy", "Org", "https://example.test", "v1",
+                             "MIT", "redistributable", "2026-08-06", "b" * 64,
+                             "official_documentation", True)
+    payload = source.to_dict()
+    legacy_payload = {key: value for key, value in payload.items()
+                      if key not in {"authors", "venue", "year", "doi", "arxiv_id",
+                                     "hash_input"}}
+    with registry._connect() as connection:
+        connection.execute("INSERT INTO public_sources_v1 VALUES (?, ?, ?, ?)", (
+            source.source_id, json.dumps(legacy_payload), source.content_sha256,
+            "legacy-fingerprint",
+        ))
+    registry.add_source(source)
+    with pytest.raises(ValueError, match="identity conflict"):
+        registry.add_source(dataclasses.replace(source, notes="substantive change"))

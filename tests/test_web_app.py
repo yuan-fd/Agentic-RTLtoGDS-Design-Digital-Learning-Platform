@@ -39,6 +39,8 @@ def test_health_distinguishes_web_and_execution_readiness(tmp_path):
     assert health["orfs_ready"] is False
     assert health["execution_ready"] is False
     assert health["runtime_worker_ready"] is False
+    assert health["dse_controller_ready"] is False
+    assert health["parameter_calibration_ready"] is False
     # BYOK is not a product capability in the internal managed-model service;
     # absence is stronger than a permanently-false compatibility flag.
     assert "byok_input_enabled" not in health
@@ -56,6 +58,18 @@ def test_health_reports_only_a_fresh_live_runtime_worker(tmp_path):
 
     assert health["runtime_worker_ready"] is True
     assert health["runtime_worker_status"] == "idle"
+
+
+def test_health_reports_fresh_durable_dse_controller(tmp_path):
+    state = make_state(tmp_path)
+    (tmp_path / "dse-controller.heartbeat.json").write_text(json.dumps({
+        "pid": os.getpid(), "status": "running", "active_run": "pipeline-live",
+        "updated_at": "now", "updated_at_epoch": time.time(),
+    }))
+    health = state.health()
+    assert health["dse_controller_ready"] is True
+    assert health["dse_controller_status"] == "running"
+    assert health["dse_controller_active_pipeline"] == "pipeline-live"
 
 
 

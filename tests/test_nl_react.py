@@ -5,13 +5,18 @@ import json
 import pytest
 
 from openroad_platform_contracts import RepairAction
+from openroad_platform_execution import ORFSRTLToGDSFactory
 from openroad_platform_scheduler import LimitedReActController, NaturalLanguageTaskCompiler
+
+
+def _compiler() -> NaturalLanguageTaskCompiler:
+    return NaturalLanguageTaskCompiler(ORFSRTLToGDSFactory())
 
 
 def test_chinese_orfs_intent_compiles_to_validated_task(tmp_path):
     rtl = tmp_path / "adder.v"
     rtl.write_text("module adder(input a,b,output y); assign y=a+b; endmodule\n")
-    task = NaturalLanguageTaskCompiler().compile(
+    task = _compiler().compile(
         "请用 OpenROAD Nangate45 把这个设计跑到 GDS，时钟 8ns，利用率 35%",
         project_id="p7", design_id="adder", rtl_path=rtl, top="adder",
     )
@@ -24,7 +29,7 @@ def test_chinese_orfs_intent_compiles_to_validated_task(tmp_path):
 
 def test_rtlscout_intent_requires_specir_and_frozen_oracle():
     with pytest.raises(ValueError, match="SpecIR-only"):
-        NaturalLanguageTaskCompiler().compile(
+        _compiler().compile(
             "用 RTLScout 离线 fake 在 simple_adder 上最多 3 步",
             project_id="p7", design_id="adder",
         )
@@ -38,7 +43,7 @@ def test_intent_cannot_inject_shell_platform_or_plugin(tmp_path, intent):
     rtl = tmp_path / "top.v"
     rtl.write_text("module top; endmodule\n")
     with pytest.raises(ValueError):
-        NaturalLanguageTaskCompiler().compile(
+        _compiler().compile(
             intent, project_id="p7", design_id="top", rtl_path=rtl, top="top",
         )
 
@@ -46,7 +51,7 @@ def test_intent_cannot_inject_shell_platform_or_plugin(tmp_path, intent):
 def test_repair_policy_requires_evidence_and_only_changes_template_fields(tmp_path):
     rtl = tmp_path / "top.v"
     rtl.write_text("module top; endmodule\n")
-    task = NaturalLanguageTaskCompiler().compile(
+    task = _compiler().compile(
         "ORFS GDS 利用率 40%", project_id="p7", design_id="top",
         rtl_path=rtl, top="top",
     )
@@ -66,7 +71,7 @@ def test_repair_policy_requires_evidence_and_only_changes_template_fields(tmp_pa
 def test_repair_budget_forces_stop_and_unknown_fields_are_rejected(tmp_path):
     rtl = tmp_path / "top.v"
     rtl.write_text("module top; endmodule\n")
-    task = NaturalLanguageTaskCompiler().compile(
+    task = _compiler().compile(
         "ORFS GDS", project_id="p7", design_id="top", rtl_path=rtl,
     )
     controller = LimitedReActController(max_repairs=2, max_same_failure=2)
@@ -85,7 +90,7 @@ def test_repair_budget_forces_stop_and_unknown_fields_are_rejected(tmp_path):
 def test_pdn_area_failure_creates_data_only_floorplan_repair(tmp_path):
     rtl = tmp_path / "tiny.v"
     rtl.write_text("module tiny(input a, output y); assign y=~a; endmodule\n")
-    task = NaturalLanguageTaskCompiler().compile(
+    task = _compiler().compile(
         "ORFS GDS", project_id="p12", design_id="tiny", rtl_path=rtl, top="tiny",
     )
     controller = LimitedReActController()

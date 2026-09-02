@@ -208,6 +208,58 @@ def test_orfs_random_seed_is_explicit_in_generated_config(tmp_path):
     assert plan.request.or_seed == 271828
 
 
+def test_runner_preserves_ordered_systemverilog_bundle_and_include_tree(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    root = tmp_path / "ibex"
+    include = root / "vendor/prim"; include.mkdir(parents=True)
+    (include / "prim_assert.svh").write_text("`define ASSERT(x)\n")
+    package = root / "ibex_pkg.sv"; package.write_text("package ibex_pkg; endpackage\n")
+    top = root / "ibex_core.sv"; top.write_text("module ibex_core(input clk_i); endmodule\n")
+    clock_gate = root / "syn/prim_clock_gating.v"; clock_gate.parent.mkdir()
+    clock_gate.write_text("module prim_clock_gating; endmodule\n")
+    runner = ORFSRunner(
+        orfs_root=orfs, work_root=tmp_path / "runs",
+        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys",
+    )
+    request = RunRequest(
+        rtl_path=str(top), rtl_root=str(root),
+        rtl_files=(str(package), str(top), str(clock_gate)),
+        rtl_include_dirs=(str(include),), synth_hdl_frontend="slang",
+        design_options={"openroad_hierarchical": True, "swap_arith_operators": 1},
+        top="ibex_core", clock="clk_i", target_stage=RunStage.SYNTH,
+    )
+    plan = runner.prepare(RunRequest.from_dict(request.to_dict()))
+    config = Path(plan.config_path).read_text()
+    staged = Path(plan.workdir) / "designs/src/ibex_core"
+    assert config.index(str(staged / "ibex_pkg.sv")) < config.index(str(staged / "ibex_core.sv"))
+    assert "export SYNTH_HDL_FRONTEND = slang" in config
+    assert "export OPENROAD_HIERARCHICAL = 1" in config
+    assert "export SWAP_ARITH_OPERATORS = 1" in config
+    assert str(staged / "vendor/prim") in config
+    assert (staged / "vendor/prim/prim_assert.svh").is_file()
+    contract = json.loads((Path(plan.workdir) / "design_input_manifest.json").read_text())
+    assert contract["source_order"] == [
+        "ibex_pkg.sv", "ibex_core.sv", "syn/prim_clock_gating.v",
+    ]
+
+
+def test_runner_records_typed_parameter_contract_before_execution(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runner = ORFSRunner(orfs_root=orfs, work_root=tmp_path / "runs",
+                        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys")
+    plan = runner.prepare(RunRequest(
+        rtl_path=str(rtl), top="top", platform="asap7",
+        flow_parameters={"core_utilization_pct": 55, "enable_dpo": True},
+    ))
+    contract = json.loads((Path(plan.workdir) / "parameter_contract.json").read_text())
+    assert contract["requested_parameters"] == {
+        "core_utilization_pct": 55, "enable_dpo": 1,
+    }
+    assert contract["effective_configuration_id"].startswith("orfs-effective-")
+    assert contract["claim_boundary"].startswith("requested and materialized")
+
+
 def test_finish_json_fallback_preserves_terminal_qor_without_analysis_package(tmp_path):
     orfs, bin_dir = _fake_runtime(tmp_path)
     rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")

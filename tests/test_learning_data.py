@@ -26,13 +26,14 @@ def _context(**changes):
     return LearningContext(**values)
 
 
-def _completed_runtime(tmp_path):
+def _completed_runtime(tmp_path, *, rtl_sha=RTL_SHA, labels=None):
     store = RuntimeStore(tmp_path / "runtime.db")
     task = TaskSpec(
         task_id="learning-task", project_id="p14", design_id="gcd",
-        plugin_id="orfs", inputs={"rtl_sha256": RTL_SHA},
+        plugin_id="orfs", inputs={"rtl_sha256": rtl_sha},
         parameters={"platform": "nangate45", "core_utilization_pct": 35.0,
                     "place_density": 0.5}, timeout_seconds=30,
+        labels=dict(labels or {}),
     )
     run, stage = store.submit_plugin_run(task, plugin_version="1.0.0")
     attempt = store.start_attempt(stage.stage_run_id, worker_id="test",
@@ -52,7 +53,7 @@ def _completed_runtime(tmp_path):
     return store, run.run_id
 
 
-def _runtime_with_qor_artifact(tmp_path):
+def _runtime_with_qor_artifact(tmp_path, payload=None):
     store = RuntimeStore(tmp_path / "runtime.db")
     task = TaskSpec(
         task_id="learning-qor", project_id="p14", design_id="gcd", plugin_id="orfs",
@@ -64,7 +65,7 @@ def _runtime_with_qor_artifact(tmp_path):
     workspace = tmp_path / "workspace"
     report = workspace / "orfs/implementation/analysis/report.json"
     report.parent.mkdir(parents=True)
-    report.write_text(json.dumps({
+    report.write_text(json.dumps(payload or {
         "runtime_seconds": 81.25,
         "kpi": {"area_um2": 88.3, "setup_wns_ns": 5.6,
                 "wirelength_um": 283, "power_W": 8.1e-6, "drc_errors": 0,
@@ -114,6 +115,31 @@ def test_runtime_export_rejects_design_platform_and_rtl_context_mismatch(tmp_pat
         exporter.export_run(run_id, _context(platform="asap7"))
 
 
+def test_runtime_export_uses_declared_bundle_fingerprint_before_primary_rtl(tmp_path):
+    bundle_sha = "b" * 64
+    runtime, run_id = _completed_runtime(
+        tmp_path, labels={"design_bundle_sha256": bundle_sha})
+    observation = RuntimeEvidenceExporter(runtime).export_run(
+        run_id, _context(design_fingerprint=bundle_sha))
+    assert observation.context.design_fingerprint == bundle_sha
+    with pytest.raises(ValueError, match="RTL fingerprint"):
+        RuntimeEvidenceExporter(runtime).export_run(
+            run_id, _context(design_fingerprint="c" * 64))
+
+
+def test_runtime_export_accepts_only_valid_legacy_bundle_fingerprint(tmp_path):
+    bundle_sha = "b" * 64
+    runtime, run_id = _completed_runtime(
+        tmp_path, labels={"reference_source_sha256": bundle_sha})
+    RuntimeEvidenceExporter(runtime).export_run(
+        run_id, _context(design_fingerprint=bundle_sha))
+    invalid_runtime, invalid_run_id = _completed_runtime(
+        tmp_path / "invalid", labels={"reference_source_sha256": "not-a-sha"})
+    with pytest.raises(ValueError, match="reference_source_sha256"):
+        RuntimeEvidenceExporter(invalid_runtime).export_run(
+            invalid_run_id, _context())
+
+
 def test_runtime_export_reads_only_verified_registered_orfs_qor(tmp_path):
     runtime, run_id, _ = _runtime_with_qor_artifact(tmp_path)
     observation = RuntimeEvidenceExporter(runtime).export_run(run_id, _context())
@@ -123,6 +149,23 @@ def test_runtime_export_reads_only_verified_registered_orfs_qor(tmp_path):
     }
     assert "not_allowlisted" not in observation.metrics
     assert observation.metric_units["power_W"] == "W"
+
+
+def test_runtime_export_keeps_intermediate_proxy_out_of_final_qor_namespace(tmp_path):
+    runtime, run_id, _ = _runtime_with_qor_artifact(tmp_path, {
+        "metric_scope": "intermediate_proxy", "proxy_stage": "cts",
+        "runtime_seconds": 12.0,
+        "kpi": {"proxy_area_um2": 91.0, "proxy_setup_wns_ns": 0.4,
+                "proxy_power_W": 0.001, "area_um2": 999.0,
+                "setup_wns_ns": 99.0},
+    })
+    observation = RuntimeEvidenceExporter(runtime).export_run(
+        run_id, _context(flow_stage="cts"))
+    assert observation.metrics == {
+        "proxy_area_um2": 91.0, "proxy_setup_wns_ns": 0.4,
+        "proxy_power_W": 0.001, "runtime_seconds": 12.0,
+    }
+    assert "area_um2" not in observation.metrics
 
 
 def test_runtime_export_rejects_tampered_registered_qor(tmp_path):
@@ -141,3 +184,44 @@ def test_runtime_export_ignores_unregistered_qor_file(tmp_path):
     report.write_text('{"kpi":{"wirelength_um":1}}', encoding="utf-8")
     observation = RuntimeEvidenceExporter(runtime).export_run(run_id, _context())
     assert "wirelength_um" not in observation.metrics
+
+
+def test_runtime_export_uses_sha_verified_common_evaluator_metrics(tmp_path):
+    store = RuntimeStore(tmp_path / "runtime.db")
+    task = TaskSpec(
+        task_id="common-eval", project_id="p14", design_id="gcd", plugin_id="orfs",
+        inputs={"rtl_sha256": RTL_SHA}, parameters={"platform": "nangate45"},
+        timeout_seconds=30,
+    )
+    run, stage = store.submit_plugin_run(task, plugin_version="1.2.0")
+    workspace = tmp_path / "workspace"
+    report = workspace / "orfs/implementation/analysis/common_evaluation.json"
+    report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({
+        "schema_version": 3, "kind": "common-orfs-signoff-evaluation",
+        "feasible": True, "metrics": {
+            "area_um2": 10.0, "setup_wns_ns": .2, "setup_tns_ns": 0,
+            "hold_wns_ns": .1, "power_W": .003, "drc_errors": 0,
+            "runtime_seconds": 40,
+        },
+    }), encoding="utf-8")
+    attempt = store.start_attempt(stage.stage_run_id, worker_id="test",
+                                  workspace=workspace, lease_seconds=10)
+    store.register_artifact(
+        attempt.attempt_id, kind="report",
+        store_key="orfs/implementation/analysis/common_evaluation.json",
+        size_bytes=report.stat().st_size,
+        sha256=hashlib.sha256(report.read_bytes()).hexdigest(),
+    )
+    store.finish_attempt(attempt.attempt_id, RuntimeStatus.SUCCEEDED, exit_code=0,
+                         now=datetime.now(timezone.utc))
+    observation = RuntimeEvidenceExporter(store).export_run(run.run_id, _context())
+    assert observation.metrics["area_um2"] == 10.0
+    assert observation.metrics["drc_errors"] == 0.0
+    assert observation.metrics["setup_tns_ns"] == 0.0
+    assert observation.metric_units["area_um2"] == "um^2"
+    assert observation.metric_units["setup_tns_ns"] == "ns"
+    assert observation.metric_units["hold_wns_ns"] == "ns"
+    with pytest.raises(ValueError, match="succeeded observation requires metrics"):
+        RuntimeEvidenceExporter(
+            store, use_common_evaluation=False).export_run(run.run_id, _context())

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,9 +19,23 @@ def main() -> int:
     parser.add_argument("--result", type=Path, required=True)
     args = parser.parse_args()
     task = json.loads(args.request.read_text(encoding="utf-8"))["task"]
+    if (os.environ.get("OPENROAD_TEST_FAIL_QUICK") == "orfs_failure"
+            and task.get("labels", {}).get("fidelity") == "quick"):
+        args.result.write_text(json.dumps({
+            "schema_version": 1, "status": "failed", "exit_code": 2,
+            "started_at": now(), "ended_at": now(), "metrics": [],
+            "artifacts": [],
+            "failure": {
+                "category": "orfs_failure",
+                "message": "injected parameter-dependent quick-stage failure",
+            },
+            "provenance": {"adapter": "closed-loop-test-double"},
+        }), encoding="utf-8")
+        return 2
     params = task["parameters"]
-    util = float(params["core_utilization_pct"])
-    density = float(params["place_density"])
+    flow = params.get("flow_parameters") or {}
+    util = float(flow.get("core_utilization_pct", params["core_utilization_pct"]))
+    density = float(params["place_density"]) + .20 * float(flow.get("place_density_lb_addon", 0))
     period = float(params["clock_period_ns"])
     replica = int(task.get("labels", {}).get("replica_index", 0))
     jitter = (-1.0, 0.0, 1.0)[replica % 3]
@@ -45,7 +60,9 @@ def main() -> int:
         "odb": "orfs/implementation/final.odb",
         "config": "orfs/implementation/config.mk",
         "toolchain_snapshot": "orfs/implementation/toolchain.json",
+        "parameter_contract": "orfs/implementation/parameter-contract.json",
         "run_result": "orfs/implementation/run-result.json",
+        "design_input_manifest": "orfs/implementation/design-input-manifest.json",
         "def": "orfs/implementation/final.def",
         "netlist": "orfs/implementation/final.v",
         "gds": "orfs/implementation/final.gds",

@@ -75,33 +75,27 @@ def test_public_overview_login_and_two_user_design_run_isolation(tmp_path: Path)
         assert request(bob, base, f"/api/designs/{design['id']}")[0] == 404
 
         status, rejected = request(
-            alice, base, "/api/v2/closed-loops", method="POST",
+            alice, base, "/api/v2/external-optimizer-loops", method="POST",
             body={"design_id": design["id"], "repetitions": 3, "max_rounds": 3},
         )
         assert status == 400
         assert "does not accept manual search controls" in rejected["error"]
 
         status, submitted = request(
-            alice, base, "/api/v2/closed-loops", method="POST",
+            alice, base, "/api/v2/external-optimizer-loops", method="POST",
             body={"design_id": design["id"], "objective_profile": "balanced"},
         )
-        assert status == 201
-        pipeline_id = submitted["pipeline_id"]
-        run_ids = submitted["state"]["active_run_ids"]
-        assert len(run_ids) == 3
-        alice_runs = request(alice, base, "/api/runtime/runs")[1]["runs"]
-        assert {item["run_id"] for item in alice_runs} == set(run_ids)
-        assert request(bob, base, "/api/runtime/runs")[1]["runs"] == []
-        assert request(bob, base, f"/api/runtime/runs/{run_ids[0]}")[0] == 404
-        assert request(bob, base, f"/api/v2/closed-loops/{pipeline_id}")[0] == 404
-        assert request(alice, base, f"/api/runtime/runs/{run_ids[0]}")[1]["wait"]["people_ahead"] == 0
-        status, rejected_resume = request(
-            alice, base,
-            f"/api/v2/closed-loops/{pipeline_id}/run-to-boundary",
-            method="POST", body={"max_transitions": 1, "seed": 7},
-        )
         assert status == 400
-        assert "accepts no transition" in rejected_resume["error"]
+        assert "does not accept manual search controls: design_id" in submitted["error"]
+        for frozen_field in ("clock", "platform"):
+            status, rejected_frozen = request(
+                alice, base, "/api/v2/external-optimizer-loops", method="POST",
+                body={"spec_id": "not-needed", frozen_field: "client-override"},
+            )
+            assert status == 400
+            assert f"does not accept manual search controls: {frozen_field}" in rejected_frozen["error"]
+        assert request(alice, base, "/api/runtime/runs")[1]["runs"] == []
+        assert request(bob, base, "/api/runtime/runs")[1]["runs"] == []
         assert request(alice, base, "/api/runtime/runs/from-design", method="POST",
                        body={"design_id": design["id"]})[0] == 404
         for removed in (
@@ -129,7 +123,7 @@ def test_public_overview_login_and_two_user_design_run_isolation(tmp_path: Path)
         alice_results = request(alice, base, "/api/platform/results")[1]
         bob_results = request(bob, base, "/api/platform/results")[1]
         assert alice_results["counts"]["designs"] == 1
-        assert alice_results["counts"]["runtime_runs"] == 3
+        assert alice_results["counts"]["runtime_runs"] == 0
         assert bob_results["counts"]["designs"] == 0
         assert bob_results["counts"]["runtime_runs"] == 0
 

@@ -1,4 +1,10 @@
+import dataclasses
+
+import pytest
+
 from openroad_platform_analysis import (diagnosis_packet, paired_replica_seeds,
+                                        intermediate_proxy_score,
+                                        observed_hypervolume_trace,
                                         relative_utility, stalled_decision,
                                         summarize_replicates)
 from openroad_platform_contracts import (EvidencePointer, LearningContext,
@@ -51,6 +57,16 @@ def test_failed_constraint_blocks_promotion_and_produces_non_executable_diagnosi
     assert packet["violated_constraints"]
 
 
+def test_diagnosis_counts_all_replica_failure_without_crashing():
+    objectives = (ObjectiveSpec("area_um2", "min"),)
+    packet = diagnosis_packet([
+        {"round": 1, "summary": None, "decision": "all_replicas_failed"},
+        {"round": 2, "summary": {"failure_rate": .5, "constraints": []}},
+    ], objectives)
+    assert packet["failed_rounds"] == 2
+    assert packet["last_round"] == 2
+
+
 def test_first_feasible_candidate_replaces_an_infeasible_baseline_even_if_relative_qor_is_negative():
     decision = stalled_decision(
         candidate_utility=-.2, best_utility=-1.0,
@@ -66,3 +82,49 @@ def test_paired_replica_seeds_are_stable_distinct_and_seed_sensitive():
     assert first == paired_replica_seeds(20260825, 5)
     assert len(first) == len(set(first)) == 5
     assert first != paired_replica_seeds(20260826, 5)
+
+
+def test_intermediate_score_is_explicitly_not_final_qor():
+    objectives = (ObjectiveSpec("area_um2", "min", .6),
+                  ObjectiveSpec("setup_wns_ns", "max", .4))
+    baseline = summarize_replicates(
+        [observation(1, 100, .10), observation(2, 102, .12)], objectives)
+    proxy = intermediate_proxy_score(
+        [observation(3, 90, .11)], baseline, objectives)
+    assert proxy["score"] is not None
+    assert proxy["eligible_for_calibration"] is True
+    assert proxy["quick_metrics_are_final"] is False
+    assert "never replace final QoR" in proxy["claim_boundary"]
+
+
+def test_intermediate_score_prefers_explicit_proxy_namespace():
+    objectives = (ObjectiveSpec("area_um2", "min", 1.0),)
+    baseline = summarize_replicates([observation(1, 100, .1)], objectives)
+    quick = dataclasses.replace(
+        observation(2, 1, .1),
+        metrics={"area_um2": 1.0, "proxy_area_um2": 90.0},
+        metric_units={"area_um2": "um2", "proxy_area_um2": "um2"},
+    )
+    proxy = intermediate_proxy_score([quick], baseline, objectives)
+    assert proxy["metric_sources"] == {"area_um2": "proxy_area_um2"}
+    assert proxy["proxy_medians"] == {"area_um2": 90.0}
+    assert proxy["score"] == pytest.approx(.1)
+
+
+def test_hypervolume_trace_uses_only_observed_eligible_full_summaries():
+    objectives = (ObjectiveSpec("area_um2", "min", .5),
+                  ObjectiveSpec("setup_wns_ns", "max", .5, 1.0))
+    baseline = summarize_replicates([observation(1, 100, 0)], objectives)
+    history = [
+        {"round": 1, "kind": "bo_candidate", "candidate_id": "a",
+         "summary": summarize_replicates([observation(2, 80, .2)], objectives)},
+        {"round": 2, "kind": "quick_proxy_only", "candidate_id": "fake",
+         "summary": None},
+        {"round": 3, "kind": "bo_candidate", "candidate_id": "b",
+         "summary": summarize_replicates([observation(3, 70, .1)], objectives)},
+    ]
+    trace = observed_hypervolume_trace(history, objectives, baseline)
+    assert len(trace["trace"]) == 2
+    assert {item["candidate_id"] for item in trace["pareto"]} == {"a", "b"}
+    assert trace["hypervolume"] >= trace["trace"][0]["hypervolume"]
+    assert trace["predictions_included"] is False

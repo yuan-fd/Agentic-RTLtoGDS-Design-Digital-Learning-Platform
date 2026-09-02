@@ -4,6 +4,8 @@ import json
 
 from openroad_platform_analysis.netlist import summarize_netlist
 from openroad_platform_analysis.parsers import cell_coords, stage_json
+from openroad_platform_analysis.diagnosis import diagnose
+from openroad_platform_analysis.reporter import build_report
 
 
 def test_stage_metrics_and_density_are_available_without_web_app(tmp_path):
@@ -17,6 +19,19 @@ def test_stage_metrics_and_density_are_available_without_web_app(tmp_path):
         tmp_path, "nangate45", "top", expected_stage="synth"
     )
     assert metrics["stages"]["synth"]["metrics"]["instance_count"] == 13
+    assert metrics["summary"]["overall_status"] == "target_stage_complete"
+    assert metrics["summary"]["signoff_complete"] is False
+
+    diagnosis = diagnose(metrics)
+    assert diagnosis["verdict"] == "target_stage_complete"
+    assert "不能声明布线 DRC" in diagnosis["summary"]
+    report = build_report("top", "nangate45", metrics, diagnosis)
+    assert report["flow_status"] == "target_stage_completed"
+    assert report["coverage"] == {
+        "target_stage": "synth", "target_stage_complete": True,
+        "signoff_complete": False, "drc_observed": False,
+    }
+    assert "无 DRC" not in report["diagnosis"]["summary"]
 
     result_dir = tmp_path / "results/nangate45/top/base"
     result_dir.mkdir(parents=True)

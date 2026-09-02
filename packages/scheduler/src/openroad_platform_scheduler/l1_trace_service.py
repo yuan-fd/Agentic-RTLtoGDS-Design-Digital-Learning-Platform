@@ -74,7 +74,7 @@ class L1TraceService:
     def record_draft(self, trace_id: str, draft: GoalDraft) -> L1TraceEvent:
         draft.validate()
         return self._append(trace_id, kind=TraceEventKind.GOAL_DRAFTED, goal_id=draft.draft_id,
-                            facts={"request_sha256": draft.request_sha256, "intent": draft.intent.value,
+                            facts={"request_text": draft.request_text, "request_sha256": draft.request_sha256, "intent": draft.intent.value,
                                    "blocking_fields": [item.value for item in draft.unresolved_blocking_fields()]})
 
     def record_goal(self, trace_id: str, goal: DesignGoal) -> L1TraceEvent:

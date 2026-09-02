@@ -32,6 +32,11 @@ def evidence() -> EvidencePointer:
     return EvidencePointer(ref="artifact:run-result", sha256="b" * 64)
 
 
+def test_evidence_pointer_accepts_loss_accounted_edair_reference():
+    pointer = EvidencePointer(ref="edair:run-accepted", sha256="c" * 64)
+    assert pointer.to_dict()["ref"] == "edair:run-accepted"
+
+
 def observation() -> LearningObservation:
     return LearningObservation(
         observation_id="obs-1", context=context(),
@@ -109,3 +114,19 @@ def test_trajectory_is_offline_evidence_and_context_bound():
     assert TrajectoryStep.from_dict(step.to_dict()) == step
     with pytest.raises(ValueError, match="cannot execute"):
         dataclasses.replace(step, execution_allowed=True).validate()
+
+
+def test_parameter_contract_supports_mixed_conditional_space_and_large_budget():
+    values = (
+        ParameterSpec("util", 20, 80, kind="int", step=1, stage="floorplan"),
+        ParameterSpec("dpo", None, None, kind="bool", stage="place"),
+        ParameterSpec("effort", None, None, kind="categorical",
+                      choices=("low", "medium", "high"), stage="route",
+                      active_when={"dpo": 1}),
+    )
+    for value in values:
+        assert ParameterSpec.from_dict(value.to_dict()) == value
+    expanded = dataclasses.replace(study(), parameter_space=values, max_runs=600)
+    expanded.validate()
+    with pytest.raises(ValueError, match="at least two"):
+        ParameterSpec("bad", None, None, kind="categorical", choices=("one",)).validate()

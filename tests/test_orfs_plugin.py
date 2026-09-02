@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from openroad_platform_contracts import RuntimeStatus
+from openroad_platform_analysis import ORFSProtectedEvaluator
 from openroad_platform_execution import (
     PluginRegistry,
     ToolchainConfig,
@@ -79,7 +80,7 @@ def test_orfs_plugin_runs_full_runtime_chain_and_records_provenance(tmp_path):
     attempt = view["stages"][0]["attempts"][0]
     kinds = {item["kind"] for item in attempt["artifacts"]}
     assert {"gds", "def", "netlist", "odb", "config",
-            "toolchain_snapshot", "run_result"} <= kinds
+            "toolchain_snapshot", "parameter_contract", "run_result", "log"} <= kinds
     for artifact in attempt["artifacts"]:
         path = Path(attempt["workspace"]) / artifact["store_key"]
         assert path.is_file() and path.stat().st_size == artifact["size_bytes"]
@@ -102,8 +103,57 @@ def test_orfs_plugin_runs_full_runtime_chain_and_records_provenance(tmp_path):
     assert [event["payload"]["tool_stage"] for event in tool_events[::2]] == [
         "synth", "floorplan", "place", "cts", "route", "finish"
     ]
-    assert all(event["producer"] == "adapter:orfs@1.0.0" for event in tool_events)
+    assert all(event["producer"] == "adapter:orfs@1.2.0" for event in tool_events)
     assert [event["event_type"] for event in view["events"]][-1] == "run.finished"
+    assert Path(attempt["workspace"], "orfs/implementation/orfs-flow/Makefile").is_file()
+    assert not (toolchain.flow_home / "results").exists()
+
+
+def test_runtime_registers_infeasible_orfs_qor_instead_of_claiming_success(tmp_path):
+    """A runnable flow with incomplete signoff data is explicitly infeasible."""
+    toolchain = fake_toolchain(tmp_path)
+    task = build_orfs_task(
+        FIXTURES / "p2_mux_2to1.v", project_id="p2-test", design_id="mux-test",
+        top="mux_2to1", timeout_seconds=30, stage_timeout_seconds=10,
+    )
+    runtime = WorkflowRuntime(
+        RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([orfs_plugin_manifest(toolchain)]),
+        workspace_root=tmp_path / "attempts", worker_id="p2-test-worker",
+        protected_evaluator=ORFSProtectedEvaluator(),
+    )
+
+    run = runtime.submit(task, capability="eda.rtl_to_gds")
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.SUCCEEDED
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+    evidence = next(item for item in attempt["artifacts"]
+                    if item["store_key"].endswith("common_evaluation.json"))
+    assert evidence["metadata"]["producer"] == "protected-orfs-evaluator"
+    assert evidence["metadata"]["official_qor"] is True
+    assert evidence["metadata"]["feasible"] is False
+    evaluation = json.loads((Path(attempt["workspace"]) / evidence["store_key"]).read_text())
+    assert evaluation["gate"]["status"] == "failed"
+    assert "missing_required_metrics" in evaluation["gate"]["reasons"]
+
+
+def test_orfs_runner_does_not_call_the_protected_evaluator_directly():
+    source = (REPOSITORY / "packages/execution/src/openroad_platform_execution/orfs_runner.py")
+    text = source.read_text(encoding="utf-8")
+    assert "evaluate_orfs_run" not in text
+    assert "_run_common_evaluation" not in text
+    assert "openroad_platform_analysis" not in text
+
+
+def test_orfs_adapter_has_no_analysis_or_visualization_import_path():
+    source = (REPOSITORY / "packages/execution/src/openroad_platform_execution/orfs_adapter.py")
+    text = source.read_text(encoding="utf-8")
+    assert "packages/analysis/src" not in text
+    assert "openroad_platform_visualization" not in text
+
+
+def test_orfs_manifest_pins_operator_cpu_limit_for_workers(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENROAD_PLATFORM_ORFS_CORES", "12")
+    manifest = orfs_plugin_manifest(fake_toolchain(tmp_path))
+    assert manifest.environment["OPENROAD_PLATFORM_ORFS_CORES"] == "12"
 
 
 def test_orfs_plugin_rejects_rtl_changed_after_task_creation(tmp_path):
@@ -131,10 +181,41 @@ def test_orfs_plugin_rejects_rtl_changed_after_task_creation(tmp_path):
     assert not (Path(attempt["workspace"]) / "orfs/implementation").exists()
 
 
+def test_orfs_plugin_stages_hash_pinned_multifile_systemverilog_bundle(tmp_path):
+    root = tmp_path / "rtl"; include = root / "include"; include.mkdir(parents=True)
+    package = root / "pkg.sv"; package.write_text("package p; endpackage\n")
+    top = root / "mux_2to1.sv"
+    top.write_text("module mux_2to1(input clk,input a,output y); assign y=a; endmodule\n")
+    (include / "defs.svh").write_text("`define WIDTH 8\n")
+    task = build_orfs_task(
+        top, rtl_files=(package, top), rtl_root=root,
+        rtl_include_dirs=(include,), synth_hdl_frontend="slang",
+        project_id="p2-test", design_id="bundle", top="mux_2to1",
+        timeout_seconds=30, stage_timeout_seconds=10,
+    )
+    toolchain = fake_toolchain(tmp_path / "tools")
+    store = RuntimeStore(tmp_path / "runtime.db")
+    runtime = WorkflowRuntime(
+        store, PluginRegistry([orfs_plugin_manifest(toolchain)]),
+        workspace_root=tmp_path / "attempts", worker_id="bundle-worker",
+    )
+    run = runtime.submit(task); completed = runtime.execute_once(run.run_id)
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+    assert completed.status is RuntimeStatus.SUCCEEDED
+    assert task.inputs["rtl_bundle"]["files"][0]["relative_path"] == "pkg.sv"
+    manifest_artifact = next(item for item in attempt["artifacts"]
+                             if item["kind"] == "design_input_manifest")
+    manifest = json.loads((Path(attempt["workspace"]) /
+                           manifest_artifact["store_key"]).read_text())
+    assert manifest["source_order"] == ["pkg.sv", "mux_2to1.sv"]
+    assert manifest["include_dirs"] == ["include"]
+    assert manifest["synth_hdl_frontend"] == "slang"
+
+
 def test_repository_orfs_manifest_is_strict_and_arch_compatible():
     registry = PluginRegistry.from_directory(REPOSITORY / "integrations/orfs")
     manifest = registry.resolve(
-        "orfs", version="1.0.0", capability="eda.rtl_to_gds",
+        "orfs", version="1.2.0", capability="eda.rtl_to_gds",
         arch=platform.machine(),
     )
     assert Path(manifest.adapter_entry[1]).is_file()

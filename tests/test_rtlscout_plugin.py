@@ -13,6 +13,7 @@ import pytest
 from openroad_platform_contracts import RuntimeStatus
 from openroad_platform_execution import (
     PluginRegistry,
+    ORFSRTLToGDSFactory,
     ToolchainConfig,
     build_rtlscout_task,
     orfs_plugin_manifest,
@@ -166,7 +167,7 @@ def test_rtlscout_to_orfs_composition_preserves_source_hash(tmp_path):
         model="fake:simple_adder_pass", max_steps=3, timeout_seconds=30,
     )
     result = execute_rtl_to_orfs(
-        runtime, task, top="generated_top",
+        runtime, task, top="generated_top", rtl_to_gds_factory=ORFSRTLToGDSFactory(),
         orfs_options={"timeout_seconds": 30, "stage_timeout_seconds": 10},
     )
 
