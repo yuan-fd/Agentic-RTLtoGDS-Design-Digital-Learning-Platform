@@ -153,6 +153,7 @@ class WorkflowRuntime:
                 domain = run.task_spec.inputs.get("parameter_domain")
                 if not isinstance(domain, dict) or not isinstance(domain.get("experiment_protocol"), dict):
                     raise ValueError("ORFS-Agent task lacks an immutable experiment protocol")
+                workspace.mkdir(parents=True, exist_ok=True)
                 receipt = workspace / "runtime_protocol_receipt.json"
                 receipt.write_text(json.dumps({"schema_version": 1, "protocol": domain["experiment_protocol"],
                                                "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
