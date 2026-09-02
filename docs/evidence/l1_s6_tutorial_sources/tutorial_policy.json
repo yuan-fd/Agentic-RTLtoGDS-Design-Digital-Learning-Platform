@@ -1,0 +1,1 @@
+{"policy_id":"policy-1","policy_version":"v1","issuer":"platform","scope":"bounded tutorial fixture","allowed_tools":["run_stage","query_stage_metrics"]}

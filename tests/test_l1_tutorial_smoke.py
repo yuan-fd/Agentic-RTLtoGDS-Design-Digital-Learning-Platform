@@ -2,6 +2,7 @@
 from pathlib import Path
 import platform
 import sys
+import hashlib
 
 from openroad_platform_contracts import PluginManifest, TaskSpec
 from openroad_platform_contracts.agent_control import AgentBudget, DesignState, GoalPreference, QoRConstraint, ToolName
@@ -24,9 +25,15 @@ class _Provider:
     def __init__(self, responses): self.responses = iter(responses)
     def complete(self, request): return next(self.responses)
 
+SOURCES = Path(__file__).parents[1] / "docs" / "evidence" / "l1_s6_tutorial_sources"
+
+def _evidence(name):
+    source = SOURCES / name
+    return EvidencePointer(f"docs/evidence/l1_s6_tutorial_sources/{name}", hashlib.sha256(source.read_bytes()).hexdigest())
+
 class _Retriever:
     def retrieve(self, query, *, limit):
-        return (L1KnowledgeHit("Use registered timing metrics after a bounded run.", EvidencePointer("docs/evidence/tutorial_l1", "e" * 64)),)
+        return (L1KnowledgeHit((SOURCES / "tutorial_knowledge.md").read_text(), _evidence("tutorial_knowledge.md")),)
 
 class _Factory:
     capability = "eda.rtl_to_gds"
@@ -37,12 +44,14 @@ def test_tutorial_shaped_language_to_runtime_trace_smoke(tmp_path):
     fixture = Path(__file__).parent / "fixtures" / "echo_adapter.py"
     manifest = PluginManifest("tutorial-fixture", "1.0.0", (sys.executable, str(fixture)), ("eda.rtl_to_gds",), (platform.machine(),), {"type":"object"}, {"type":"object"}, ({"kind":"report","required":True},), 15)
     runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.sqlite"), PluginRegistry([manifest]), workspace_root=tmp_path / "work", adapter=ProcessAdapter(ProcessGuardian(poll_interval=0.01, terminate_grace=0.1)))
-    provenance=EvidencePointer("artifact:trusted-policy", "d" * 64)
-    trusted=TrustedGoalPolicy("policy-1","v1","platform",provenance,"p1","top","tutorial-platform","pdk-1","toolchain-1",EvidencePointer("artifact:rtl","a"*64),GoalPreference.BALANCED,(QoRConstraint("messages",">=",1),),("route",),("density",),AgentBudget(2,2,60),(ToolName.RUN_STAGE,ToolName.QUERY_STAGE_METRICS))
+    provenance=_evidence("tutorial_policy.json")
+    rtl=_evidence("tutorial_top.v")
+    knowledge=_evidence("tutorial_knowledge.md")
+    trusted=TrustedGoalPolicy("policy-1","v1","platform",provenance,"p1","top","tutorial-platform","pdk-1","toolchain-1",rtl,GoalPreference.BALANCED,(QoRConstraint("messages",">=",1),),("route",),("density",),AgentBudget(2,2,60),(ToolName.RUN_STAGE,ToolName.QUERY_STAGE_METRICS))
     model=_Provider([
         {"request_text":"Run a bounded route step then inspect its metrics.","intent":"diagnose","questions":[],"answers":[],"schema_version":1},
-        {"call":{"call_id":"call-run","goal_id":"goal-1","state_id":"state-1","tool":"run_stage","arguments":{"stage":"route"},"producer":"tutorial_fixture_model","evidence":[{"ref":"docs/evidence/tutorial_l1","sha256":"e"*64,"schema_version":1}],"schema_version":1},"decision_summary":"Run the permitted route stage to obtain Runtime facts.","citations":[{"ref":"docs/evidence/tutorial_l1","sha256":"e"*64,"schema_version":1}]},
-        {"call":{"call_id":"call-query","goal_id":"goal-1","state_id":"state-2","tool":"query_stage_metrics","arguments":{"run_id":"REPLACED"},"producer":"tutorial_fixture_model","evidence":[{"ref":"docs/evidence/tutorial_l1","sha256":"e"*64,"schema_version":1}],"schema_version":1},"decision_summary":"Read registered metrics rather than infer QoR from raw logs.","citations":[{"ref":"docs/evidence/tutorial_l1","sha256":"e"*64,"schema_version":1}]},
+        {"call":{"call_id":"call-run","goal_id":"goal-1","state_id":"state-1","tool":"run_stage","arguments":{"stage":"route"},"producer":"tutorial_fixture_model","evidence":[knowledge.to_dict()],"schema_version":1},"decision_summary":"Run the permitted route stage to obtain Runtime facts.","citations":[knowledge.to_dict()]},
+        {"call":{"call_id":"call-query","goal_id":"goal-1","state_id":"state-2","tool":"query_stage_metrics","arguments":{"run_id":"REPLACED"},"producer":"tutorial_fixture_model","evidence":[knowledge.to_dict()],"schema_version":1},"decision_summary":"Read registered metrics rather than infer QoR from raw logs.","citations":[knowledge.to_dict()]},
     ])
     draft=L1ModelBoundary.compile_draft(model,"Run a bounded route step then inspect its metrics.",draft_id="draft-1")
     goal=GoalFinalizer.finalize(draft,trusted,goal_id="goal-1")
@@ -64,3 +73,5 @@ def test_tutorial_shaped_language_to_runtime_trace_smoke(tmp_path):
     events=trace.store.read("trace-1")
     assert state2.status == "observed" and any(event.kind.value == "state_transition" for event in events)
     assert events[-1].kind.value == "reflection_recorded" and events[-1].facts["decision"] == "stop"
+    for pointer in (knowledge, provenance, rtl):
+        assert hashlib.sha256((Path(__file__).parents[1] / pointer.ref).read_bytes()).hexdigest() == pointer.sha256

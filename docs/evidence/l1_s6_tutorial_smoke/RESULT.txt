@@ -5,5 +5,7 @@ Natural-language request -> typed GoalDraft -> trusted Goal -> cited run_stage
 -> real WorkflowRuntime/ProcessAdapter execution -> Runtime observation ->
 cited query_stage_metrics -> persisted stop reflection.
 
+Trace citations and Goal anchors resolve to the real source files in
+`../l1_s6_tutorial_sources/` and are SHA-256 checked in the smoke test.
 This proves the L1 control-plane integration only; it makes no OpenROAD QoR
 or optimizer-quality claim.
