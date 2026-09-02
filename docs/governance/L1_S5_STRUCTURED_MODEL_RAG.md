@@ -51,6 +51,7 @@ S6 will provide the first actual provider-to-S4-to-Runtime tutorial smoke.
 
 ## Rollback
 
-Revert the single S5 completion commit containing this document.  No schema,
-Runtime state, external project, or protected experiment input requires data
-migration or cleanup.
+For the S5 completion repair, first run `git revert HEAD` while `HEAD` is the
+completion-repair commit, then run `git revert 2121340`, followed by
+`git revert da11639`.  No schema, Runtime state, external project, or
+protected experiment input requires data migration or cleanup.

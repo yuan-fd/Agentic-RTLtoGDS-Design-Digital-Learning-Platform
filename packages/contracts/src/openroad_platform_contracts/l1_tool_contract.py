@@ -29,7 +29,17 @@ _FORBIDDEN_SCHEMA_TERMS = frozenset({
 def reject_forbidden_field_tree(name: str, value: Mapping[str, Any]) -> None:
     """Reject unsafe keys in a JSON-like mapping despite spelling variants."""
     _validate_mapping(name, value)
+    _reject_forbidden_value(name, value)
+
+
+def _reject_forbidden_value(name: str, value: Any) -> None:
     forbidden_compact = {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS}
+    if isinstance(value, (tuple, list)):
+        for item in value:
+            _reject_forbidden_value(name, item)
+        return
+    if not isinstance(value, Mapping):
+        return
     for key, item in value.items():
         if not isinstance(key, str):
             raise ValueError(f"{name} keys must be strings")
@@ -38,12 +48,7 @@ def reject_forbidden_field_tree(name: str, value: Mapping[str, Any]) -> None:
         compact = "".join(tokens)
         if snake_case in _FORBIDDEN_SCHEMA_TERMS or compact in forbidden_compact or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
             raise ValueError(f"{name} contains forbidden executable field {key!r}")
-        if isinstance(item, Mapping):
-            reject_forbidden_field_tree(name, item)
-        elif isinstance(item, (tuple, list)):
-            for child in item:
-                if isinstance(child, Mapping):
-                    reject_forbidden_field_tree(name, child)
+        _reject_forbidden_value(name, item)
 
 
 def _identifier_list(name: str, values: tuple[str, ...]) -> None:

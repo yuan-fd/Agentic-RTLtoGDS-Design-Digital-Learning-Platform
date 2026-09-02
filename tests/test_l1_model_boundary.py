@@ -31,7 +31,7 @@ def test_model_boundary_rejects_shell_and_unretrieved_citations():
     malicious={"call":{"call_id":"call-1","goal_id":"goal-1","state_id":"state-1","tool":"query_timing","arguments":{"run_id":"run-1","shell":"rm"},"producer":"model","evidence":[],"schema_version":1},"decision_summary":"inspect timing","citations":[hits[0].evidence.to_dict()]}
     with pytest.raises(ValueError,match="forbidden"):
         L1ModelBoundary.propose_tool(_Provider(malicious),goal,state,hits)
-    tcl={"call":{"call_id":"call-1","goal_id":"goal-1","state_id":"state-1","tool":"query_timing","arguments":{"run_id":"run-1","nested":[{"tclScript":"report_timing"}]},"producer":"model","evidence":[],"schema_version":1},"decision_summary":"inspect timing","citations":[hits[0].evidence.to_dict()]}
+    tcl={"call":{"call_id":"call-1","goal_id":"goal-1","state_id":"state-1","tool":"query_timing","arguments":{"run_id":"run-1","nested":[[{"tclScript":"report_timing"}]]},"producer":"model","evidence":[],"schema_version":1},"decision_summary":"inspect timing","citations":[hits[0].evidence.to_dict()]}
     with pytest.raises(ValueError,match="forbidden"):
         L1ModelBoundary.propose_tool(_Provider(tcl),goal,state,hits)
     uncited={"call":{"call_id":"call-1","goal_id":"goal-1","state_id":"state-1","tool":"query_timing","arguments":{"run_id":"run-1"},"producer":"model","evidence":[],"schema_version":1},"decision_summary":"inspect timing","citations":[{"ref":"docs/evidence/other","sha256":"f"*64,"schema_version":1}]}
