@@ -33,6 +33,12 @@ def test_trace_event_rejects_execution_and_hidden_reasoning_surfaces(field, valu
         L1TraceEvent(**{**_event().__dict__, field: value}).validate()
 
 
+@pytest.mark.parametrize("key", ["shellCommand", "credentialToken", "hiddenReasoning"])
+def test_trace_event_rejects_camel_case_unsafe_facts(key: str) -> None:
+    with pytest.raises(ValueError):
+        L1TraceEvent(**{**_event().__dict__, "facts": {key: "must-not-persist"}}).validate()
+
+
 def test_policy_and_receipt_events_require_their_respective_evidence() -> None:
     with pytest.raises(ValueError, match="requires a verdict"):
         L1TraceEvent(**{**_event(TraceEventKind.POLICY_DECIDED).__dict__, "policy_verdict": None}).validate()

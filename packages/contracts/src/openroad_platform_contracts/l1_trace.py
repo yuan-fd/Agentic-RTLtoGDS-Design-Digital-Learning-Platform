@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 from .agent_control import ToolName
 from .learning import EvidencePointer
+from .l1_tool_contract import reject_forbidden_field_tree
 from .platform import SCHEMA_VERSION, _known_payload, _primitive, _validate_identifier, _validate_mapping, _validate_version
 
 
@@ -31,10 +32,9 @@ _FORBIDDEN_FIELDS = frozenset({
 
 
 def _json_data(name: str, value: Mapping[str, Any]) -> None:
+    reject_forbidden_field_tree(name, value)
     _validate_mapping(name, value)
     for key, item in value.items():
-        if key.lower() in _FORBIDDEN_FIELDS:
-            raise ValueError(f"{name} contains forbidden field {key!r}")
         if isinstance(item, Mapping):
             _json_data(name, item)
         elif isinstance(item, (tuple, list)):

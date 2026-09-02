@@ -22,7 +22,28 @@ _FORBIDDEN_SCHEMA_TERMS = frozenset({
     "command", "cmd", "shell", "script", "executable", "exec", "program", "argv",
     "path", "cwd", "env", "environment", "credential", "api_key", "access_key",
     "private_key", "secret", "authorization", "token", "password",
+    "chain_of_thought", "hidden_reasoning",
 })
+
+
+def reject_forbidden_field_tree(name: str, value: Mapping[str, Any]) -> None:
+    """Reject unsafe keys in a JSON-like mapping despite spelling variants."""
+    _validate_mapping(name, value)
+    forbidden_compact = {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValueError(f"{name} keys must be strings")
+        snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key).lower()
+        tokens = tuple(part for part in re.split(r"[^a-z0-9]+", snake_case) if part)
+        compact = "".join(tokens)
+        if snake_case in _FORBIDDEN_SCHEMA_TERMS or compact in forbidden_compact or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
+            raise ValueError(f"{name} contains forbidden executable field {key!r}")
+        if isinstance(item, Mapping):
+            reject_forbidden_field_tree(name, item)
+        elif isinstance(item, (tuple, list)):
+            for child in item:
+                if isinstance(child, Mapping):
+                    reject_forbidden_field_tree(name, child)
 
 
 def _identifier_list(name: str, values: tuple[str, ...]) -> None:
@@ -35,16 +56,8 @@ def _identifier_list(name: str, values: tuple[str, ...]) -> None:
 
 
 def _schema(name: str, value: Mapping[str, Any]) -> None:
-    _validate_mapping(name, value)
-    for key, item in value.items():
-        if not isinstance(key, str):
-            raise ValueError(f"{name} keys must be strings")
-        snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key).lower()
-        tokens = tuple(part for part in re.split(r"[^a-z0-9]+", snake_case) if part)
-        compact = "".join(tokens)
-        forbidden_compact = {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS}
-        if snake_case in _FORBIDDEN_SCHEMA_TERMS or compact in forbidden_compact or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
-            raise ValueError(f"{name} contains forbidden executable field {key!r}")
+    reject_forbidden_field_tree(name, value)
+    for item in value.values():
         _schema_value(name, item)
 
 

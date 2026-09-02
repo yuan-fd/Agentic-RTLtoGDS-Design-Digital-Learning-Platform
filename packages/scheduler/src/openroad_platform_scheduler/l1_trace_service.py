@@ -11,6 +11,7 @@ from uuid import uuid4
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState, SemanticToolCall, ToolReceipt
 from openroad_platform_contracts.l1_goal_draft import GoalDraft
 from openroad_platform_contracts.l1_observation import RuntimeObservation
+from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 from openroad_platform_contracts.l1_trace import L1TraceEvent, TraceEventKind
 
 from .l1_trace_store import L1TraceStore
@@ -70,24 +71,29 @@ class L1TraceService:
                                                    "producer": call.producer}, hypotheses=hypotheses,
                             evidence=call.evidence)
 
-    def record_policy(self, trace_id: str, state: DesignState, call: SemanticToolCall, *, verdict: str,
-                      summary: str) -> L1TraceEvent:
-        state.validate(); call.validate()
-        if call.goal_id != state.goal_id or call.state_id != state.state_id:
+    def record_policy(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall,
+                      policy: TrustedPolicyIdentity, *, verdict: str, summary: str) -> L1TraceEvent:
+        goal.validate(); state.validate(); call.validate(); policy.validate()
+        if state.goal_id != goal.goal_id or call.goal_id != state.goal_id or call.state_id != state.state_id:
             raise ValueError("policy call does not match trace state")
+        expected = {"l1_policy_id": policy.policy_id, "l1_policy_version": policy.policy_version,
+                    "l1_policy_issuer": policy.issuer, "l1_policy_provenance": policy.provenance.ref,
+                    "l1_policy_provenance_sha256": policy.provenance.sha256}
+        if any(goal.labels.get(key) != value for key, value in expected.items()):
+            raise ValueError("policy identity does not match the finalized DesignGoal")
         if verdict not in {"allow", "deny", "needs_clarification"}:
             raise ValueError("trace policy verdict is unsupported")
         return self._append(trace_id, kind=TraceEventKind.POLICY_DECIDED, goal_id=state.goal_id,
                             state_before=state, state_after=state, planner_summary=summary, tool=call.tool,
-                            policy_verdict=verdict, facts={"call_id": call.call_id}, evidence=call.evidence)
+                            policy_verdict=verdict, facts={"call_id": call.call_id, "policy": policy.to_dict()},
+                            evidence=(*call.evidence, policy.provenance))
 
-    def record_receipt(self, trace_id: str, state: DesignState, receipt: ToolReceipt,
-                       *, next_state: DesignState | None = None) -> L1TraceEvent:
+    def record_receipt(self, trace_id: str, state: DesignState, receipt: ToolReceipt) -> L1TraceEvent:
         receipt.validate()
         if receipt.goal_id != state.goal_id or receipt.state_id != state.state_id:
             raise ValueError("tool receipt does not match trace state")
         return self._append(trace_id, kind=TraceEventKind.TOOL_RECEIPT, goal_id=state.goal_id,
-                            state_before=state, state_after=next_state or state, tool=receipt.tool,
+                            state_before=state, state_after=state, tool=receipt.tool,
                             facts={"call_id": receipt.call_id, "status": receipt.status, "result": receipt.result},
                             evidence=receipt.evidence)
 
