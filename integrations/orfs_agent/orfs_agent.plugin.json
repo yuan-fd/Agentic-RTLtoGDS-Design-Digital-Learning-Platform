@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orfs-agent",
+  "plugin_version": "2025.1",
+  "adapter_entry": ["python3", "./orfs_agent_adapter.py"],
+  "capabilities": ["optimizer.l2.dataset-bridge"],
+  "supported_arch": ["aarch64", "x86_64"],
+  "input_schema": {
+    "type": "object",
+    "required": ["design", "platform", "objective", "observations"]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["status", "artifacts", "provenance"]
+  },
+  "required_tools": ["git", "python3"],
+  "default_timeout_seconds": 1800,
+  "artifact_rules": [
+    {"kind": "optimizer_dataset", "required": true},
+    {"kind": "optimizer_input_manifest", "required": true},
+    {"kind": "upstream_source_lock", "required": true},
+    {"kind": "report", "required": false},
+    {"kind": "log", "required": false}
+  ],
+  "environment": {}
+}
