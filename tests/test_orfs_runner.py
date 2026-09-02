@@ -62,6 +62,7 @@ def test_runner_executes_stages_and_applies_finish_hard_gate(tmp_path):
     # Execution owns raw process evidence; derived analysis is a separate
     # post-processing concern and must not be created by the runner.
     assert not (Path(plan.workdir) / "analysis/report.json").exists()
+    assert not (Path(plan.workdir) / "analysis/parameter_liveness.json").exists()
     assert (Path(plan.workdir) / "run_result.json").is_file()
 
 
