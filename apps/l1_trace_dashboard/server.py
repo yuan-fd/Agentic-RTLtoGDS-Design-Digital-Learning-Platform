@@ -6,8 +6,7 @@ import json
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
-from openroad_platform_scheduler.l1_trace_projection import list_trace_ids, project_trace
-from openroad_platform_scheduler.l1_trace_store import L1TraceStore
+from openroad_platform_scheduler.l1_trace_projection import L1TraceReader, list_trace_ids, project_trace
 
 ROOT = Path(__file__).parent
 def handler(store):
@@ -29,6 +28,6 @@ def handler(store):
     return DashboardHandler
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("--trace-db",type=Path,required=True); parser.add_argument("--host",default="127.0.0.1"); parser.add_argument("--port",type=int,default=8765); args=parser.parse_args()
-    Dashboard=handler(L1TraceStore(args.trace_db))
+    Dashboard=handler(L1TraceReader(args.trace_db))
     ThreadingHTTPServer((args.host,args.port),Dashboard).serve_forever()
 if __name__ == "__main__": main()

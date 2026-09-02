@@ -2,8 +2,9 @@
 
 S7 adds a standalone read-only dashboard at `apps/l1_trace_dashboard/`.  It
 does not alter the legacy web application or API.  Its only data source is
-`L1TraceStore`, whose `read()` validates the append-only hash chain before
-`l1_trace_projection` turns stored events into JSON.
+`L1TraceReader`, which opens SQLite with `mode=ro`, performs no mkdir/DDL or
+migration, fails closed for missing/old schemas, and validates the append-only
+hash chain before `l1_trace_projection` turns stored events into JSON.
 
 The UI shows the tutorial-required layers: goal/Goal IR events, typed calls
 and policy verdicts, Runtime receipts/state transitions, evidence references,
