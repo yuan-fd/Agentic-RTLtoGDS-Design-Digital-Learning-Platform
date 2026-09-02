@@ -55,9 +55,14 @@ class L1TraceService:
 
     def record_goal(self, trace_id: str, goal: DesignGoal) -> L1TraceEvent:
         goal.validate()
+        policy_anchor = {key: goal.labels[key] for key in (
+            "l1_policy_id", "l1_policy_version", "l1_policy_issuer",
+            "l1_policy_provenance", "l1_policy_provenance_sha256",
+        ) if key in goal.labels}
         return self._append(trace_id, kind=TraceEventKind.GOAL_FINALIZED, goal_id=goal.goal_id,
                             facts={"goal_sha256": _hash(goal), "toolchain_id": goal.toolchain_id,
-                                   "pdk_id": goal.pdk_id, "allowed_tools": [item.value for item in goal.allowed_tools]},
+                                   "pdk_id": goal.pdk_id, "allowed_tools": [item.value for item in goal.allowed_tools],
+                                   "policy_anchor": policy_anchor},
                             evidence=(goal.rtl_artifact,))
 
     def record_call(self, trace_id: str, state: DesignState, call: SemanticToolCall,
@@ -81,6 +86,13 @@ class L1TraceService:
                     "l1_policy_provenance_sha256": policy.provenance.sha256}
         if any(goal.labels.get(key) != value for key, value in expected.items()):
             raise ValueError("policy identity does not match the finalized DesignGoal")
+        finalized = [event for event in self.store.read(trace_id)
+                     if event.kind is TraceEventKind.GOAL_FINALIZED and event.goal_id == goal.goal_id]
+        if len(finalized) != 1:
+            raise ValueError("policy decision requires exactly one finalized Goal trace anchor")
+        anchor = finalized[0].facts
+        if anchor.get("goal_sha256") != _hash(goal) or anchor.get("policy_anchor") != expected:
+            raise ValueError("policy decision does not match the durable finalized Goal anchor")
         if verdict not in {"allow", "deny", "needs_clarification"}:
             raise ValueError("trace policy verdict is unsupported")
         return self._append(trace_id, kind=TraceEventKind.POLICY_DECIDED, goal_id=state.goal_id,

@@ -64,6 +64,11 @@ def test_trace_receipt_cannot_advance_state_and_policy_must_match_goal(tmp_path:
     import pytest
     with pytest.raises(ValueError, match="identity"):
         trace.record_policy("trace-1", goal, state, call, wrong, verdict="allow", summary="no")
+    with pytest.raises(ValueError, match="finalized Goal"):
+        trace.record_policy("trace-1", goal, state, call, _policy(), verdict="allow", summary="no")
+    trace.record_goal("trace-1", goal)
+    policy_event = trace.record_policy("trace-1", goal, state, call, _policy(), verdict="allow", summary="ok")
+    assert policy_event.facts["policy"]["policy_id"] == "policy-1"
     receipt = ToolReceipt("call-1", "goal-1", "state-1", ToolName.QUERY_TIMING, "completed", {}, (EvidencePointer("run:run-1", "e" * 64),), "forged-state")
     event = trace.record_receipt("trace-1", state, receipt)
     assert event.state_before_sha256 == event.state_after_sha256
