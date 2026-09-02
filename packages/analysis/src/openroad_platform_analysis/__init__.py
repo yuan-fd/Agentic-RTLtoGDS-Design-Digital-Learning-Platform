@@ -1,97 +1,39 @@
-"""Deterministic ORFS evidence, diagnostics, layout density, and comparisons."""
+"""Evidence boundary with an explicitly lazy legacy research surface.
 
-from .diagnosis import diagnose
-from .pipeline import analyze_run
-from .reporter import build_llm_prompt, build_report
+The product path imports this package for evidence readers and the protected
+ORFS evaluator.  It must not import BO/GP, evolution, or other optional
+research implementations merely as an import side effect.
+"""
 
-from .knowledge_base import (
-    EvidenceContext, EvidenceKnowledgeBase, KnowledgeRecord,
-)
-from .evolve_agent import EvidenceDrivenEvolveAgent, EvolutionProposal
-from .evidence_rag import EvidenceBundle, EvidenceKnowledgeRecordV2, EvidenceRAG
-from .learning_data import LearningDatasetStore, RuntimeEvidenceExporter
-from .optimization import (
-    GaussianProcessRegressorLite,
-    MultiObjectiveBayesianOptimizer,
-    OptimizationStudyStore,
-    pareto_front,
-    proposal_to_experiment_plan,
-)
-from .iterative_agent import (
-    AnalysisLayer, CoderAgent, DisruptorAgent, HeadroomLedger,
-    HeadroomEntry, IterationLedger, IterationState, OptimizerAgent,
-    OptimizerHypothesis, OptimizerPlan,
-)
-from .lessons import LessonsStore, Lesson, distill_lesson, lesson_from_iteration
-from .skills import SkillsStore, Skill, apply_skill
-from .feedback_loop import FeedbackLoop, FeedbackOutcome
-from .offline_policy import (
-    BehaviorCloningShadowPolicy,
-    OfflineLinearQShadowPolicy,
-    OfflineInteractionQShadowPolicy,
-    build_trajectory,
-    split_by_design,
-)
-from .open_knowledge import (
-    BenchmarkDefinition, CorpusSnapshot, DocumentClaim, KnowledgeSource,
-    PublicKnowledgeRegistry, load_public_manifest,
-)
-from .learning_collector import CollectionReceipt, LearningCollector, TenantLearningStore
-from .recommendations import (
-    AutomationEnvelope, ConfidenceBreakdown, PolicyRecommendation,
-    RecommendationStore, UserDecision, automation_envelope, build_recommendation,
-)
-from .research_methods import RESEARCH_METHODS, ResearchMethod, research_method_catalog
-from .calibration import (
-    CalibrationReport, OODAssessment, assess_ood, bounded_benchmark_points, calibrate_gp,
-)
-from .design_ir import build_design_ir, design_ir_json, evidence_cards_from_design_ir
-from .runtime_ir import build_run_evidence_ir, evidence_cards_from_run_ir
-from .design_suite import list_design_packages, load_design_package
-from .replication import compare_replication_reports, replication_report
-from .causal_evidence import factorial_interaction_report, validate_holdout_interaction
-from .causal_learning import followup_from_interaction, teacher_context_from_holdout
-from .native_orfs_evidence import native_orfs_run_view
-from .verification_evidence import generate_mutants, mutation_report, independent_verification_gate
-from .edair import agent_evidence_view, artifact_ref, build_edair, evidence_packet, physical_ir, timing_ir
-from .circuitops_ir import circuitops_lpg_ir, export_netlist_to_circuitops, request_table_rows
-from .hypothesis_ledger import HypothesisLedger, assess_hypothesis, promote_after_holdout, reflection_hypothesis
-from .closed_loop import (
-    summarize_replicates, relative_utility, stalled_decision, diagnosis_packet,
-    paired_replica_seeds,
-)
-from .paper_harness import PaperProtocolStore, compare_arms, preregister_protocol, summarize_arm
+from __future__ import annotations
 
-__all__ = [
-    "analyze_run", "build_llm_prompt", "build_report", "diagnose",
-    "EvidenceContext", "EvidenceKnowledgeBase", "KnowledgeRecord",
-    "EvidenceDrivenEvolveAgent", "EvolutionProposal",
-    "EvidenceBundle", "EvidenceKnowledgeRecordV2", "EvidenceRAG",
-    "LearningDatasetStore", "RuntimeEvidenceExporter",
-    "GaussianProcessRegressorLite", "MultiObjectiveBayesianOptimizer",
-    "OptimizationStudyStore", "pareto_front", "proposal_to_experiment_plan",
-    "BehaviorCloningShadowPolicy", "OfflineLinearQShadowPolicy", "OfflineInteractionQShadowPolicy",
-    "build_trajectory", "split_by_design",
-    "BenchmarkDefinition", "CorpusSnapshot", "DocumentClaim", "KnowledgeSource",
-    "PublicKnowledgeRegistry", "load_public_manifest",
-    "CollectionReceipt", "LearningCollector", "TenantLearningStore",
-    "AutomationEnvelope", "ConfidenceBreakdown", "PolicyRecommendation",
-    "RecommendationStore", "UserDecision", "automation_envelope",
-    "build_recommendation",
-    "RESEARCH_METHODS", "ResearchMethod", "research_method_catalog",
-    "CalibrationReport", "OODAssessment", "assess_ood",
-    "bounded_benchmark_points", "calibrate_gp",
-    "build_design_ir", "design_ir_json", "evidence_cards_from_design_ir",
-    "build_run_evidence_ir", "evidence_cards_from_run_ir",
-    "list_design_packages", "load_design_package",
-    "replication_report", "compare_replication_reports",
-    "factorial_interaction_report", "validate_holdout_interaction",
-    "followup_from_interaction", "teacher_context_from_holdout", "native_orfs_run_view",
-    "generate_mutants", "mutation_report", "independent_verification_gate",
-    "artifact_ref", "timing_ir", "physical_ir", "build_edair", "agent_evidence_view", "evidence_packet",
-    "circuitops_lpg_ir", "export_netlist_to_circuitops", "request_table_rows",
-    "HypothesisLedger", "reflection_hypothesis", "assess_hypothesis", "promote_after_holdout",
-    "summarize_replicates", "relative_utility", "stalled_decision", "diagnosis_packet",
-    "paired_replica_seeds",
-    "PaperProtocolStore", "preregister_protocol", "summarize_arm", "compare_arms",
-]
+from importlib import import_module
+
+from .common_evaluator import evaluate_orfs_run, write_immutable_evaluation
+from .orfs_protected_evaluator import ORFSProtectedEvaluator
+
+
+__all__ = ("evaluate_orfs_run", "write_immutable_evaluation", "ORFSProtectedEvaluator")
+
+_LEGACY_MODULES = (
+    "diagnosis", "pipeline", "reporter", "knowledge_base", "evolve_agent",
+    "evidence_rag", "learning_data", "optimization", "optimizer_plugins",
+    "iterative_agent", "lessons", "skills", "feedback_loop", "offline_policy",
+    "open_knowledge", "learning_collector", "recommendations", "research_methods",
+    "calibration", "design_ir", "runtime_ir", "design_suite", "replication",
+    "causal_evidence", "causal_learning", "native_orfs_evidence",
+    "verification_evidence", "edair", "circuitops_ir", "hypothesis_ledger",
+    "closed_loop", "paper_harness", "optimization_memory", "state_tuning",
+    "official_autotuner", "industrial_dse_protocol", "paper_statistics",
+)
+
+
+def __getattr__(name: str):
+    """Resolve historical research exports only when a legacy caller asks."""
+    for module_name in _LEGACY_MODULES:
+        module = import_module(f"{__name__}.{module_name}")
+        if hasattr(module, name):
+            value = getattr(module, name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
