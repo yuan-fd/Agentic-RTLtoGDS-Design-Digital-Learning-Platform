@@ -111,6 +111,42 @@ def _result(*, status: str, started: str, artifacts: list[dict[str, str]],
             "failure": failure, "provenance": dict(provenance)}
 
 
+def _validate_domain_and_observations(domain: Mapping[str, Any], observations: list[Any], platform: str) -> None:
+    required = {"schema_version", "platform", "search_parameter_names", "admissible_values", "fixed_parameters",
+                "experiment_protocol", "protocol_sha256", "frozen_constraints", "domain_sha256"}
+    if set(domain) != required or domain.get("schema_version") != 1 or domain.get("platform") != platform:
+        raise ValueError("parameter_domain has unknown or missing fields")
+    unsigned = {key: value for key, value in domain.items() if key != "domain_sha256"}
+    if domain.get("domain_sha256") != hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()).hexdigest():
+        raise ValueError("parameter_domain hash is invalid")
+    protocol = domain["experiment_protocol"]
+    protocol_keys = {"rtl_sha256", "pdk_id", "toolchain_id", "sdc_sha256", "evaluator_version", "seed_policy", "timing"}
+    if not isinstance(protocol, Mapping) or set(protocol) != protocol_keys or not isinstance(protocol.get("timing"), Mapping):
+        raise ValueError("experiment protocol is invalid")
+    protocol_hash = hashlib.sha256(json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if domain.get("protocol_sha256") != protocol_hash or set(protocol["timing"]) != {"clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"}:
+        raise ValueError("experiment protocol hash or timing is invalid")
+    names = {"core_utilization_pct", "tns_end_percent", "global_placement_padding", "detail_placement_padding",
+             "enable_dpo", "place_density_lb_addon", "cts_cluster_size", "cts_cluster_diameter"}
+    search, fixed = domain.get("search_parameter_names"), domain.get("fixed_parameters")
+    values = domain.get("admissible_values")
+    if not isinstance(search, list) or set(search) | set(fixed or {}) != names or set(search) & set(fixed or {}) or set(values or {}) != set(search):
+        raise ValueError("parameter_domain is not a complete allowlisted partition")
+    if domain.get("frozen_constraints") != ["clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"]:
+        raise ValueError("parameter_domain frozen constraints are invalid")
+    for observation in observations:
+        parameters = observation.get("parameters") if isinstance(observation, Mapping) else None
+        if not isinstance(parameters, Mapping) or set(parameters) != names | {"clock_period_ns"}:
+            raise ValueError("observation must contain the frozen clock and complete shared domain")
+        if observation.get("protocol_sha256") != protocol_hash or float(parameters["clock_period_ns"]) != float(protocol["timing"]["clock_period_ns"]):
+            raise ValueError("observation does not match the frozen experiment protocol")
+        for name in names:
+            if name in fixed and parameters[name] != fixed[name]:
+                raise ValueError("observation fixed parameter differs from its domain")
+            if name in values and parameters[name] not in values[name]:
+                raise ValueError("observation search parameter is outside its domain")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--request", type=Path, required=True)
@@ -130,14 +166,9 @@ def main() -> int:
             raise ValueError("design, platform, objective, and non-empty observations are required")
         if not all(isinstance(item, Mapping) for item in observations):
             raise ValueError("observations must be objects")
-        if not isinstance(parameter_domain, Mapping) or parameter_domain.get("platform") != platform:
+        if not isinstance(parameter_domain, Mapping):
             raise ValueError("a typed parameter_domain for the requested platform is required")
-        expected_domain_hash = parameter_domain.get("domain_sha256")
-        domain_without_hash = {key: value for key, value in parameter_domain.items() if key != "domain_sha256"}
-        actual_domain_hash = hashlib.sha256(json.dumps(
-            domain_without_hash, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        if not isinstance(expected_domain_hash, str) or expected_domain_hash != actual_domain_hash:
-            raise ValueError("parameter_domain hash is invalid")
+        _validate_domain_and_observations(parameter_domain, observations, platform)
         upstream = _checked_source(_load_lock())
         rows = [_row(item, design=design, platform=platform) for item in observations]
         workspace = args.result.parent

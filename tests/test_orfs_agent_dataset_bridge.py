@@ -62,6 +62,9 @@ def _domain() -> ORFSAgentDomain:
         fixed_parameters={"tns_end_percent": 100, "global_placement_padding": 2,
                           "detail_placement_padding": 1, "place_density_lb_addon": .2,
                           "cts_cluster_size": 20, "cts_cluster_diameter": 90},
+        experiment_protocol={"rtl_sha256": "a" * 64, "pdk_id": "asap7", "toolchain_id": "openroad-26Q1",
+                             "sdc_sha256": "b" * 64, "evaluator_version": "orfs-protected-v1", "seed_policy": "fixed-v1",
+                             "timing": {"clock_period_ns": 1.0, "clock_uncertainty_ns": .1, "io_delay_ns": .2}},
     )
 
 
@@ -71,22 +74,56 @@ def test_typed_domain_is_complete_and_keeps_timing_constraints_frozen():
         "core_utilization_pct", "tns_end_percent", "global_placement_padding",
         "detail_placement_padding", "enable_dpo", "place_density_lb_addon",
         "cts_cluster_size", "cts_cluster_diameter"}
-    assert domain["frozen_constraints"] == ["clock_period_ns", "clock_uncertainty", "io_delay"]
+    assert domain["frozen_constraints"] == ["clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"]
     with pytest.raises(ValueError, match="padding relation"):
         ORFSAgentDomain.create(platform="asap7", search_parameter_names=(
             "core_utilization_pct", "global_placement_padding", "detail_placement_padding"),
             admissible_values={"core_utilization_pct": (40, 50), "global_placement_padding": (1, 2),
                                "detail_placement_padding": (0, 1)},
             fixed_parameters={"tns_end_percent": 100, "enable_dpo": 1, "place_density_lb_addon": .2,
-                              "cts_cluster_size": 20, "cts_cluster_diameter": 90})
+                              "cts_cluster_size": 20, "cts_cluster_diameter": 90},
+            experiment_protocol=_domain().experiment_protocol)
 
 
 def test_task_builder_carries_the_immutable_domain_not_an_optimizer_request():
     task = build_orfs_agent_dataset_task(project_id="p5", design_id="ibex", objective="ECP_final",
-                                         observations=[{"parameters": {}, "metrics": {}}], domain=_domain(),
+                                         observations=[_observation()], domain=_domain(),
                                          task_id="orfs-agent-domain-test")
     assert task.inputs["parameter_domain"]["domain_sha256"]
     assert task.expected_artifacts == ("optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock")
+
+
+def _observation() -> dict:
+    domain = _domain()
+    return {"run_id": "run-001", "protocol_sha256": domain.to_dict()["protocol_sha256"], "feasible": True,
+            "parameters": {"clock_period_ns": 1.0, "core_utilization_pct": 40, "tns_end_percent": 100,
+                           "global_placement_padding": 2, "detail_placement_padding": 1, "enable_dpo": 0,
+                           "place_density_lb_addon": .2, "cts_cluster_size": 20, "cts_cluster_diameter": 90}, "metrics": {}}
+
+
+def test_domain_refuses_forged_payload_and_mixed_observations():
+    payload = _domain().to_dict(); payload["anything"] = "forged"
+    with pytest.raises(ValueError, match="unknown or missing"):
+        ORFSAgentDomain.from_dict(payload)
+    observation = _observation(); observation["parameters"]["core_utilization_pct"] = 99
+    with pytest.raises(ValueError, match="outside"):
+        _domain().validate_observation(observation)
+    observation = _observation(); observation["protocol_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="protocol"):
+        _domain().validate_observation(observation)
+
+
+def test_adapter_rechecks_domain_and_observation_boundary():
+    domain = _domain().to_dict(); observation = _observation()
+    bridge._validate_domain_and_observations(domain, [observation], "asap7")
+    forged = {"platform": "asap7", "anything": "x"}
+    forged["domain_sha256"] = __import__("hashlib").sha256(
+        json.dumps({"platform": "asap7", "anything": "x"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    with pytest.raises(ValueError, match="unknown or missing"):
+        bridge._validate_domain_and_observations(forged, [observation], "asap7")
+    bad = _observation(); del bad["parameters"]["enable_dpo"]
+    with pytest.raises(ValueError, match="complete shared domain"):
+        bridge._validate_domain_and_observations(domain, [bad], "asap7")
 
 
 def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch, tmp_path):
@@ -108,8 +145,7 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
     request.write_text(json.dumps({"plugin": {"plugin_id": "orfs-agent"}, "task": {
         "task_id": "dataset-001", "plugin_id": "orfs-agent", "inputs": {
             "design": "ibex", "platform": "asap7", "objective": "ECP_final", "observations": [{
-                "run_id": "run-001", "parameters": {"clock_period_ns": 1.0},
-                "metrics": {"setup_wns_ns": -.1}, "artifact_refs": ["runtime:run-001:qor"], "feasible": True,
+                **_observation(), "metrics": {"setup_wns_ns": -.1}, "artifact_refs": ["runtime:run-001:qor"],
             }], "parameter_domain": _domain().to_dict(),
         },
     }}), encoding="utf-8")
