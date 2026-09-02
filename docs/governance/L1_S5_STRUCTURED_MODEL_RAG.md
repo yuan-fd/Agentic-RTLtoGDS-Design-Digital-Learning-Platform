@@ -29,6 +29,7 @@ typed call -> L1SemanticToolPolicy -> S4 loop -> Runtime
 - `packages/scheduler/src/openroad_platform_scheduler/l1_model_boundary.py`
 - `packages/contracts/src/openroad_platform_contracts/l1_tool_contract.py` (shared recursive shell/Tcl exclusion)
 - `tests/test_l1_model_boundary.py`
+- `docs/evidence/l1_s5_structured_boundary.txt`
 - this document
 
 Runtime, protected evaluator, execution packages, external optimizer
@@ -48,10 +49,13 @@ external executable integration.  They prove provider-independent typed
 draft decoding, request immutability, recursive shell rejection, rejection of
 uncited retrieval claims, and final policy validation of the proposed tool.
 S6 will provide the first actual provider-to-S4-to-Runtime tutorial smoke.
+The immutable test evidence is
+`docs/evidence/l1_s5_structured_boundary.txt`
+(`767104decddbd366ac2853b237a475d163a2396375e0d19bc60ffa05639469f9`);
+its terminal status is `PASS`.
 
 ## Rollback
 
-For the S5 completion repair, first run `git revert HEAD` while `HEAD` is the
-completion-repair commit, then run `git revert 2121340`, followed by
-`git revert da11639`.  No schema, Runtime state, external project, or
+Revert S5 commits in this exact newest-to-oldest order: `fffeb32`, then
+`2121340`, then `da11639`.  No schema, Runtime state, external project, or
 protected experiment input requires data migration or cleanup.

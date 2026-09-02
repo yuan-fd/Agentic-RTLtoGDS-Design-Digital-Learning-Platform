@@ -1,0 +1,16 @@
+L1 S5 structured model/RAG boundary acceptance evidence
+Terminal status: PASS
+
+Command:
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src \
+  .tools/venvs/orfs-agent/bin/python -m pytest -q \
+  tests/test_l1_model_boundary.py tests/test_l1_goal_draft_contracts.py \
+  tests/test_l1_goal_finalizer.py tests/test_l1_tool_contracts.py
+
+Result: 12 passed
+
+Covered invariants: typed draft request preservation; provider output shape;
+recursive root/nested/list-of-list Tcl rejection including camelCase;
+read-only retrieval citations; and finalized semantic-policy validation.
+No Runtime, evaluator, external optimizer, or historical evidence was used or
+changed by this deterministic boundary test.
