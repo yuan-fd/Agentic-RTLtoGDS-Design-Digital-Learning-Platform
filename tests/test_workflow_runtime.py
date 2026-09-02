@@ -4,6 +4,7 @@ import platform
 import sys
 import threading
 import time
+import json
 from pathlib import Path
 
 from openroad_platform_contracts import PluginManifest, RuntimeStatus, TaskSpec
@@ -36,6 +37,22 @@ def task(*, timeout_seconds: int = 10) -> TaskSpec:
     )
 
 
+class _RecordingEvaluator:
+    """A platform evaluator double: it only adds workspace-local evidence."""
+
+    def __init__(self):
+        self.calls = []
+
+    def evaluate(self, *, manifest, task, workspace):
+        self.calls.append((manifest.plugin_id, task.task_id, workspace))
+        path = Path(workspace) / "protected-evaluation.json"
+        path.write_text(json.dumps({"canonical": True}), encoding="utf-8")
+        return ({
+            "kind": "report", "path": "protected-evaluation.json",
+            "metadata": {"producer": "test-protected-evaluator"},
+        },)
+
+
 def test_runtime_executes_full_contract_attempt_evidence_chain(tmp_path):
     store = RuntimeStore(tmp_path / "runtime.db")
     runtime = WorkflowRuntime(
@@ -55,6 +72,72 @@ def test_runtime_executes_full_contract_attempt_evidence_chain(tmp_path):
         "run.accepted", "stage.ready", "attempt.started",
         "artifact.registered", "metric.recorded", "attempt.finished", "run.finished",
     ]
+
+
+def test_runtime_rejects_adapter_that_tampers_orfs_protocol_receipt(tmp_path):
+    protocol = {"rtl_sha256": "a" * 64, "pdk_id": "asap7", "toolchain_id": "openroad",
+                "sdc_sha256": "b" * 64, "evaluator_version": "v1", "seed_policy": "fixed",
+                "timing": {"clock_period_ns": 1.0, "clock_uncertainty_ns": .1, "io_delay_ns": .2}}
+    manifest = PluginManifest(plugin_id="orfs-agent", plugin_version="test",
+        adapter_entry=(sys.executable, str(FIXTURES / "tamper_receipt_adapter.py")), capabilities=("test.orfs",),
+        supported_arch=(platform.machine(),), input_schema={"type": "object"}, output_schema={"type": "object"},
+        artifact_rules=({"kind": "report", "required": True}, {"kind": "runtime_protocol_receipt", "required": False}))
+    task = TaskSpec(task_id="tamper-receipt", project_id="p", design_id="d", plugin_id="orfs-agent",
+        inputs={"parameter_domain": {"experiment_protocol": protocol}}, expected_artifacts=("report",))
+    runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([manifest]), workspace_root=tmp_path / "work")
+    run = runtime.submit(task, capability="test.orfs")
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+
+
+def test_runtime_registers_post_execution_evaluator_evidence_after_adapter_success(tmp_path):
+    store = RuntimeStore(tmp_path / "runtime.db")
+    evaluator = _RecordingEvaluator()
+    runtime = WorkflowRuntime(
+        store, registry("echo_adapter.py"), protected_evaluator=evaluator,
+        workspace_root=tmp_path / "workspaces", worker_id="test-worker",
+    )
+
+    run = runtime.submit(task(), capability="test.echo")
+    completed = runtime.execute_once(run.run_id)
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+
+    assert completed.status is RuntimeStatus.SUCCEEDED
+    assert evaluator.calls and evaluator.calls[0][:2] == ("echo", "task-e2e")
+    artifact = next(item for item in attempt["artifacts"]
+                    if item["store_key"] == "protected-evaluation.json")
+    path = Path(attempt["workspace"]) / artifact["store_key"]
+    assert artifact["metadata"]["producer"] == "test-protected-evaluator"
+    assert artifact["sha256"] == __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+
+
+def test_runtime_rejects_evaluator_artifact_outside_workspace(tmp_path):
+    class UnsafeEvaluator:
+        def evaluate(self, **_kwargs):
+            return ({"kind": "report", "path": "../outside.json"},)
+
+    runtime = WorkflowRuntime(
+        RuntimeStore(tmp_path / "runtime.db"), registry("echo_adapter.py"),
+        protected_evaluator=UnsafeEvaluator(),
+        workspace_root=tmp_path / "workspaces", worker_id="test-worker",
+    )
+    run = runtime.submit(task(), capability="test.echo")
+
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+    assert attempt["failure"]["category"] == "runtime_error"
+    assert all(item["store_key"] != "../outside.json" for item in attempt["artifacts"])
+
+
+def test_runtime_idempotent_submission_reuses_only_the_same_immutable_task(tmp_path):
+    runtime = WorkflowRuntime(
+        RuntimeStore(tmp_path / "runtime.db"), registry("echo_adapter.py"),
+        workspace_root=tmp_path / "workspaces", worker_id="test-worker",
+    )
+    first = runtime.submit_idempotent(task(), capability="test.echo")
+    again = runtime.submit_idempotent(task(), capability="test.echo")
+
+    assert again.run_id == first.run_id
+    assert len(runtime.store.list_runs()) == 1
 
 
 def test_runtime_injects_ephemeral_credential_without_persisting_value(tmp_path):

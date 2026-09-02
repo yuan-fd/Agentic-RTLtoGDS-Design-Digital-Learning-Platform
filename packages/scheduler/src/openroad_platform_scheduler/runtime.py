@@ -150,6 +150,7 @@ class WorkflowRuntime:
         )
         try:
             runtime_receipt: dict | None = None
+            runtime_receipt_sha256: str | None = None
             environment = dict(self.environment_resolver(run) if self.environment_resolver else {})
             if ready.plugin_id == "orfs-agent":
                 domain = run.task_spec.inputs.get("parameter_domain")
@@ -160,7 +161,8 @@ class WorkflowRuntime:
                 receipt.write_text(json.dumps({"schema_version": 1, "protocol": domain["experiment_protocol"],
                                                "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
                 environment["ORFS_AGENT_PROTOCOL_RECEIPT"] = str(receipt)
-                environment["ORFS_AGENT_PROTOCOL_RECEIPT_SHA256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+                runtime_receipt_sha256 = hashlib.sha256(receipt.read_bytes()).hexdigest()
+                environment["ORFS_AGENT_PROTOCOL_RECEIPT_SHA256"] = runtime_receipt_sha256
                 runtime_receipt = {
                     "kind": "runtime_protocol_receipt", "path": receipt.name,
                     "metadata": {"producer": "runtime", "attempt_id": attempt.attempt_id},
@@ -174,6 +176,8 @@ class WorkflowRuntime:
                 environment=environment,
             )
             if execution.result.status is RuntimeStatus.SUCCEEDED:
+                if runtime_receipt is not None and runtime_receipt_sha256 != hashlib.sha256(receipt.read_bytes()).hexdigest():
+                    raise ValueError("adapter modified the Runtime protocol receipt")
                 runtime_artifacts = self.adapter.validate_additional_artifacts(
                     workspace, manifest, (runtime_receipt,) if runtime_receipt is not None else ())
                 evaluator_artifacts: tuple[dict, ...] = ()
