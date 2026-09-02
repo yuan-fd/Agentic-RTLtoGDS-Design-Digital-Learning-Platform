@@ -149,7 +149,16 @@ class L1TraceService:
         expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
         if after != expected:
             raise ValueError("observation successor state is not the canonical reducer result")
-        return self._append(trace_id, kind=TraceEventKind.STATE_TRANSITION, goal_id=before.goal_id,
-                            state_before=before, state_after=after, facts={"run_id": observation.run_id,
-                            "attempt_id": observation.attempt_id, "terminal_status": observation.terminal_status,
-                            "metrics": observation.metrics}, evidence=observation.evidence)
+        existing = self.store.read(trace_id)
+        previous = existing[-1] if existing else None
+        event = L1TraceEvent(
+            trace_id=trace_id, event_id=f"trace-event-{uuid4().hex}", sequence=len(existing),
+            kind=TraceEventKind.STATE_TRANSITION, goal_id=before.goal_id, occurred_at=self.clock().isoformat(),
+            state_before_sha256=_hash(before), state_after_sha256=_hash(after), planner_summary=None,
+            tool=None, policy_verdict=None, facts={"run_id": observation.run_id,
+            "attempt_id": observation.attempt_id, "terminal_status": observation.terminal_status,
+            "metrics": observation.metrics}, hypotheses={}, evidence=observation.evidence,
+            parent_event_id=previous.event_id if previous else None,
+        )
+        self.store.append_state_transition(event, before=before, after=after, observation=observation)
+        return event

@@ -7,7 +7,10 @@ import json
 import sqlite3
 from pathlib import Path
 
-from openroad_platform_contracts.l1_trace import L1TraceEvent
+from openroad_platform_contracts.l1_trace import L1TraceEvent, TraceEventKind
+from openroad_platform_contracts.l1_observation import RuntimeObservation
+
+from .l1_state_reducer import L1StateReducer
 
 
 def _canonical(event: L1TraceEvent) -> str:
@@ -23,6 +26,11 @@ def _digest(serialized: str, previous_event_sha256: str | None = None) -> str:
     """
     predecessor = previous_event_sha256 or ""
     return hashlib.sha256((predecessor + "\n" + serialized).encode("utf-8")).hexdigest()
+
+
+def _digest_event(value: object) -> str:
+    payload = value.to_dict() if hasattr(value, "to_dict") else value
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 class L1TraceStore:
@@ -55,6 +63,22 @@ class L1TraceStore:
         return connection
 
     def append(self, event: L1TraceEvent) -> str:
+        if event.kind is TraceEventKind.STATE_TRANSITION:
+            raise ValueError("state transitions require the Runtime observation append boundary")
+        return self._append(event)
+
+    def append_state_transition(self, event: L1TraceEvent, *, before, after,
+                                observation: RuntimeObservation) -> str:
+        if event.kind is not TraceEventKind.STATE_TRANSITION:
+            raise ValueError("Runtime observation append boundary only accepts state transitions")
+        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
+        if after != expected:
+            raise ValueError("state transition does not match canonical Runtime reducer result")
+        if event.state_before_sha256 != _digest_event(before) or event.state_after_sha256 != _digest_event(after):
+            raise ValueError("state transition hashes do not match Runtime reducer states")
+        return self._append(event)
+
+    def _append(self, event: L1TraceEvent) -> str:
         event.validate()
         payload = _canonical(event)
         with self._connect() as connection:

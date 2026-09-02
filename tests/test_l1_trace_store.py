@@ -60,6 +60,13 @@ def test_store_rejects_state_hash_discontinuity(tmp_path: Path) -> None:
         store.append(delayed_broken)
 
 
+def test_store_rejects_direct_state_transition_event(tmp_path: Path) -> None:
+    store = L1TraceStore(tmp_path / "trace.sqlite")
+    transition = L1TraceEvent(**{**_event(0, None).__dict__, "kind": TraceEventKind.STATE_TRANSITION})
+    with pytest.raises(ValueError, match="Runtime observation"):
+        store.append(transition)
+
+
 @pytest.mark.parametrize("column", ["event_json", "parent_event_id", "sequence"])
 def test_store_rejects_rehashed_or_relinked_history(tmp_path: Path, column: str) -> None:
     database = tmp_path / "trace.sqlite"; store = L1TraceStore(database)

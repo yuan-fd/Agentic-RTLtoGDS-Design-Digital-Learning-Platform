@@ -77,6 +77,14 @@ def test_trace_receipt_cannot_advance_state_and_policy_must_match_goal(tmp_path:
     assert event.state_before_sha256 == event.state_after_sha256
 
 
+def test_trace_receipt_requires_prior_call_and_allowed_policy(tmp_path: Path) -> None:
+    import pytest
+    trace = L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")); state = _state()
+    receipt = ToolReceipt("call-1", "goal-1", "state-1", ToolName.QUERY_TIMING, "completed", {}, (EvidencePointer("run:run-1", "e" * 64),), None)
+    with pytest.raises(ValueError, match="prior matching tool call"):
+        trace.record_receipt("trace-1", state, receipt)
+
+
 def test_trace_service_rejects_forked_or_stale_stateful_events(tmp_path: Path) -> None:
     import pytest
     trace = L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")); before = _state()
