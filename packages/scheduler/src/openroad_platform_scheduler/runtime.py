@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import re
+import json
 import socket
 import time
 import uuid
@@ -63,12 +64,56 @@ class WorkflowRuntime:
         )
         return run
 
+    def submit_idempotent(
+        self,
+        task: TaskSpec,
+        *,
+        plugin_version: str | None = None,
+        capability: str | None = None,
+    ) -> RuntimeRun:
+        """Submit one migration-owned task exactly once by its stable task id.
+
+        Normal product callers should use :meth:`submit` and allocate a fresh
+        task id.  This narrow entry point exists for a legacy queue projection:
+        a worker can restart after Runtime accepted the task but before it
+        persisted the back-reference in the old queue.  Reusing the same task
+        id is safe only when the complete immutable TaskSpec is identical.
+        """
+        task.validate()
+        if task.plugin_id is None:
+            raise ValueError("P1 WorkflowRuntime only supports direct plugin TaskSpec")
+        manifest = self.registry.resolve(
+            task.plugin_id,
+            version=plugin_version,
+            capability=capability,
+            arch=platform.machine(),
+        )
+        existing = self.store.find_run_by_task_id(task.task_id)
+        if existing is not None:
+            if existing.task_spec.to_dict() != task.to_dict():
+                raise ValueError(
+                    "Runtime task_id already exists with a different immutable TaskSpec"
+                )
+            stage = self.store.list_stages(existing.run_id)[0]
+            if stage.plugin_version != manifest.plugin_version:
+                raise ValueError("Runtime task_id already exists with a different plugin version")
+            return existing
+        run, _ = self.store.submit_plugin_run(task, plugin_version=manifest.plugin_version)
+        return run
+
     def execute_once(
         self,
         run_id: str,
         *,
         on_line: Callable[[str], None] | None = None,
+        external_cancel_requested: Callable[[], bool] | None = None,
     ) -> RuntimeRun:
+        # A compatibility caller may observe an old cancellation request, but
+        # it cannot declare an execution state.  Runtime first records the
+        # request in its own store, then its normal lease/process path enforces
+        # the cancellation.
+        if external_cancel_requested is not None and external_cancel_requested():
+            self.store.request_cancel(run_id)
         run = self.store.get_run(run_id)
         stages = self.store.list_stages(run_id)
         ready = next(
@@ -94,6 +139,7 @@ class WorkflowRuntime:
         pulse = _LeasePulse(
             self.store, run_id, attempt.attempt_id,
             worker_id=self.worker_id, lease_seconds=self.lease_seconds,
+            external_cancel_requested=external_cancel_requested,
         )
         line_observer = _RuntimeLineObserver(
             self.store, run_id=run_id, stage_run_id=ready.stage_run_id,
@@ -102,7 +148,15 @@ class WorkflowRuntime:
             downstream=on_line,
         )
         try:
-            environment = self.environment_resolver(run) if self.environment_resolver else None
+            environment = dict(self.environment_resolver(run) if self.environment_resolver else {})
+            if ready.plugin_id == "orfs-agent":
+                domain = run.task_spec.inputs.get("parameter_domain")
+                if not isinstance(domain, dict) or not isinstance(domain.get("experiment_protocol"), dict):
+                    raise ValueError("ORFS-Agent task lacks an immutable experiment protocol")
+                receipt = workspace / "runtime_protocol_receipt.json"
+                receipt.write_text(json.dumps({"schema_version": 1, "protocol": domain["experiment_protocol"],
+                                               "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
+                environment["ORFS_AGENT_PROTOCOL_RECEIPT"] = str(receipt)
             execution = self.adapter.execute(
                 manifest,
                 run.task_spec,
@@ -161,15 +215,20 @@ class _LeasePulse:
         *,
         worker_id: str,
         lease_seconds: int,
+        external_cancel_requested: Callable[[], bool] | None = None,
     ):
         self.store = store
         self.run_id = run_id
         self.attempt_id = attempt_id
         self.worker_id = worker_id
         self.lease_seconds = lease_seconds
+        self.external_cancel_requested = external_cancel_requested
         self.last = 0.0
 
     def __call__(self) -> bool:
+        if self.external_cancel_requested is not None and self.external_cancel_requested():
+            self.store.request_cancel(self.run_id)
+            return True
         run = self.store.get_run(self.run_id)
         if run.status is RuntimeStatus.CANCEL_REQUESTED:
             return True

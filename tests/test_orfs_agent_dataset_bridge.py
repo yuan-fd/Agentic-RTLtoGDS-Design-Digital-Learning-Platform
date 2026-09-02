@@ -149,7 +149,8 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
     })
     request = tmp_path / "request.json"; result = tmp_path / "result.json"
     receipt = tmp_path / "runtime-protocol-receipt.json"
-    receipt.write_text(json.dumps({"schema_version": 1, "protocol": _domain().experiment_protocol}), encoding="utf-8")
+    receipt.write_text(json.dumps({"schema_version": 1, "protocol": _domain().experiment_protocol,
+                                   "run_id": "runtime-test", "attempt_id": "attempt-test"}), encoding="utf-8")
     monkeypatch.setenv("ORFS_AGENT_PROTOCOL_RECEIPT", str(receipt))
     request.write_text(json.dumps({"plugin": {"plugin_id": "orfs-agent"}, "task": {
         "task_id": "dataset-001", "plugin_id": "orfs-agent", "inputs": {

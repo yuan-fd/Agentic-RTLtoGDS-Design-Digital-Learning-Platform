@@ -113,12 +113,17 @@ def _result(*, status: str, started: str, artifacts: list[dict[str, str]],
             "failure": failure, "provenance": dict(provenance)}
 
 
-def _load_protocol_receipt() -> Mapping[str, Any]:
+def _load_protocol_receipt(workspace: Path) -> Mapping[str, Any]:
     receipt_path = os.environ.get("ORFS_AGENT_PROTOCOL_RECEIPT")
     if not receipt_path:
         raise ValueError("Runtime must inject ORFS_AGENT_PROTOCOL_RECEIPT")
-    receipt = json.loads(Path(receipt_path).read_text(encoding="utf-8"))
-    if not isinstance(receipt, Mapping) or set(receipt) != {"schema_version", "protocol"} or receipt.get("schema_version") != 1:
+    path = Path(receipt_path).resolve()
+    try:
+        path.relative_to(workspace.resolve())
+    except ValueError as exc:
+        raise ValueError("Runtime protocol receipt must be inside the attempt workspace") from exc
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(receipt, Mapping) or set(receipt) != {"schema_version", "protocol", "run_id", "attempt_id"} or receipt.get("schema_version") != 1:
         raise ValueError("Runtime protocol receipt is invalid")
     if not isinstance(receipt["protocol"], Mapping):
         raise ValueError("Runtime protocol receipt is invalid")
@@ -147,6 +152,8 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
         raise ValueError("request protocol does not match Runtime protocol receipt")
     if domain.get("protocol_sha256") != protocol_hash or set(protocol["timing"]) != {"clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"}:
         raise ValueError("experiment protocol hash or timing is invalid")
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in protocol["timing"].values()):
+        raise ValueError("experiment protocol timing is invalid")
     try:
         timing = {key: float(value) for key, value in protocol["timing"].items()}
     except (TypeError, ValueError) as exc:
@@ -228,7 +235,7 @@ def main() -> int:
             raise ValueError("observations must be objects")
         if not isinstance(parameter_domain, Mapping):
             raise ValueError("a typed parameter_domain for the requested platform is required")
-        _validate_domain_and_observations(parameter_domain, observations, platform, _load_protocol_receipt())
+        _validate_domain_and_observations(parameter_domain, observations, platform, _load_protocol_receipt(args.result.parent))
         upstream = _checked_source(_load_lock())
         rows = [_row(item, design=design, platform=platform) for item in observations]
         workspace = args.result.parent

@@ -75,6 +75,8 @@ class ORFSAgentDomain:
     def create(cls, *, platform: str, search_parameter_names: Sequence[str],
                admissible_values: Mapping[str, Sequence[Any]], fixed_parameters: Mapping[str, Any],
                experiment_protocol: Mapping[str, Any]) -> "ORFSAgentDomain":
+        if platform not in _PLATFORM_UTILIZATION:
+            raise ValueError("ORFS-Agent platform is not allowlisted")
         names = tuple(str(name) for name in search_parameter_names)
         if not platform or not names or len(names) != len(set(names)):
             raise ValueError("platform and distinct search parameter names are required")
