@@ -1,6 +1,7 @@
 """S4 durable Plan -> Validate -> Execute -> Observe orchestration."""
 from __future__ import annotations
 from uuid import uuid4
+from dataclasses import replace
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState, SemanticToolCall
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 from .l1_loop_store import L1LoopStore
@@ -14,6 +15,12 @@ class L1DurableLoop:
     def plan_validate_execute(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall, policy: TrustedPolicyIdentity, *, planner_summary: str) -> dict:
         L1SemanticToolPolicy.validate(goal, state, call)
         plan_id = f"plan-{uuid4().hex}"; self.store.propose(plan_id, trace_id, goal.goal_id, state.state_id, call.to_dict())
+        if call.tool.value == "set_flow_params":
+            self.store.save_proposal(f"proposal-{call.call_id}", trace_id, goal.goal_id, state.state_id, dict(call.arguments["values"]))
+        proposal_id = call.arguments.get("proposal_id")
+        if proposal_id:
+            patch=self.store.consume_proposal(proposal_id,trace_id,goal.goal_id,state.state_id,plan_id)
+            call=replace(call, arguments={**call.arguments,"parameter_patch":patch})
         self.trace.record_call(trace_id, state, call, planner_summary=planner_summary)
         self.trace.record_policy(trace_id, goal, state, call, policy, verdict="allow", summary="typed policy accepted call")
         receipt = self.bridge.execute(goal, state, call); self.trace.record_receipt(trace_id, state, receipt)

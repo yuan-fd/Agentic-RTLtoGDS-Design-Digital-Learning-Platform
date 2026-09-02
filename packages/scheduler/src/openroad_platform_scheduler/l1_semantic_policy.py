@@ -30,11 +30,11 @@ class L1SemanticToolPolicy:
             cls._exact(a, {"values"}, {"values"}); values = a["values"]
             if not isinstance(values, Mapping) or not values or set(values) - set(goal.allowed_parameters): raise ValueError("parameter values are outside DesignGoal policy")
         elif call.tool is ToolName.RUN_STAGE:
-            cls._exact(a, {"stage", "parameter_patch"}, {"stage"})
+            cls._exact(a, {"stage", "parameter_patch", "proposal_id"}, {"stage"})
             if a["stage"] not in goal.allowed_stages: raise ValueError("stage is outside DesignGoal policy")
             cls._patch(a.get("parameter_patch"), goal)
         elif call.tool is ToolName.RUN_FULL_FLOW:
-            cls._exact(a, {"parameter_patch"}); cls._patch(a.get("parameter_patch"), goal)
+            cls._exact(a, {"parameter_patch", "proposal_id"}); cls._patch(a.get("parameter_patch"), goal)
         elif call.tool is ToolName.COMPARE_RUNS:
             cls._exact(a, {"left_run_id", "right_run_id", "metrics"}, {"left_run_id", "right_run_id", "metrics"})
             cls._id(a["left_run_id"], "left_run_id"); cls._id(a["right_run_id"], "right_run_id")
