@@ -67,7 +67,8 @@ class L1RuntimeBridge:
         if not isinstance(run_id, str) or not run_id:
             raise RuntimeError("Runtime submit returned no run_id")
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
-                           {"run_id": run_id, "capability": self._factory.capability}, (), None)
+                           {"run_id": run_id, "capability": self._factory.capability},
+                           (_evidence(f"run:{run_id}", {"goal_id": goal.goal_id, "call_id": call.call_id}),), None)
 
     def execute(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         """Dispatch only the tutorial's 12 typed tools; no generic executor exists."""
@@ -95,7 +96,7 @@ class L1RuntimeBridge:
         proposal_sha256 = hashlib.sha256(json.dumps(task.to_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
                            {"parameter_patch": dict(values), "task_spec_sha256": proposal_sha256,
-                            "requires_following_run": True}, (), None)
+                            "requires_following_run": True}, (goal.rtl_artifact,), None)
 
     def stop_or_escalate(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         self._binding(goal, state, call)
@@ -110,7 +111,7 @@ class L1RuntimeBridge:
             raise ValueError("Runtime does not expose controlled cancellation")
         self._cancel_port(run_id)
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
-                           {"run_id": run_id, "action": "cancel_requested"}, (), None)
+                           {"run_id": run_id, "action": "cancel_requested"}, (_evidence(f"run:{run_id}", view),), None)
 
     def design_summary(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         self._binding(goal, state, call)
