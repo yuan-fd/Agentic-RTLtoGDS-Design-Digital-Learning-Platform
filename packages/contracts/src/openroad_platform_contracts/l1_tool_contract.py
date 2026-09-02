@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -37,10 +38,11 @@ def _schema(name: str, value: Mapping[str, Any]) -> None:
     for key, item in value.items():
         if not isinstance(key, str):
             raise ValueError(f"{name} keys must be strings")
-        lowered = key.lower().replace("-", "_")
-        tokens = tuple(part for part in lowered.split("_") if part)
+        snake_case = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key).lower()
+        tokens = tuple(part for part in re.split(r"[^a-z0-9]+", snake_case) if part)
         compact = "".join(tokens)
-        if lowered in _FORBIDDEN_SCHEMA_TERMS or compact in {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS} or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
+        forbidden_compact = {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS}
+        if snake_case in _FORBIDDEN_SCHEMA_TERMS or compact in forbidden_compact or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
             raise ValueError(f"{name} contains forbidden executable field {key!r}")
         if isinstance(item, Mapping):
             _schema(name, item)

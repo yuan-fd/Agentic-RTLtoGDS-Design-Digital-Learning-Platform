@@ -33,3 +33,7 @@ def test_definition_rejects_shell_surface() -> None:
         SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"shell": "string"}}).validate()
     with pytest.raises(ValueError, match="forbidden executable"):
         SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": {"shell_command": "string"}}}).validate()
+    with pytest.raises(ValueError, match="forbidden executable"):
+        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"shellCommand": "string"}}).validate()
+    with pytest.raises(ValueError, match="forbidden executable"):
+        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": [{"credentialToken": "string"}]}}).validate()

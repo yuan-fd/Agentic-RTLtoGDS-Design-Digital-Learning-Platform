@@ -40,4 +40,5 @@ def test_finalizer_requires_answered_draft_and_records_only_policy_facts() -> No
     assert goal.design_id == "aes"
     assert goal.labels["l1_draft_sha256"] == _draft(True).request_sha256
     assert goal.labels["l1_policy_provenance"] == "artifact:policy"
+    assert goal.labels["l1_policy_provenance_sha256"] == "d" * 64
     assert goal.allowed_parameters == ("core_utilization_pct",)

@@ -67,7 +67,8 @@ class GoalFinalizer:
             allowed_tools=policy.allowed_tools,
             labels={"l1_draft_sha256": draft.request_sha256, "l1_parser_id": draft.parser_id,
                     "l1_policy_id": policy.policy_id, "l1_policy_version": policy.policy_version,
-                    "l1_policy_issuer": policy.issuer, "l1_policy_provenance": policy.provenance.ref},
+                    "l1_policy_issuer": policy.issuer, "l1_policy_provenance": policy.provenance.ref,
+                    "l1_policy_provenance_sha256": policy.provenance.sha256},
         )
         goal.validate()
         return goal
