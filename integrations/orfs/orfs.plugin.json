@@ -3,7 +3,7 @@
   "plugin_id": "orfs",
   "plugin_version": "1.0.0",
   "adapter_entry": ["python3", "./orfs_adapter.py"],
-  "capabilities": ["eda.orfs", "eda.rtl_to_gds"],
+  "capabilities": ["source-audit.orfs"],
   "supported_arch": ["aarch64"],
   "input_schema": {
     "type": "object",
@@ -20,7 +20,7 @@
     {"kind": "def", "required": false},
     {"kind": "netlist", "required": false},
     {"kind": "gds", "required": false},
-    {"kind": "log", "required": false},
+    {"kind": "log", "required": true},
     {"kind": "report", "required": false},
     {"kind": "config", "required": false},
     {"kind": "toolchain_snapshot", "required": false},

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orfs",
+  "upstream": {
+    "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git",
+    "commit": "51ad1231a231ee85234c06db807688d029b85c35",
+    "native_entrypoint": "flow/Makefile"
+  },
+  "license": {
+    "status": "red",
+    "file": null,
+    "redistribution_conclusion": "No LICENSE/COPYING file was present in the inspected pinned checkout; executable admission is prohibited pending reviewed license evidence."
+  },
+  "execution_class": "source-audit-only",
+  "environment": {
+    "required_tools": ["make", "openroad", "yosys"],
+    "network": "not required at execution time",
+    "credentials": "none"
+  },
+  "security": {
+    "reviewed_write_boundary": "Unapproved.  A future approved adapter must execute only from an Attempt-local flow copy and write only inside the Runtime workspace."
+  },
+  "adapter_boundary": {
+    "input": "hash-pinned RTL/SDC TaskSpec references",
+    "output": "PluginResult with workspace-contained artifacts, metrics and raw logs"
+  },
+  "evidence": {
+    "native_smoke": "historical-only; not admission evidence",
+    "platform_smoke": "historical-only; not admission evidence"
+  }
+}

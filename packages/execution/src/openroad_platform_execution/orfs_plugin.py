@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import platform
 import sys
@@ -16,6 +17,17 @@ from .toolchain import ToolchainConfig
 
 ORFS_PLUGIN_ID = "orfs"
 ORFS_PLUGIN_VERSION = "1.0.0"
+
+
+def _require_executable_admission() -> None:
+    """Refuse an unreviewed external ORFS checkout before process creation."""
+    lock = Path(__file__).resolve().parents[4] / "integrations/orfs/orfs.intake.lock.json"
+    try:
+        payload = json.loads(lock.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise PermissionError("ORFS executable admission lock is missing or invalid") from exc
+    if payload.get("execution_class") != "admitted-bounded-runtime-plugin":
+        raise PermissionError("ORFS is source-audit-only; executable admission is not approved")
 
 
 def build_orfs_task(
@@ -99,6 +111,8 @@ def orfs_plugin_manifest(
 ) -> PluginManifest:
     """Bind the repository adapter to one explicit immutable toolchain profile."""
 
+    _require_executable_admission()
+
     adapter = Path(__file__).with_name("orfs_adapter.py").resolve()
     environment = {
         key: os.environ[key]
@@ -136,7 +150,7 @@ def orfs_plugin_manifest(
         required_tools=("make", "git", "openroad", "yosys"),
         default_timeout_seconds=default_timeout_seconds,
         artifact_rules=tuple(
-            {"kind": kind, "required": False}
+            {"kind": kind, "required": kind == "log"}
             for kind in (
                 "odb", "def", "netlist", "gds", "log", "report", "config",
                 "toolchain_snapshot", "run_result", "other",

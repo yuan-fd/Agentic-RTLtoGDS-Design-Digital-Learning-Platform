@@ -5,7 +5,7 @@ import json
 import os
 import re
 import subprocess
-import sys
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -78,6 +78,11 @@ class ORFSRunner:
         if workdir.exists() and any(workdir.iterdir()):
             raise FileExistsError(f"Run workspace is not empty: {workdir}")
         workdir.mkdir(parents=True, exist_ok=True)
+        # Never invoke make in the operator-owned ORFS tree. Materialize a
+        # per-Attempt flow copy before process creation.
+        staged_flow = workdir / "orfs-flow"
+        shutil.copytree(self.flow_home, staged_flow, symlinks=True)
+
         config_path = write_design_files(
             workdir=workdir,
             rtl_path=rtl_path,
@@ -97,7 +102,7 @@ class ORFSRunner:
             design=design,
             clock=clock,
             workdir=str(workdir),
-            flow_home=str(self.flow_home),
+            flow_home=str(staged_flow),
             config_path=str(config_path),
             stages=stages,
             request=request,
@@ -110,6 +115,7 @@ class ORFSRunner:
             "workdir": plan.workdir,
             "flow_home": plan.flow_home,
             "config_path": plan.config_path,
+            "source_flow_home": str(self.flow_home),
             "stages": [stage.value for stage in plan.stages],
             "request": request.to_dict(),
             "tools": self.tool_versions(),
@@ -141,7 +147,7 @@ class ORFSRunner:
             command = self._command(plan, stage)
             outcome = self.guardian.run(
                 command,
-                cwd=self.flow_home,
+                cwd=Path(plan.flow_home),
                 env=self._environment(),
                 log_path=log_path,
                 timeout_seconds=plan.request.stage_timeout_seconds,
@@ -189,7 +195,6 @@ class ORFSRunner:
                 self._write_flow_error(workdir, stage, message or status.value)
                 break
 
-        self._run_analysis(plan, stage_results)
         artifacts = self._collect_artifacts(plan)
         metrics = self._collect_metrics(plan)
         completed_stages = {item.stage for item in stage_results
@@ -326,7 +331,7 @@ class ORFSRunner:
         results = self._results_dir(plan)
         outcome = self.guardian.run(
             self._make_command(plan, "gds"),
-            cwd=self.flow_home,
+            cwd=Path(plan.flow_home),
             env=self._environment(),
             log_path=Path(plan.workdir) / "logs" / "flow.log",
             timeout_seconds=plan.request.stage_timeout_seconds,
@@ -415,75 +420,9 @@ class ORFSRunner:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"stage={stage.value}\nreason={message}\n", encoding="utf-8")
 
-    @staticmethod
-    def _run_analysis(plan: ExecutionPlan, stages: list[StageResult]) -> None:
-        try:
-            from openroad_platform_analysis.pipeline import analyze_run
-        except ImportError:
-            # The native CLI is a first-class platform path, not a reduced
-            # demo mode.  In a source checkout make the sibling analysis
-            # package discoverable; installed deployments should carry it as
-            # a dependency.  Never silently drop the structured report.
-            local_analysis = Path(__file__).resolve().parents[4] / "packages" / "analysis" / "src"
-            if local_analysis.is_dir() and str(local_analysis) not in sys.path:
-                sys.path.insert(0, str(local_analysis))
-            try:
-                from openroad_platform_analysis.pipeline import analyze_run
-            except ImportError as exc:
-                path = Path(plan.workdir) / "analysis" / "analysis_error.log"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(f"analysis dependency unavailable: {exc}\n", encoding="utf-8")
-                return
-        runtime = sum(item.seconds for item in stages)
-        try:
-            analyze_run(
-                plan.workdir,
-                platform=plan.request.platform,
-                design=plan.design,
-                runtime_seconds=runtime,
-                expected_stage=plan.request.target_stage.value,
-            )
-        except Exception as exc:
-            path = Path(plan.workdir) / "analysis" / "analysis_error.log"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(f"{type(exc).__name__}: {exc}\n", encoding="utf-8")
-
     def _collect_metrics(self, plan: ExecutionPlan) -> list[Metric]:
-        try:
-            from openroad_platform_analysis.parsers.stage_json import extract_metrics
-        except ImportError:
-            # The native CLI is also a supported platform entrypoint.  Do not
-            # silently turn a complete physical-design run into metric-less
-            # evidence merely because the optional reporting package was not
-            # installed in that process.  The finish JSON is ORFS's own
-            # authoritative output, so a minimal dependency-free extraction
-            # still preserves the ranking-critical terminal facts.
-            return self._collect_finish_metrics_fallback(plan)
-        payload = extract_metrics(
-            Path(plan.workdir), plan.request.platform, plan.design,
-            expected_stage=plan.request.target_stage.value,
-        )
-        summary = payload.get("summary", {})
-        metrics = []
-        for key, value in summary.items():
-            if isinstance(value, (str, int, float)) or value is None:
-                metrics.append(Metric(name=key, value=value, source="ORFS stage JSON"))
-        # Candidate ranking must consume the same terminal QoR facts a human
-        # sees in the ORFS report.  Previously Runtime only exposed the
-        # pass/fail summary above, even though the parser had already found
-        # area, WNS and power under ``stages.finish``.  That made a real ORFS
-        # campaign unable to honour its declared objective profile.
-        finish = ((payload.get("stages") or {}).get("finish") or {}).get("metrics") or {}
-        terminal_qor = {
-            "finish__design__instance__area": finish.get("instance_area_um2"),
-            "finish__timing__setup__ws": finish.get("setup_wns_ns"),
-            "finish__power__total": finish.get("power_W"),
-        }
-        for name, value in terminal_qor.items():
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                metrics.append(Metric(name=name, value=value,
-                                      source="ORFS finish-stage parsed metric"))
-        return metrics
+        """Keep execution facts independent; protected evaluation parses QoR."""
+        return self._collect_finish_metrics_fallback(plan)
 
     @staticmethod
     def _collect_finish_metrics_fallback(plan: ExecutionPlan) -> list[Metric]:

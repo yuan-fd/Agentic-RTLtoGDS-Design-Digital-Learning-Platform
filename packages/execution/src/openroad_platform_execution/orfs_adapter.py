@@ -19,8 +19,6 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 for source_root in (
     REPOSITORY_ROOT / "packages/contracts/src",
     REPOSITORY_ROOT / "packages/execution/src",
-    REPOSITORY_ROOT / "packages/analysis/src",
-    REPOSITORY_ROOT / "packages/visualization/src",
 ):
     sys.path.insert(0, str(source_root))
 
@@ -167,19 +165,8 @@ def _plugin_result(result, *, plan_workdir: Path, workspace: Path, input_referen
         })
     gds = next((plan_workdir / artifact.path for artifact in result.artifacts
                 if Path(artifact.path).suffix.lower() == ".gds"), None)
-    if gds is not None and gds.is_file():
-        try:
-            from openroad_platform_visualization import render_gds
-            preview = plan_workdir / "visuals/final_layout_2d.png"
-            render_gds(gds, preview, dpi=150)
-            artifacts.append({
-                "kind": "layout_view",
-                "path": str(preview.resolve().relative_to(workspace)),
-                "renderer": "KLayout pya.LayoutView",
-            })
-        except Exception as exc:
-            # The GDS remains authoritative; preview generation is optional.
-            print(f"[visualization-warning] {type(exc).__name__}: {exc}", flush=True)
+    # Visual rendering is a non-authoritative post-processing concern.  This
+    # bounded execution adapter never imports visualization or analysis code.
     run_result = plan_workdir / "run_result.json"
     artifacts.append({
         "kind": "run_result",
