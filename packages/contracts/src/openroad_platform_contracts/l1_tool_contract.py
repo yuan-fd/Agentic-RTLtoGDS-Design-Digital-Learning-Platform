@@ -19,7 +19,7 @@ TUTORIAL_L1_TOOLS = frozenset({
 
 
 _FORBIDDEN_SCHEMA_TERMS = frozenset({
-    "command", "cmd", "shell", "script", "executable", "exec", "program", "argv",
+    "command", "cmd", "shell", "tcl", "script", "executable", "exec", "program", "argv",
     "path", "cwd", "env", "environment", "credential", "api_key", "access_key",
     "private_key", "secret", "authorization", "token", "password",
     "chain_of_thought", "hidden_reasoning",

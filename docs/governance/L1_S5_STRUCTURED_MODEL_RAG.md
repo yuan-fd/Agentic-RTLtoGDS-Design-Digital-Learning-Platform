@@ -27,6 +27,7 @@ typed call -> L1SemanticToolPolicy -> S4 loop -> Runtime
 ## Changed files
 
 - `packages/scheduler/src/openroad_platform_scheduler/l1_model_boundary.py`
+- `packages/contracts/src/openroad_platform_contracts/l1_tool_contract.py` (shared recursive shell/Tcl exclusion)
 - `tests/test_l1_model_boundary.py`
 - this document
 
