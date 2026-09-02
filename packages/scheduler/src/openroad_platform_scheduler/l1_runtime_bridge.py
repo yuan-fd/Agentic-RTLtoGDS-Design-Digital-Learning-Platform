@@ -160,7 +160,7 @@ class L1RuntimeBridge:
                                             if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
         evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
         if not evidence:
-            evidence = (_evidence(f"runtime:{run_id}", view),)
+            evidence = (_evidence(f"run:{run_id}", view),)
         terminal_status = run.get("terminal_reason") if run.get("terminal_reason") in {"timed_out", "lost"} else run["status"]
         return RuntimeObservation(run_id, attempt["attempt_id"], stage_view.get("stage_key"), terminal_status, metrics, evidence)
 
