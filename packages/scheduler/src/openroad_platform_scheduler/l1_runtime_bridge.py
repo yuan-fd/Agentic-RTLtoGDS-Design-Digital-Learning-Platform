@@ -16,6 +16,8 @@ from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_contracts.platform import TaskSpec
 from openroad_platform_contracts.task_factory import RTLToGDSFactory
 from .l1_semantic_policy import L1SemanticToolPolicy
+from .l1_state_reducer import L1StateReducer
+from .l1_trace_service import L1TraceService
 
 
 def _evidence(ref: str, value: object) -> EvidencePointer:
@@ -144,11 +146,19 @@ class L1RuntimeBridge:
             raise ValueError("Runtime run has no attempt observation")
         attempt = attempts[-1]; metrics = {item["name"]: float(item["value"]) for item in attempt.get("metrics", ())
                                             if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
-        evidence = tuple(_evidence(f"runtime-artifact:{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
+        evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
         if not evidence:
             evidence = (_evidence(f"runtime:{run_id}", view),)
         stage = next((item.get("stage_key") for item in view.get("stages", ()) if item.get("successful_attempt_id") == attempt["attempt_id"]), None)
         return RuntimeObservation(run_id, attempt["attempt_id"], stage, run["status"], metrics, evidence)
+
+    def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
+                         *, run_id: str, next_state_id: str) -> DesignState:
+        """The only S3 handoff from Runtime facts into the S2 state authority."""
+        observation = self.observation(run_id)
+        successor = L1StateReducer.apply(state, observation, next_state_id=next_state_id)
+        trace.record_observation(trace_id, state, successor, observation)
+        return successor
 
     @staticmethod
     def _bounded(value: Mapping[str, Any]) -> dict[str, Any]:

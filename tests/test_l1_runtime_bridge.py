@@ -6,6 +6,8 @@ from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_execution.orfs_task_factory import ORFSRTLToGDSFactory
 from openroad_platform_execution.orfs_plugin import build_orfs_task
 from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge
+from openroad_platform_scheduler.l1_trace_service import L1TraceService
+from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 
 
 class _Runtime:
@@ -23,6 +25,8 @@ def test_runtime_bridge_only_submits_immutable_task_and_observes_runtime(tmp_pat
     receipt = bridge.submit(goal, state, SemanticToolCall("call-1", "goal-1", "state-1", ToolName.RUN_STAGE, {"stage": "route"}, "planner"))
     assert receipt.status == "accepted" and runtime.task.parameters["target_stage"] == "route"
     assert bridge.observation("run-1").attempt_id == "attempt-1"
+    successor = bridge.reduce_and_trace(L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")), "trace-1", state, run_id="run-1", next_state_id="state-2")
+    assert successor.metrics["setup_wns_ns"] == -0.1
 
 
 def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_controls(tmp_path):
