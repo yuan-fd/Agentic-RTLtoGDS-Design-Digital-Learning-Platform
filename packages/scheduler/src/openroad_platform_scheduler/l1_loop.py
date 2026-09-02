@@ -14,6 +14,8 @@ class L1DurableLoop:
         self.store, self.bridge, self.trace = store, bridge, trace
     def plan_validate_execute(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall, policy: TrustedPolicyIdentity, *, planner_summary: str) -> dict:
         L1SemanticToolPolicy.validate(goal, state, call)
+        if call.tool.value in {"run_stage", "run_full_flow"} and state.remaining_budget.max_eda_runs < 1:
+            raise ValueError("DesignGoal EDA-run budget is exhausted")
         plan_id = f"plan-{uuid4().hex}"; self.store.propose(plan_id, trace_id, goal.goal_id, state.state_id, call.to_dict())
         if call.tool.value == "set_flow_params":
             self.store.save_proposal(f"proposal-{call.call_id}", trace_id, goal.goal_id, state.state_id, dict(call.arguments["values"]))
