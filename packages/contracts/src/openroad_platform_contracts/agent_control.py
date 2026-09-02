@@ -28,13 +28,16 @@ class GoalPreference(str, Enum):
 
 
 class ToolName(str, Enum):
+    GET_DESIGN_SUMMARY = "get_design_summary"
     CREATE_EXPERIMENT = "create_experiment"
     SET_FLOW_PARAMS = "set_flow_params"
     RUN_STAGE = "run_stage"
+    RUN_FULL_FLOW = "run_full_flow"
     QUERY_TIMING = "query_timing"
     QUERY_CONGESTION = "query_congestion"
     QUERY_DRC = "query_drc"
     QUERY_POWER = "query_power"
+    QUERY_STAGE_METRICS = "query_stage_metrics"
     QUERY_ARTIFACT_EXCERPT = "query_artifact_excerpt"
     COMPARE_RUNS = "compare_runs"
     PROPOSE_SEARCH_POLICY = "propose_search_policy"

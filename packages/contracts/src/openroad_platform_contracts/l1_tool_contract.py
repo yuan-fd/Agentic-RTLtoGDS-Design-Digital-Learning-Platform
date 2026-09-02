@@ -3,25 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Mapping
 
+from .agent_control import ToolName
 from .platform import SCHEMA_VERSION, _known_payload, _primitive, _validate_identifier, _validate_mapping, _validate_version
 
 
-class L1ToolName(str, Enum):
-    GET_DESIGN_SUMMARY = "get_design_summary"
-    QUERY_TIMING = "query_timing"
-    QUERY_CONGESTION = "query_congestion"
-    QUERY_DRC = "query_drc"
-    QUERY_POWER = "query_power"
-    QUERY_STAGE_METRICS = "query_stage_metrics"
-    GET_ARTIFACT_EXCERPT = "get_artifact_excerpt"
-    SET_FLOW_PARAMS = "set_flow_params"
-    RUN_STAGE = "run_stage"
-    RUN_FULL_FLOW = "run_full_flow"
-    COMPARE_RUNS = "compare_runs"
-    STOP_OR_ESCALATE = "stop_or_escalate"
+TUTORIAL_L1_TOOLS = frozenset({
+    ToolName.GET_DESIGN_SUMMARY, ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
+    ToolName.QUERY_DRC, ToolName.QUERY_POWER, ToolName.QUERY_STAGE_METRICS,
+    ToolName.QUERY_ARTIFACT_EXCERPT, ToolName.SET_FLOW_PARAMS, ToolName.RUN_STAGE,
+    ToolName.RUN_FULL_FLOW, ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE,
+})
 
 
 _FORBIDDEN_SCHEMA_TERMS = frozenset({
@@ -48,7 +41,7 @@ def _schema(name: str, value: Mapping[str, Any]) -> None:
 
 @dataclass(frozen=True)
 class SemanticToolDefinition:
-    name: L1ToolName
+    name: ToolName
     version: str
     description: str
     capability: str
@@ -63,7 +56,7 @@ class SemanticToolDefinition:
 
     def validate(self) -> None:
         _validate_version(self.schema_version)
-        if not isinstance(self.name, L1ToolName):
+        if not isinstance(self.name, ToolName):
             raise ValueError("semantic tool name must be typed")
         _validate_identifier("tool version", self.version)
         _validate_identifier("tool capability", self.capability)
@@ -85,7 +78,7 @@ class SemanticToolDefinition:
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "SemanticToolDefinition":
         value = _known_payload(cls, payload)
-        value["name"] = L1ToolName(value["name"])
+        value["name"] = ToolName(value["name"])
         for field in ("preconditions", "postconditions", "evidence_kinds", "permissions"):
             value[field] = tuple(value.get(field, ()))
         result = cls(**value)
@@ -108,7 +101,7 @@ class SemanticToolRegistryContract:
             if not isinstance(definition, SemanticToolDefinition):
                 raise ValueError("registry definitions must contain SemanticToolDefinition values")
             definition.validate()
-        if {item.name for item in self.definitions} != set(L1ToolName):
+        if {item.name for item in self.definitions} != TUTORIAL_L1_TOOLS:
             raise ValueError("registry must define exactly the tutorial L1 tool surface")
 
     def to_dict(self) -> dict[str, Any]:
