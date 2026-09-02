@@ -221,6 +221,7 @@ class WorkflowRuntime:
     def describe(self, run_id: str) -> dict:
         return self.store.describe_run(run_id)
 
+
 class _LeasePulse:
     def __init__(
         self,
