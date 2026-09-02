@@ -12,6 +12,8 @@ import hashlib
 import json
 import os
 import subprocess
+import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -123,9 +125,19 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
     protocol_keys = {"rtl_sha256", "pdk_id", "toolchain_id", "sdc_sha256", "evaluator_version", "seed_policy", "timing"}
     if not isinstance(protocol, Mapping) or set(protocol) != protocol_keys or not isinstance(protocol.get("timing"), Mapping):
         raise ValueError("experiment protocol is invalid")
+    if not all(isinstance(protocol[name], str) and protocol[name] for name in ("pdk_id", "toolchain_id", "evaluator_version", "seed_policy")):
+        raise ValueError("experiment protocol identifiers are invalid")
+    if not all(isinstance(protocol[name], str) and re.fullmatch(r"[0-9a-f]{64}", protocol[name]) for name in ("rtl_sha256", "sdc_sha256")):
+        raise ValueError("experiment protocol hashes are invalid")
     protocol_hash = hashlib.sha256(json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     if domain.get("protocol_sha256") != protocol_hash or set(protocol["timing"]) != {"clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"}:
         raise ValueError("experiment protocol hash or timing is invalid")
+    try:
+        timing = {key: float(value) for key, value in protocol["timing"].items()}
+    except (TypeError, ValueError) as exc:
+        raise ValueError("experiment protocol timing is invalid") from exc
+    if not all(math.isfinite(value) for value in timing.values()) or timing["clock_period_ns"] <= 0 or min(timing.values()) < 0:
+        raise ValueError("experiment protocol timing is invalid")
     names = {"core_utilization_pct", "tns_end_percent", "global_placement_padding", "detail_placement_padding",
              "enable_dpo", "place_density_lb_addon", "cts_cluster_size", "cts_cluster_diameter"}
     search, fixed = domain.get("search_parameter_names"), domain.get("fixed_parameters")
@@ -134,16 +146,46 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
         raise ValueError("parameter_domain is not a complete allowlisted partition")
     if domain.get("frozen_constraints") != ["clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"]:
         raise ValueError("parameter_domain frozen constraints are invalid")
+    bounds = {"core_utilization_pct": (30, 75) if platform == "asap7" else (20, 70) if platform == "sky130hd" else (20, 80),
+              "tns_end_percent": (0, 100), "global_placement_padding": (0, 3), "detail_placement_padding": (0, 3),
+              "enable_dpo": (0, 1), "place_density_lb_addon": (0, .5), "cts_cluster_size": (10, 40), "cts_cluster_diameter": (40, 120)}
+    integers = names - {"place_density_lb_addon"}
+    def canonical(name: str, value: Any) -> int | float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ValueError(f"{name} is not finite numeric")
+        normalized = int(value) if name in integers else float(value)
+        if normalized != value or not bounds[name][0] <= normalized <= bounds[name][1]:
+            raise ValueError(f"{name} is outside its admitted range")
+        return normalized
+    normalized_fixed = {name: canonical(name, value) for name, value in fixed.items()}
+    normalized_values = {}
+    for name, raw in values.items():
+        if not isinstance(raw, list):
+            raise ValueError("admissible values must be lists")
+        choices = tuple(dict.fromkeys(canonical(name, value) for value in raw))
+        if len(choices) < 2:
+            raise ValueError("every search parameter needs two admissible values")
+        normalized_values[name] = choices
+    if {"global_placement_padding", "detail_placement_padding"} <= set(search):
+        raise ValueError("padding relation requires one padding value fixed")
+    gp, dp = normalized_fixed.get("global_placement_padding"), normalized_fixed.get("detail_placement_padding")
+    if gp is not None and dp is not None and dp > gp:
+        raise ValueError("detail padding exceeds global padding")
+    if gp is not None and "detail_placement_padding" in normalized_values and any(value > gp for value in normalized_values["detail_placement_padding"]):
+        raise ValueError("detail padding domain exceeds fixed global padding")
+    if dp is not None and "global_placement_padding" in normalized_values and any(value < dp for value in normalized_values["global_placement_padding"]):
+        raise ValueError("global padding domain is below fixed detail padding")
     for observation in observations:
         parameters = observation.get("parameters") if isinstance(observation, Mapping) else None
         if not isinstance(parameters, Mapping) or set(parameters) != names | {"clock_period_ns"}:
             raise ValueError("observation must contain the frozen clock and complete shared domain")
-        if observation.get("protocol_sha256") != protocol_hash or float(parameters["clock_period_ns"]) != float(protocol["timing"]["clock_period_ns"]):
+        if observation.get("protocol_sha256") != protocol_hash or float(parameters["clock_period_ns"]) != timing["clock_period_ns"]:
             raise ValueError("observation does not match the frozen experiment protocol")
         for name in names:
-            if name in fixed and parameters[name] != fixed[name]:
+            value = canonical(name, parameters[name])
+            if name in normalized_fixed and value != normalized_fixed[name]:
                 raise ValueError("observation fixed parameter differs from its domain")
-            if name in values and parameters[name] not in values[name]:
+            if name in normalized_values and value not in normalized_values[name]:
                 raise ValueError("observation search parameter is outside its domain")
 
 

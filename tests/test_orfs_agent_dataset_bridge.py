@@ -124,6 +124,12 @@ def test_adapter_rechecks_domain_and_observation_boundary():
     bad = _observation(); del bad["parameters"]["enable_dpo"]
     with pytest.raises(ValueError, match="complete shared domain"):
         bridge._validate_domain_and_observations(domain, [bad], "asap7")
+    forged = _domain().to_dict(); forged["experiment_protocol"]["rtl_sha256"] = "not-a-hash"
+    unsigned = {key: value for key, value in forged.items() if key != "domain_sha256"}
+    forged["domain_sha256"] = __import__("hashlib").sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    with pytest.raises(ValueError, match="protocol hashes"):
+        bridge._validate_domain_and_observations(forged, [observation], "asap7")
 
 
 def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch, tmp_path):
