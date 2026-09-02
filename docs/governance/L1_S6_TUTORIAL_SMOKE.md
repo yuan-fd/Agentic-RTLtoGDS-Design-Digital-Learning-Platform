@@ -40,10 +40,8 @@ The captured artifact directory contains `RESULT.txt` and `MANIFEST.sha256`
 with terminal status and file hashes.  Runtime, protected evaluator, external
 optimizer algorithms, RTL/PDK/SDC and historical evidence are unchanged.
 
-Implementation rollback: run `git revert fdcf8a9`, then `git revert ae28c14`.
-Those are the only S6 commits that change executable behavior or captured
-evidence.  `aabd838` and `298c91e` are documentation-only rollback corrections
-and may intentionally remain: they change no Runtime behavior or evidence
-content.  If a downstream branch also wishes to remove those governance notes,
-revert their known branch-local documentation commits after the implementation
-rollback.  S6 has no database schema migration or external side effect.
+The exact, conflict-safe rollback sequence is maintained in
+`scripts/rollback_l1_s6.sh`.  It intentionally reverts all S6 implementation
+and S6-documentation commits that modify this file before reverting its
+creation commit, while retaining the helper itself as an audit instruction.
+S6 has no database schema migration or external side effect.
