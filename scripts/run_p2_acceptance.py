@@ -146,7 +146,7 @@ def main() -> int:
 
 def verify_attempt(attempt: dict) -> dict:
     workspace = Path(attempt["workspace"])
-    required = {"gds", "def", "netlist", "odb", "config",
+    required = {"gds", "def", "netlist", "odb", "config", "log",
                 "toolchain_snapshot", "run_result"}
     records = []
     paths = {}

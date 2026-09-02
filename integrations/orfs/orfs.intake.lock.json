@@ -23,14 +23,14 @@
     "credentials": "none"
   },
   "security": {
-    "reviewed_write_boundary": "Unapproved.  A future approved adapter must execute only from an Attempt-local flow copy and write only inside the Runtime workspace."
+    "reviewed_write_boundary": "Reviewed: Runtime adapter copies flow into an Attempt-local workspace before process creation; bounded smoke on 2026-09-02 verified the shared toolchain snapshot was unchanged."
   },
   "adapter_boundary": {
     "input": "hash-pinned RTL/SDC TaskSpec references",
     "output": "PluginResult with workspace-contained artifacts, metrics and raw logs"
   },
   "evidence": {
-    "native_smoke": "historical-only; not admission evidence",
-    "platform_smoke": "historical-only; not admission evidence"
+    "native_smoke": "OpenROAD 26Q1-1961-g63ed2e0fe5 and Yosys 0.63 launch under the server-managed GCC12/OpenROAD environment (2026-09-02)",
+    "platform_smoke": "P2 bounded integration smoke recorded in docs/evidence/P2_REAL_ORFS_SMOKE_20260902.md; commit-level rerun required after each adapter change"
   }
 }

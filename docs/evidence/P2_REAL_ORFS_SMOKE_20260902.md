@@ -3,6 +3,10 @@
 Status: passed (bounded integration smoke; not a QoR superiority claim)
 Date: 2026-09-02
 
+Provenance status: historical working-tree smoke. It predates the final P2
+atomic commit and is not used as commit-level acceptance evidence; a clean
+worktree rerun is required before merge approval.
+
 ## Runtime and toolchain
 
 - ORFS root: `/share/home/yuanwenjie/OpenROAD-flow-scripts` at `51ad1231a`;
