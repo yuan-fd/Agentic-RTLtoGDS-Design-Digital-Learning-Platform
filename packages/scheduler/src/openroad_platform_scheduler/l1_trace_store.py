@@ -70,8 +70,13 @@ class L1TraceStore:
                     raise ValueError("trace event sequence is not append-only")
                 if event.parent_event_id != last["event_id"]:
                     raise ValueError("trace event parent does not match previous event")
-                predecessor_event = L1TraceEvent.from_dict(json.loads(last["event_json"]))
-                if event.state_before_sha256 is not None and predecessor_event.state_after_sha256 is not None and event.state_before_sha256 != predecessor_event.state_after_sha256:
+                state_rows = connection.execute(
+                    "SELECT event_json FROM l1_trace_event WHERE trace_id = ? ORDER BY sequence DESC",
+                    (event.trace_id,),
+                ).fetchall()
+                predecessor_event = next((parsed for row in state_rows
+                                          if (parsed := L1TraceEvent.from_dict(json.loads(row["event_json"]))).state_after_sha256 is not None), None)
+                if event.state_before_sha256 is not None and predecessor_event is not None and event.state_before_sha256 != predecessor_event.state_after_sha256:
                     raise ValueError("trace event state does not continue predecessor state")
             predecessor = last["event_sha256"] if last is not None else None
             digest = _digest(payload, predecessor)
@@ -92,6 +97,7 @@ class L1TraceStore:
             ).fetchall()
         result: list[L1TraceEvent] = []
         previous: L1TraceEvent | None = None
+        previous_state: L1TraceEvent | None = None
         previous_digest: str | None = None
         for expected_sequence, row in enumerate(rows):
             if row["sequence"] != expected_sequence:
@@ -105,9 +111,11 @@ class L1TraceStore:
             event = L1TraceEvent.from_dict(json.loads(row["event_json"]))
             if event.event_id != row["event_id"] or event.sequence != row["sequence"] or event.parent_event_id != row["parent_event_id"]:
                 raise ValueError("stored L1 trace event columns disagree with payload")
-            if previous is not None and event.state_before_sha256 is not None and previous.state_after_sha256 is not None and event.state_before_sha256 != previous.state_after_sha256:
+            if previous_state is not None and event.state_before_sha256 is not None and event.state_before_sha256 != previous_state.state_after_sha256:
                 raise ValueError("stored L1 trace event state does not continue predecessor state")
             result.append(event)
             previous = event
+            if event.state_after_sha256 is not None:
+                previous_state = event
             previous_digest = row["event_sha256"]
         return tuple(result)

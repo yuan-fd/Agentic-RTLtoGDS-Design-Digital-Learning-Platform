@@ -55,6 +55,22 @@ class L1TraceService:
         if prior is not None and prior.state_after_sha256 != _hash(state):
             raise ValueError("stateful trace event uses a stale or forked DesignState")
 
+    def _require_call_history(self, trace_id: str, state: DesignState, call: SemanticToolCall,
+                              *, require_allowed_policy: bool) -> None:
+        events = self.store.read(trace_id)
+        called = any(event.kind is TraceEventKind.TOOL_CALLED and event.goal_id == state.goal_id
+                     and event.tool is call.tool and event.facts.get("call_id") == call.call_id
+                     and event.state_before_sha256 == _hash(state) for event in events)
+        if not called:
+            raise ValueError("trace event requires a prior matching tool call")
+        if require_allowed_policy and not any(
+            event.kind is TraceEventKind.POLICY_DECIDED and event.goal_id == state.goal_id
+            and event.tool is call.tool and event.facts.get("call_id") == call.call_id
+            and event.policy_verdict == "allow" and event.state_before_sha256 == _hash(state)
+            for event in events
+        ):
+            raise ValueError("tool receipt requires a prior matching allowed policy")
+
     def record_draft(self, trace_id: str, draft: GoalDraft) -> L1TraceEvent:
         draft.validate()
         return self._append(trace_id, kind=TraceEventKind.GOAL_DRAFTED, goal_id=draft.draft_id,
@@ -103,6 +119,7 @@ class L1TraceService:
         anchor = finalized[0].facts
         if anchor.get("goal_sha256") != _hash(goal) or anchor.get("policy_anchor") != expected:
             raise ValueError("policy decision does not match the durable finalized Goal anchor")
+        self._require_call_history(trace_id, state, call, require_allowed_policy=False)
         if verdict not in {"allow", "deny", "needs_clarification"}:
             raise ValueError("trace policy verdict is unsupported")
         return self._append(trace_id, kind=TraceEventKind.POLICY_DECIDED, goal_id=state.goal_id,
@@ -115,6 +132,8 @@ class L1TraceService:
         self._require_current_state(trace_id, state)
         if receipt.goal_id != state.goal_id or receipt.state_id != state.state_id:
             raise ValueError("tool receipt does not match trace state")
+        call = SemanticToolCall(receipt.call_id, receipt.goal_id, receipt.state_id, receipt.tool, {}, "receipt-link")
+        self._require_call_history(trace_id, state, call, require_allowed_policy=True)
         return self._append(trace_id, kind=TraceEventKind.TOOL_RECEIPT, goal_id=state.goal_id,
                             state_before=state, state_after=state, tool=receipt.tool,
                             facts={"call_id": receipt.call_id, "status": receipt.status, "result": receipt.result},
