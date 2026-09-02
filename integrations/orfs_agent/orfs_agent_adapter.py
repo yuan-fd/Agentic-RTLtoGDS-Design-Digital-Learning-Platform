@@ -113,7 +113,20 @@ def _result(*, status: str, started: str, artifacts: list[dict[str, str]],
             "failure": failure, "provenance": dict(provenance)}
 
 
-def _validate_domain_and_observations(domain: Mapping[str, Any], observations: list[Any], platform: str) -> None:
+def _load_protocol_receipt() -> Mapping[str, Any]:
+    receipt_path = os.environ.get("ORFS_AGENT_PROTOCOL_RECEIPT")
+    if not receipt_path:
+        raise ValueError("Runtime must inject ORFS_AGENT_PROTOCOL_RECEIPT")
+    receipt = json.loads(Path(receipt_path).read_text(encoding="utf-8"))
+    if not isinstance(receipt, Mapping) or set(receipt) != {"schema_version", "protocol"} or receipt.get("schema_version") != 1:
+        raise ValueError("Runtime protocol receipt is invalid")
+    if not isinstance(receipt["protocol"], Mapping):
+        raise ValueError("Runtime protocol receipt is invalid")
+    return receipt["protocol"]
+
+
+def _validate_domain_and_observations(domain: Mapping[str, Any], observations: list[Any], platform: str,
+                                      authoritative_protocol: Mapping[str, Any]) -> None:
     required = {"schema_version", "platform", "search_parameter_names", "admissible_values", "fixed_parameters",
                 "experiment_protocol", "protocol_sha256", "frozen_constraints", "domain_sha256"}
     if set(domain) != required or domain.get("schema_version") != 1 or domain.get("platform") != platform:
@@ -130,6 +143,8 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
     if not all(isinstance(protocol[name], str) and re.fullmatch(r"[0-9a-f]{64}", protocol[name]) for name in ("rtl_sha256", "sdc_sha256")):
         raise ValueError("experiment protocol hashes are invalid")
     protocol_hash = hashlib.sha256(json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if dict(protocol) != dict(authoritative_protocol):
+        raise ValueError("request protocol does not match Runtime protocol receipt")
     if domain.get("protocol_sha256") != protocol_hash or set(protocol["timing"]) != {"clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"}:
         raise ValueError("experiment protocol hash or timing is invalid")
     try:
@@ -146,6 +161,8 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
         raise ValueError("parameter_domain is not a complete allowlisted partition")
     if domain.get("frozen_constraints") != ["clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"]:
         raise ValueError("parameter_domain frozen constraints are invalid")
+    if platform not in {"asap7", "sky130hd", "nangate45"}:
+        raise ValueError("platform is not allowlisted")
     bounds = {"core_utilization_pct": (30, 75) if platform == "asap7" else (20, 70) if platform == "sky130hd" else (20, 80),
               "tns_end_percent": (0, 100), "global_placement_padding": (0, 3), "detail_placement_padding": (0, 3),
               "enable_dpo": (0, 1), "place_density_lb_addon": (0, .5), "cts_cluster_size": (10, 40), "cts_cluster_diameter": (40, 120)}
@@ -179,7 +196,8 @@ def _validate_domain_and_observations(domain: Mapping[str, Any], observations: l
         parameters = observation.get("parameters") if isinstance(observation, Mapping) else None
         if not isinstance(parameters, Mapping) or set(parameters) != names | {"clock_period_ns"}:
             raise ValueError("observation must contain the frozen clock and complete shared domain")
-        if observation.get("protocol_sha256") != protocol_hash or float(parameters["clock_period_ns"]) != timing["clock_period_ns"]:
+        if (isinstance(parameters["clock_period_ns"], bool) or not isinstance(parameters["clock_period_ns"], (int, float))
+                or observation.get("protocol_sha256") != protocol_hash or parameters["clock_period_ns"] != timing["clock_period_ns"]):
             raise ValueError("observation does not match the frozen experiment protocol")
         for name in names:
             value = canonical(name, parameters[name])
@@ -210,7 +228,7 @@ def main() -> int:
             raise ValueError("observations must be objects")
         if not isinstance(parameter_domain, Mapping):
             raise ValueError("a typed parameter_domain for the requested platform is required")
-        _validate_domain_and_observations(parameter_domain, observations, platform)
+        _validate_domain_and_observations(parameter_domain, observations, platform, _load_protocol_receipt())
         upstream = _checked_source(_load_lock())
         rows = [_row(item, design=design, platform=platform) for item in observations]
         workspace = args.result.parent

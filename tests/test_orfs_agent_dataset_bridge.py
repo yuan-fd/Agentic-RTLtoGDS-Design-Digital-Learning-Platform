@@ -115,21 +115,21 @@ def test_domain_refuses_forged_payload_and_mixed_observations():
 
 def test_adapter_rechecks_domain_and_observation_boundary():
     domain = _domain().to_dict(); observation = _observation()
-    bridge._validate_domain_and_observations(domain, [observation], "asap7")
+    bridge._validate_domain_and_observations(domain, [observation], "asap7", domain["experiment_protocol"])
     forged = {"platform": "asap7", "anything": "x"}
     forged["domain_sha256"] = __import__("hashlib").sha256(
         json.dumps({"platform": "asap7", "anything": "x"}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     with pytest.raises(ValueError, match="unknown or missing"):
-        bridge._validate_domain_and_observations(forged, [observation], "asap7")
+        bridge._validate_domain_and_observations(forged, [observation], "asap7", domain["experiment_protocol"])
     bad = _observation(); del bad["parameters"]["enable_dpo"]
     with pytest.raises(ValueError, match="complete shared domain"):
-        bridge._validate_domain_and_observations(domain, [bad], "asap7")
+        bridge._validate_domain_and_observations(domain, [bad], "asap7", domain["experiment_protocol"])
     forged = _domain().to_dict(); forged["experiment_protocol"]["rtl_sha256"] = "not-a-hash"
     unsigned = {key: value for key, value in forged.items() if key != "domain_sha256"}
     forged["domain_sha256"] = __import__("hashlib").sha256(
         json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     with pytest.raises(ValueError, match="protocol hashes"):
-        bridge._validate_domain_and_observations(forged, [observation], "asap7")
+        bridge._validate_domain_and_observations(forged, [observation], "asap7", domain["experiment_protocol"])
 
 
 def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch, tmp_path):
@@ -148,6 +148,9 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
         "repository": "https://example.invalid/orfs-agent.git", "cache_path": ".external-src/audit-cache",
     })
     request = tmp_path / "request.json"; result = tmp_path / "result.json"
+    receipt = tmp_path / "runtime-protocol-receipt.json"
+    receipt.write_text(json.dumps({"schema_version": 1, "protocol": _domain().experiment_protocol}), encoding="utf-8")
+    monkeypatch.setenv("ORFS_AGENT_PROTOCOL_RECEIPT", str(receipt))
     request.write_text(json.dumps({"plugin": {"plugin_id": "orfs-agent"}, "task": {
         "task_id": "dataset-001", "plugin_id": "orfs-agent", "inputs": {
             "design": "ibex", "platform": "asap7", "objective": "ECP_final", "observations": [{

@@ -38,6 +38,8 @@ def _protocol(raw: Mapping[str, Any]) -> dict[str, Any]:
     timing = raw["timing"]
     if not isinstance(timing, Mapping) or set(timing) != {"clock_period_ns", "clock_uncertainty_ns", "io_delay_ns"}:
         raise ValueError("experiment protocol timing is incomplete")
+    if any(isinstance(timing[name], bool) or not isinstance(timing[name], (int, float)) for name in timing):
+        raise ValueError("experiment protocol timing is invalid")
     normalized = {name: float(timing[name]) for name in timing}
     if not all(math.isfinite(value) for value in normalized.values()) or normalized["clock_period_ns"] <= 0 or min(normalized.values()) < 0:
         raise ValueError("experiment protocol timing is invalid")
@@ -145,7 +147,8 @@ class ORFSAgentDomain:
         parameters = observation.get("parameters")
         if not isinstance(parameters, Mapping) or set(parameters) != set(SHARED_PARAMETER_NAMES) | {"clock_period_ns"}:
             raise ValueError("observation must contain exactly the frozen clock and shared parameter domain")
-        if float(parameters["clock_period_ns"]) != self.experiment_protocol["timing"]["clock_period_ns"]:
+        if (isinstance(parameters["clock_period_ns"], bool) or not isinstance(parameters["clock_period_ns"], (int, float))
+                or float(parameters["clock_period_ns"]) != self.experiment_protocol["timing"]["clock_period_ns"]):
             raise ValueError("observation clock does not match the frozen experiment protocol")
         for name in SHARED_PARAMETER_NAMES:
             value = _canonical(name, parameters[name], platform=self.platform)
