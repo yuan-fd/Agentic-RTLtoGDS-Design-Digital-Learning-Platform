@@ -5,6 +5,8 @@
   "repository": "https://github.com/ABKGroup/ORFS-Agent.git",
   "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
   "cache_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
+  "cache_path_status": "source-audit cache only; never an admitted execution source",
+  "execution_source_policy": "Runtime must receive an explicit clean detached checkout at this commit; untracked files, a branch checkout, or a cache-only path are rejected.",
   "license": "BSD-3-Clause",
   "paper": {
     "title": "ORFS-Agent: Tool-Using Agents for Chip Design Optimization",
@@ -23,6 +25,7 @@
     "The full campaign script mutates a Makefile and assumes specific ORFS revisions and design files.",
     "The full campaign launcher invokes named remote hosts over SSH.",
     "The analyst workbench uses the Anthropic SDK and an ANTHROPIC_API_KEY.",
-    "The platform adapter does not copy or modify upstream source; it materializes the upstream data contract in an isolated Runtime workspace."
+    "The platform adapter does not copy or modify upstream source; it materializes the upstream data contract in an isolated Runtime workspace.",
+    "Denied upstream entrypoints: maindriver.sh/run_or_job.py/run_agent.sh because they use SSH, eval remote output, mutate Makefiles, write .env, or create environments."
   ]
 }

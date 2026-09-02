@@ -7,6 +7,7 @@
     "repository": "https://github.com/ABKGroup/ORFS-Agent.git",
     "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
     "checkout_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
+    "checkout_path_status": "source-audit cache only; native and Runtime smoke evidence use an explicit clean detached checkout",
     "license": {
       "spdx": "BSD-3-Clause",
       "license_sha256": "243601633b171278cd98f9ea495cbfc74aad9d7fc062c6e7c81e20d1fc44a22f"
@@ -55,6 +56,12 @@
     "platform_runtime_loop": "eligible after repeated feasible baseline, warm-up, GP/EI candidates, and independent confirmation",
     "upstream_full_launcher": "blocked: its scripts assume named SSH hosts, remote paths, and an Anthropic credentialed analyst",
     "paper_published_numbers": "not comparable until the paper ORFS commit, exact design/PDK assets, toolchain, and full protocol are separately admitted"
+  },
+  "security_entrypoint_review": {
+    "run_or_job.py": "DENY: invokes SSH and eval(stdout.strip()); never executed by the platform adapter.",
+    "maindriver.sh": "DENY: mutates shared Makefiles and assumes named remote hosts; never executed.",
+    "run_agent.sh": "DENY: writes .env and creates a virtual environment; never executed.",
+    "analyst_agent_workbench.py": "ALLOW, bounded: imported only from an explicit clean checkout in the isolated ORFS-Agent venv; native GP/EI call receives local data only, no network or credential."
   },
   "change_rule": "Any source, dependency, or toolchain change creates a new lock file and a new campaign fingerprint; it never rewrites this lock or an existing campaign."
 }
