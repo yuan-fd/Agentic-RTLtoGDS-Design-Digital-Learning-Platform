@@ -103,6 +103,51 @@ class ProcessAdapter:
         )
 
     @staticmethod
+    def validate_additional_artifacts(
+        workspace: str | Path,
+        manifest: PluginManifest,
+        artifacts: tuple[dict, ...] | list[dict],
+    ) -> tuple[dict, ...]:
+        """Validate platform-produced post-execution evidence.
+
+        The same workspace, path and manifest artifact allowlists apply to a
+        protected evaluator as to an adapter.  This deliberately does *not*
+        reapply task expected-artifact checks: those were already satisfied by
+        the successful adapter result before post-execution evaluation starts.
+        """
+        root = Path(workspace).expanduser().resolve()
+        allowed_kinds = {
+            rule.get("kind") for rule in manifest.artifact_rules if rule.get("kind")
+        }
+        normalized = []
+        for item in artifacts:
+            if not isinstance(item, dict):
+                raise ValueError("Post-execution artifact must be an object")
+            kind, declared = item.get("kind"), item.get("path")
+            if not isinstance(kind, str) or not isinstance(declared, str):
+                raise ValueError("Post-execution artifact requires kind and path")
+            if allowed_kinds and kind not in allowed_kinds:
+                raise ValueError(f"Artifact kind is not allowed by manifest: {kind}")
+            relative = Path(declared)
+            if relative.is_absolute():
+                raise ValueError(f"Artifact path is absolute: {relative}")
+            path = (root / relative).resolve()
+            try:
+                path.relative_to(root)
+            except ValueError as exc:
+                raise ValueError(f"Artifact path is outside the workspace: {relative}") from exc
+            if not path.is_file() or path.stat().st_size == 0:
+                raise ValueError(f"Artifact is missing or empty: {relative}")
+            normalized.append({
+                "kind": kind,
+                "store_key": str(path.relative_to(root)),
+                "size_bytes": path.stat().st_size,
+                "sha256": _sha256(path),
+                "metadata": dict(item.get("metadata") or {}),
+            })
+        return tuple(normalized)
+
+    @staticmethod
     def _environment(manifest: PluginManifest) -> dict[str, str]:
         env = {key: os.environ[key] for key in SAFE_HOST_ENVIRONMENT if key in os.environ}
         env.update(manifest.environment)

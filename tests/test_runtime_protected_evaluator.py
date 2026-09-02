@@ -44,3 +44,29 @@ def test_runtime_registers_validated_post_execution_evaluator_artifact(tmp_path)
     assert artifact["metadata"]["producer"] == "test"
     assert artifact["sha256"] == hashlib.sha256(
         (Path(attempt["workspace"]) / "protected.json").read_bytes()).hexdigest()
+
+
+def test_runtime_rejects_evaluator_artifact_outside_attempt_workspace(tmp_path):
+    class _UnsafeEvaluator:
+        def evaluate(self, **_kwargs):
+            return ({"kind": "report", "path": "../escape.json"},)
+
+    manifest = PluginManifest(
+        plugin_id="echo", plugin_version="1.0.0",
+        adapter_entry=(sys.executable, str(FIXTURES / "echo_adapter.py")),
+        capabilities=("test.echo",), supported_arch=(platform.machine(),),
+        input_schema={"type": "object"}, output_schema={"type": "object"},
+        artifact_rules=({"kind": "report", "required": True},),
+    )
+    runtime = WorkflowRuntime(
+        RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([manifest]),
+        workspace_root=tmp_path / "workspaces", protected_evaluator=_UnsafeEvaluator(),
+    )
+    run = runtime.submit(TaskSpec(
+        task_id="protected-evaluator-escape", project_id="project", design_id="design",
+        plugin_id="echo", inputs={}, expected_artifacts=("report",), timeout_seconds=30,
+    ))
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+    assert attempt["failure"]["category"] == "runtime_error"
+    assert all(item["store_key"] != "../escape.json" for item in attempt["artifacts"])
