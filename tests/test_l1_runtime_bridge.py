@@ -76,13 +76,15 @@ def test_runtime_bridge_rejects_foreign_query_and_accepts_runtime_timeout_attemp
     runtime.describe = lambda run_id: {"run": {"status": "failed", "terminal_reason": "timed_out", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}}, "stages": [{"stage_key": "route", "attempts": [{"attempt_id": "attempt-timeout", "status": "timed_out", "metrics": [], "artifacts": []}]}]}
     timeout = bridge.observation("run-timeout")
     assert timeout.attempt_id == "attempt-timeout" and timeout.terminal_status == "timed_out"
-    timeout_state = bridge.reduce_and_trace(L1TraceService(L1TraceStore(tmp_path / "timeout.sqlite")), "trace-timeout", state, run_id="run-timeout", next_state_id="state-timeout")
+    timeout_trace = L1TraceService(L1TraceStore(tmp_path / "timeout.sqlite")); timeout_state = bridge.reduce_and_trace(timeout_trace, "trace-timeout", state, run_id="run-timeout", next_state_id="state-timeout")
     assert timeout_state.diagnosis["runtime_terminal_status"] == "timed_out"
+    assert timeout_trace.store.read("trace-timeout")[0].facts["terminal_status"] == "timed_out"
     runtime.describe = lambda run_id: {"run": {"status": "failed", "terminal_reason": "lost", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}}, "stages": [{"stage_key": "route", "attempts": [{"attempt_id": "attempt-lost", "status": "lost", "metrics": [], "artifacts": []}]}]}
     lost = bridge.observation("run-lost")
     assert lost.attempt_id == "attempt-lost" and lost.terminal_status == "lost"
-    lost_state = bridge.reduce_and_trace(L1TraceService(L1TraceStore(tmp_path / "lost.sqlite")), "trace-lost", state, run_id="run-lost", next_state_id="state-lost")
+    lost_trace = L1TraceService(L1TraceStore(tmp_path / "lost.sqlite")); lost_state = bridge.reduce_and_trace(lost_trace, "trace-lost", state, run_id="run-lost", next_state_id="state-lost")
     assert lost_state.diagnosis["runtime_terminal_status"] == "lost"
+    assert lost_trace.store.read("trace-lost")[0].facts["terminal_status"] == "lost"
 
 
 class _FixtureFactory:
