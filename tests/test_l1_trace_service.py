@@ -72,3 +72,20 @@ def test_trace_receipt_cannot_advance_state_and_policy_must_match_goal(tmp_path:
     receipt = ToolReceipt("call-1", "goal-1", "state-1", ToolName.QUERY_TIMING, "completed", {}, (EvidencePointer("run:run-1", "e" * 64),), "forged-state")
     event = trace.record_receipt("trace-1", state, receipt)
     assert event.state_before_sha256 == event.state_after_sha256
+
+
+def test_trace_service_rejects_forked_or_stale_stateful_events(tmp_path: Path) -> None:
+    import pytest
+    trace = L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")); before = _state()
+    first = RuntimeObservation("run-1", "attempt-1", "route", "succeeded", {"setup_wns_ns": -0.1},
+                               (EvidencePointer("artifact:route-1", "a" * 64),))
+    after = L1StateReducer.apply(before, first, next_state_id="state-a")
+    trace.record_observation("trace-1", before, after, first)
+    second = RuntimeObservation("run-2", "attempt-2", "route", "succeeded", {"setup_wns_ns": 0.1},
+                                (EvidencePointer("artifact:route-2", "b" * 64),))
+    fork = L1StateReducer.apply(before, second, next_state_id="state-b")
+    with pytest.raises(ValueError, match="stale or forked"):
+        trace.record_observation("trace-1", before, fork, second)
+    stale = SemanticToolCall("call-stale", "goal-1", "state-1", ToolName.QUERY_TIMING, {"run_id": "run-1"}, "planner")
+    with pytest.raises(ValueError, match="stale or forked"):
+        trace.record_call("trace-1", before, stale, planner_summary="stale")

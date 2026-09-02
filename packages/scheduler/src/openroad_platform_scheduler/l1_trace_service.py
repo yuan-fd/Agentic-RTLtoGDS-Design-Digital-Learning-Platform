@@ -47,6 +47,14 @@ class L1TraceService:
         self.store.append(event)
         return event
 
+    def _require_current_state(self, trace_id: str, state: DesignState) -> None:
+        """Keep a trace linear: stateful events must extend its latest state."""
+        state.validate()
+        prior = next((event for event in reversed(self.store.read(trace_id))
+                      if event.state_after_sha256 is not None), None)
+        if prior is not None and prior.state_after_sha256 != _hash(state):
+            raise ValueError("stateful trace event uses a stale or forked DesignState")
+
     def record_draft(self, trace_id: str, draft: GoalDraft) -> L1TraceEvent:
         draft.validate()
         return self._append(trace_id, kind=TraceEventKind.GOAL_DRAFTED, goal_id=draft.draft_id,
@@ -68,6 +76,7 @@ class L1TraceService:
     def record_call(self, trace_id: str, state: DesignState, call: SemanticToolCall,
                     *, planner_summary: str, hypotheses: dict | None = None) -> L1TraceEvent:
         state.validate(); call.validate()
+        self._require_current_state(trace_id, state)
         if call.goal_id != state.goal_id or call.state_id != state.state_id:
             raise ValueError("tool call does not match trace state")
         return self._append(trace_id, kind=TraceEventKind.TOOL_CALLED, goal_id=state.goal_id,
@@ -79,6 +88,7 @@ class L1TraceService:
     def record_policy(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall,
                       policy: TrustedPolicyIdentity, *, verdict: str, summary: str) -> L1TraceEvent:
         goal.validate(); state.validate(); call.validate(); policy.validate()
+        self._require_current_state(trace_id, state)
         if state.goal_id != goal.goal_id or call.goal_id != state.goal_id or call.state_id != state.state_id:
             raise ValueError("policy call does not match trace state")
         expected = {"l1_policy_id": policy.policy_id, "l1_policy_version": policy.policy_version,
@@ -102,6 +112,7 @@ class L1TraceService:
 
     def record_receipt(self, trace_id: str, state: DesignState, receipt: ToolReceipt) -> L1TraceEvent:
         receipt.validate()
+        self._require_current_state(trace_id, state)
         if receipt.goal_id != state.goal_id or receipt.state_id != state.state_id:
             raise ValueError("tool receipt does not match trace state")
         return self._append(trace_id, kind=TraceEventKind.TOOL_RECEIPT, goal_id=state.goal_id,
@@ -113,6 +124,7 @@ class L1TraceService:
                            observation: RuntimeObservation) -> L1TraceEvent:
         before.validate(); after.validate()
         observation.validate()
+        self._require_current_state(trace_id, before)
         if after.parent_state_id != before.state_id or after.goal_id != before.goal_id:
             raise ValueError("observation state lineage is invalid")
         expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
