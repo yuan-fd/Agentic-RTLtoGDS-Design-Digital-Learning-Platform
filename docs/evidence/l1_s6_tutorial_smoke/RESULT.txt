@@ -1,0 +1,9 @@
+L1 S6 tutorial-shaped bounded smoke
+Terminal status: PASS
+
+Natural-language request -> typed GoalDraft -> trusted Goal -> cited run_stage
+-> real WorkflowRuntime/ProcessAdapter execution -> Runtime observation ->
+cited query_stage_metrics -> persisted stop reflection.
+
+This proves the L1 control-plane integration only; it makes no OpenROAD QoR
+or optimizer-quality claim.

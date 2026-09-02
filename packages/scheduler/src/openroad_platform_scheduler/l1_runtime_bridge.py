@@ -145,7 +145,7 @@ class L1RuntimeBridge:
             result = {"left_run_id": run_ids[0], "right_run_id": run_ids[1], "metrics": {name: {run_id: summary[run_id].get(name) for run_id in run_ids} for name in metric_names}}
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
                            result,
-                           tuple(_evidence(f"runtime:{run_id}", view) for run_id, view in views.items()))
+                           tuple(_evidence(f"run:{run_id}", view) for run_id, view in views.items()))
 
     def observation(self, run_id: str) -> RuntimeObservation:
         view = self._runtime.describe(run_id); run = view["run"]

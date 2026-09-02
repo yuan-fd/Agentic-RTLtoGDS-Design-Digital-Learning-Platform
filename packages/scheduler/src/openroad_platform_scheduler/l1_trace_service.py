@@ -177,3 +177,16 @@ class L1TraceService:
         return self._append(trace_id, kind=TraceEventKind.STOPPED, goal_id=state.goal_id,
                             state_before=state, state_after=state,
                             facts={"run_id": run_id, "reason": reason}, evidence=state.evidence)
+
+    def record_reflection(self, trace_id: str, state: DesignState, *, summary: str,
+                          decision: str, evidence=()) -> L1TraceEvent:
+        """Persist a bounded planner decision separately from Runtime facts."""
+        if not isinstance(summary, str) or not summary.strip() or len(summary) > 4000:
+            raise ValueError("reflection summary is invalid")
+        if decision not in {"continue", "stop", "escalate"}:
+            raise ValueError("reflection decision is invalid")
+        self._require_current_state(trace_id, state)
+        return self._append(trace_id, kind=TraceEventKind.REFLECTION_RECORDED,
+                            goal_id=state.goal_id, state_before=state, state_after=state,
+                            planner_summary=summary, facts={"decision": decision},
+                            evidence=evidence)

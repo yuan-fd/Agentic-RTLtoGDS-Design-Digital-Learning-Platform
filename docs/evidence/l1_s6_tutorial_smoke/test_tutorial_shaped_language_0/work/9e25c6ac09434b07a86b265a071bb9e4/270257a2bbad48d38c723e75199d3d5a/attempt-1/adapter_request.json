@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "plugin": {
+    "plugin_id": "tutorial-fixture",
+    "plugin_version": "1.0.0"
+  },
+  "task": {
+    "task_id": "l1-call-run",
+    "project_id": "p1",
+    "design_id": "top",
+    "plugin_id": "tutorial-fixture",
+    "workflow_id": null,
+    "inputs": {
+      "message": "tutorial"
+    },
+    "parameters": {
+      "target_stage": "route"
+    },
+    "resources": {},
+    "timeout_seconds": 15,
+    "max_attempts": 1,
+    "expected_artifacts": [
+      "report"
+    ],
+    "labels": {
+      "l1_goal_id": "goal-1",
+      "l1_call_id": "call-run"
+    },
+    "schema_version": 1
+  }
+}
