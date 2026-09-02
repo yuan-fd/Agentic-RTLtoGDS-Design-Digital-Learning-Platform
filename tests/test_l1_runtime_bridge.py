@@ -15,6 +15,9 @@ from openroad_platform_scheduler.runtime_store import RuntimeStore
 from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge
 from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
+from openroad_platform_scheduler.l1_loop import L1DurableLoop
+from openroad_platform_scheduler.l1_loop_store import L1LoopStore
+from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 
 
 class _Runtime:
@@ -107,3 +110,19 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     artifact_id = runtime.describe(receipt.result["run_id"])["stages"][0]["attempts"][0]["artifacts"][0]["artifact_id"]
     excerpt = bridge.execute(goal, state, SemanticToolCall("call-excerpt", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": receipt.result["run_id"], "artifact_id": artifact_id, "max_bytes": 64}, "planner"))
     assert "bytes" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
+
+
+def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):
+    fixture = Path(__file__).parent / "fixtures" / "echo_adapter.py"
+    manifest = PluginManifest("fixture", "1.0.0", (sys.executable, str(fixture)), ("eda.rtl_to_gds",), (platform.machine(),), {"type": "object"}, {"type": "object"}, ({"kind": "report", "required": True},), 10)
+    runtime = WorkflowRuntime(RuntimeStore(tmp_path / "loop-runtime.sqlite"), PluginRegistry([manifest]), workspace_root=tmp_path / "loop-work", adapter=ProcessAdapter(ProcessGuardian(poll_interval=0.01, terminate_grace=0.1)))
+    bridge = L1RuntimeBridge(runtime, TaskSpec("loop-base", "p1", "top", plugin_id="fixture", inputs={"message":"loop"}, expected_artifacts=("report",), timeout_seconds=10), _FixtureFactory())
+    policy = TrustedPolicyIdentity("policy-1","v1","platform",EvidencePointer("artifact:policy","d"*64))
+    goal = DesignGoal("goal-1","p1","top","platform-1","pdk-1","toolchain-1",EvidencePointer("artifact:rtl","a"*64),GoalPreference.BALANCED,(QoRConstraint("setup_wns_ns",">=",0),),("route",),("density",),AgentBudget(2,2,60),allowed_tools=(ToolName.RUN_FULL_FLOW,),labels={"l1_policy_id":"policy-1","l1_policy_version":"v1","l1_policy_issuer":"platform","l1_policy_provenance":"artifact:policy","l1_policy_provenance_sha256":"d"*64})
+    state = DesignState("state-1","goal-1",0,"running",None,{},AgentBudget(2,2,60))
+    trace=L1TraceService(L1TraceStore(tmp_path/"loop-trace.sqlite")); trace.record_goal("trace-loop",goal)
+    loop=L1DurableLoop(L1LoopStore(tmp_path/"loop.sqlite"),bridge,trace)
+    plan=loop.plan_validate_execute("trace-loop",goal,state,SemanticToolCall("call-loop","goal-1","state-1",ToolName.RUN_FULL_FLOW,{},"planner"),policy,planner_summary="bounded flow")
+    runtime.execute_once(plan["run_id"])
+    successor=loop.observe("trace-loop",state,plan["plan_id"],next_state_id="state-2")
+    assert successor.diagnosis["runtime_run_id"] == plan["run_id"]

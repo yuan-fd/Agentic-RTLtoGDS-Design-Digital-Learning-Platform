@@ -162,7 +162,10 @@ class L1RuntimeBridge:
         if not evidence:
             evidence = (_evidence(f"run:{run_id}", view),)
         terminal_status = run.get("terminal_reason") if run.get("terminal_reason") in {"timed_out", "lost"} else run["status"]
-        return RuntimeObservation(run_id, attempt["attempt_id"], stage_view.get("stage_key"), terminal_status, metrics, evidence)
+        stage = stage_view.get("stage_key")
+        if stage not in {"synth", "floorplan", "place", "cts", "route", "finish"}:
+            stage = None
+        return RuntimeObservation(run_id, attempt["attempt_id"], stage, terminal_status, metrics, evidence)
 
     def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
                          *, run_id: str, next_state_id: str) -> DesignState:
