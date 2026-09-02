@@ -52,7 +52,7 @@ def test_dataset_manifest_does_not_admit_an_optimizer_capability():
         (ROOT / "integrations/orfs_agent/orfs_agent.plugin.json").read_text(encoding="utf-8")))
     assert manifest.capabilities == ("optimizer.l2.dataset-bridge",)
     assert {rule["kind"] for rule in manifest.artifact_rules} == {
-        "optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock", "report", "log"}
+        "optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock", "runtime_protocol_receipt", "report", "log"}
 
 
 def _domain() -> ORFSAgentDomain:
@@ -152,6 +152,7 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
     receipt.write_text(json.dumps({"schema_version": 1, "protocol": _domain().experiment_protocol,
                                    "run_id": "runtime-test", "attempt_id": "attempt-test"}), encoding="utf-8")
     monkeypatch.setenv("ORFS_AGENT_PROTOCOL_RECEIPT", str(receipt))
+    monkeypatch.setenv("ORFS_AGENT_PROTOCOL_RECEIPT_SHA256", __import__("hashlib").sha256(receipt.read_bytes()).hexdigest())
     request.write_text(json.dumps({"plugin": {"plugin_id": "orfs-agent"}, "task": {
         "task_id": "dataset-001", "plugin_id": "orfs-agent", "inputs": {
             "design": "ibex", "platform": "asap7", "objective": "ECP_final", "observations": [{

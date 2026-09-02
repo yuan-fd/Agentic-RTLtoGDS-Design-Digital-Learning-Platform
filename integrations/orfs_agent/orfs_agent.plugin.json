@@ -19,6 +19,7 @@
     {"kind": "optimizer_dataset", "required": true},
     {"kind": "optimizer_input_manifest", "required": true},
     {"kind": "upstream_source_lock", "required": true},
+    {"kind": "runtime_protocol_receipt", "required": false},
     {"kind": "report", "required": false},
     {"kind": "log", "required": false}
   ],

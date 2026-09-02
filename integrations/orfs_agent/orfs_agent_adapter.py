@@ -115,6 +115,7 @@ def _result(*, status: str, started: str, artifacts: list[dict[str, str]],
 
 def _load_protocol_receipt(workspace: Path) -> Mapping[str, Any]:
     receipt_path = os.environ.get("ORFS_AGENT_PROTOCOL_RECEIPT")
+    expected_sha256 = os.environ.get("ORFS_AGENT_PROTOCOL_RECEIPT_SHA256")
     if not receipt_path:
         raise ValueError("Runtime must inject ORFS_AGENT_PROTOCOL_RECEIPT")
     path = Path(receipt_path).resolve()
@@ -122,7 +123,10 @@ def _load_protocol_receipt(workspace: Path) -> Mapping[str, Any]:
         path.relative_to(workspace.resolve())
     except ValueError as exc:
         raise ValueError("Runtime protocol receipt must be inside the attempt workspace") from exc
-    receipt = json.loads(path.read_text(encoding="utf-8"))
+    content = path.read_bytes()
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256) or hashlib.sha256(content).hexdigest() != expected_sha256:
+        raise ValueError("Runtime protocol receipt digest does not match")
+    receipt = json.loads(content)
     if not isinstance(receipt, Mapping) or set(receipt) != {"schema_version", "protocol", "run_id", "attempt_id"} or receipt.get("schema_version") != 1:
         raise ValueError("Runtime protocol receipt is invalid")
     if not isinstance(receipt["protocol"], Mapping):

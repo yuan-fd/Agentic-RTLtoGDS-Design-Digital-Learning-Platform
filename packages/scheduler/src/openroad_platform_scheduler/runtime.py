@@ -5,6 +5,7 @@ from __future__ import annotations
 import platform
 import re
 import json
+import hashlib
 import socket
 import time
 import uuid
@@ -148,6 +149,7 @@ class WorkflowRuntime:
             downstream=on_line,
         )
         try:
+            runtime_artifacts: tuple[dict, ...] = ()
             environment = dict(self.environment_resolver(run) if self.environment_resolver else {})
             if ready.plugin_id == "orfs-agent":
                 domain = run.task_spec.inputs.get("parameter_domain")
@@ -158,6 +160,11 @@ class WorkflowRuntime:
                 receipt.write_text(json.dumps({"schema_version": 1, "protocol": domain["experiment_protocol"],
                                                "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
                 environment["ORFS_AGENT_PROTOCOL_RECEIPT"] = str(receipt)
+                environment["ORFS_AGENT_PROTOCOL_RECEIPT_SHA256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+                runtime_artifacts = self.adapter.validate_additional_artifacts(workspace, manifest, ({
+                    "kind": "runtime_protocol_receipt", "path": receipt.name,
+                    "metadata": {"producer": "runtime", "attempt_id": attempt.attempt_id},
+                },))
             execution = self.adapter.execute(
                 manifest,
                 run.task_spec,
@@ -177,7 +184,7 @@ class WorkflowRuntime:
                         ),
                     )
                 self.store.register_artifacts(
-                    attempt.attempt_id, (*execution.artifacts, *evaluator_artifacts)
+                    attempt.attempt_id, (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
                 )
                 self.store.register_metrics(attempt.attempt_id, execution.result.metrics)
             self.store.finish_attempt(
