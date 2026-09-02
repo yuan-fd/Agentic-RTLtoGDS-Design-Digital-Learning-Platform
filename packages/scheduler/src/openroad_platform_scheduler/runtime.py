@@ -149,7 +149,7 @@ class WorkflowRuntime:
             downstream=on_line,
         )
         try:
-            runtime_artifacts: tuple[dict, ...] = ()
+            runtime_receipt: dict | None = None
             environment = dict(self.environment_resolver(run) if self.environment_resolver else {})
             if ready.plugin_id == "orfs-agent":
                 domain = run.task_spec.inputs.get("parameter_domain")
@@ -161,10 +161,10 @@ class WorkflowRuntime:
                                                "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
                 environment["ORFS_AGENT_PROTOCOL_RECEIPT"] = str(receipt)
                 environment["ORFS_AGENT_PROTOCOL_RECEIPT_SHA256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
-                runtime_artifacts = self.adapter.validate_additional_artifacts(workspace, manifest, ({
+                runtime_receipt = {
                     "kind": "runtime_protocol_receipt", "path": receipt.name,
                     "metadata": {"producer": "runtime", "attempt_id": attempt.attempt_id},
-                },))
+                }
             execution = self.adapter.execute(
                 manifest,
                 run.task_spec,
@@ -174,6 +174,8 @@ class WorkflowRuntime:
                 environment=environment,
             )
             if execution.result.status is RuntimeStatus.SUCCEEDED:
+                runtime_artifacts = self.adapter.validate_additional_artifacts(
+                    workspace, manifest, (runtime_receipt,) if runtime_receipt is not None else ())
                 evaluator_artifacts: tuple[dict, ...] = ()
                 if self.protected_evaluator is not None:
                     evaluator_artifacts = self.adapter.validate_additional_artifacts(
