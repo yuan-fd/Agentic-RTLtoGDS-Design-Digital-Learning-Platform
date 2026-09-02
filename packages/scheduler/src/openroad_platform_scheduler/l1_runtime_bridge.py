@@ -127,6 +127,8 @@ class L1RuntimeBridge:
         if not run_ids:
             raise ValueError("Runtime read tool requires a typed run identifier")
         views = {run_id: self._runtime.describe(run_id) for run_id in run_ids}
+        for view in views.values():
+            self._require_owned_run(goal, view)
         result: dict[str, Any] = {"run_ids": run_ids, "view": self._bounded(views)}
         if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
             read = getattr(self._runtime, "read_artifact_excerpt", None)
@@ -147,7 +149,7 @@ class L1RuntimeBridge:
             raise ValueError("Runtime observation requires a terminal run")
         candidates = [(stage, attempt) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())
                       if (run["status"] == "succeeded" and stage.get("successful_attempt_id") == attempt.get("attempt_id"))
-                      or (run["status"] != "succeeded" and attempt.get("status") == run["status"])]
+                      or (run["status"] != "succeeded" and attempt.get("status") in {run["status"], run.get("terminal_reason")})]
         if len(candidates) != 1:
             raise ValueError("Runtime run has no attempt observation")
         stage_view, attempt = candidates[0]; metrics = {item["name"]: float(item["value"]) for item in attempt.get("metrics", ())
@@ -161,6 +163,7 @@ class L1RuntimeBridge:
                          *, run_id: str, next_state_id: str) -> DesignState:
         """The only S3 handoff from Runtime facts into the S2 state authority."""
         observation = self.observation(run_id)
+        self._require_owned_run_from_id(state.goal_id, run_id)
         successor = L1StateReducer.apply(state, observation, next_state_id=next_state_id)
         trace.record_observation(trace_id, state, successor, observation)
         return successor
@@ -172,3 +175,13 @@ class L1RuntimeBridge:
     @staticmethod
     def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
         return {item["name"]: float(item["value"]) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ()) for item in attempt.get("metrics", ()) if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
+
+    @staticmethod
+    def _require_owned_run(goal: DesignGoal, view: Mapping[str, Any]) -> None:
+        if view.get("run", {}).get("task_spec", {}).get("labels", {}).get("l1_goal_id") != goal.goal_id:
+            raise ValueError("Runtime run is not owned by this DesignGoal")
+
+    def _require_owned_run_from_id(self, goal_id: str, run_id: str) -> None:
+        view = self._runtime.describe(run_id)
+        if view.get("run", {}).get("task_spec", {}).get("labels", {}).get("l1_goal_id") != goal_id:
+            raise ValueError("Runtime run is not owned by this DesignGoal")

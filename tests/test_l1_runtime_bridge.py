@@ -22,7 +22,7 @@ class _Runtime:
     def submit(self, task, *, capability): self.task, self.capability = task, capability; return SimpleNamespace(run_id="run-1")
     def request_cancel(self, run_id): self.cancelled.append(run_id)
     def read_artifact_excerpt(self, run_id, artifact_id, *, offset, max_bytes): raise ValueError("artifact is not registered in the specified Runtime run")
-    def describe(self, run_id): return {"run": {"status": "succeeded"}, "stages": [{"stage_key": "route", "successful_attempt_id": "attempt-1", "attempts": [{"attempt_id": "attempt-1", "metrics": [{"name": "setup_wns_ns", "value": -0.1}], "artifacts": [{"artifact_id": "report-1"}]}]}]}
+    def describe(self, run_id): return {"run": {"status": "succeeded", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}}, "stages": [{"stage_key": "route", "successful_attempt_id": "attempt-1", "attempts": [{"attempt_id": "attempt-1", "metrics": [{"name": "setup_wns_ns", "value": -0.1}], "artifacts": [{"artifact_id": "report-1"}]}]}]}
 
 
 def test_runtime_bridge_only_submits_immutable_task_and_observes_runtime(tmp_path):
