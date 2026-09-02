@@ -12,7 +12,7 @@ updated_at: 2026-08-06
 | P2 | 现有 ORFSRunner 迁为标准插件 | 新 Runtime 下真实 Nangate45 RTL→GDS |
 | P3 | 三平台环境与源码兼容性准入 | 固定 commit 的 license/ARM/入口/smoke 结论 |
 | P4 | RTLScout 黑箱插件与 RTL→ORFS 组合工作流 | fake smoke；有预算时真实 LLM，否则明确阻塞 |
-| P5 | AgenticPD 智能优化接入 | 同基线、预算、工具链的真实候选对比 |
+| P5 | ORFS-Agent 外部 L2 优化接入 | 同一冻结基线、预算和工具链下的外部候选提案与 Runtime 实测；AgenticPD 仅保留历史证据 |
 | P6 | Campaign、有限并发、恢复、查询 API/Web | 重启无重复、workspace 隔离、资源与取消证据 |
 | P7 | NL→TaskSpec 与白名单 ReAct | 无任意 shell，修复预算和停止条件生效 |
 | P8 | TaiWei-Pin-3D 黑箱插件 | 固定 3D toolchain 下 gcd 真实 GDS/指标/视图 |
