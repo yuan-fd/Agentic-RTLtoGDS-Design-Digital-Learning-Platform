@@ -6,7 +6,9 @@ import pytest
 from openroad_platform_analysis.common_evaluator import (
     evaluate_orfs_run, write_immutable_evaluation,
 )
+from openroad_platform_analysis.orfs_protected_evaluator import ORFSProtectedEvaluator
 from openroad_platform_analysis.parsers.stage_json import extract_metrics
+from openroad_platform_contracts.platform import PluginManifest, TaskSpec
 
 
 def _json(path, payload):
@@ -121,3 +123,24 @@ def test_workspace_and_common_parser_share_canonical_time_units(tmp_path):
     assert value["stages"]["cts"]["metrics"]["setup_slack_ns"] == pytest.approx(
         -.0281865)
     assert value["stages"]["cts"]["metrics"]["fmax_mhz"] == pytest.approx(2449.86)
+
+
+def test_protected_evaluator_never_writes_error_evidence_through_adapter_symlink(tmp_path):
+    workspace, outside = tmp_path / "workspace", tmp_path / "outside"
+    workspace.mkdir(); outside.mkdir()
+    (workspace / "orfs").symlink_to(outside, target_is_directory=True)
+    manifest = PluginManifest(
+        plugin_id="orfs", plugin_version="1.0.0", adapter_entry=("echo",),
+        capabilities=("test",), supported_arch=("test",),
+        input_schema={"type": "object"}, output_schema={"type": "object"},
+    )
+    task = TaskSpec(
+        task_id="symlink", project_id="project", design_id="design", plugin_id="orfs",
+        inputs={}, parameters={"target_stage": "finish"}, timeout_seconds=1,
+    )
+    artifact = ORFSProtectedEvaluator().evaluate(
+        manifest=manifest, task=task, workspace=str(workspace),
+    )[0]
+    assert artifact["path"] == "protected_evaluator_error.log"
+    assert (workspace / artifact["path"]).is_file()
+    assert not list(outside.rglob("*"))

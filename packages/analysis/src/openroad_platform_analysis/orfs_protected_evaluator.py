@@ -70,7 +70,10 @@ class ORFSProtectedEvaluator:
             write_immutable_evaluation(output, evaluation)
             return (_artifact(root, output, outcome="completed", evaluation=evaluation),)
         except Exception as exc:
-            error = implementation / "analysis" / "common_evaluator_error.log"
+            # ``implementation`` is adapter-produced and can be a symlink.
+            # Once _inside() has rejected it, never use it again for a write:
+            # error evidence must remain under Runtime's attempt workspace.
+            error = root / "protected_evaluator_error.log"
             error.parent.mkdir(parents=True, exist_ok=True)
             error.write_text(f"{type(exc).__name__}: {exc}\n", encoding="utf-8")
             return (_artifact(root, error, outcome="error", error=f"{type(exc).__name__}: {exc}"),)
