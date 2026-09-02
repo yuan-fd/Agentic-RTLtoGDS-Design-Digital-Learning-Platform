@@ -86,7 +86,7 @@ class L1TraceService:
         return self._append(trace_id, kind=TraceEventKind.GOAL_FINALIZED, goal_id=goal.goal_id,
                             facts={"goal_sha256": _hash(goal), "toolchain_id": goal.toolchain_id,
                                    "pdk_id": goal.pdk_id, "allowed_tools": [item.value for item in goal.allowed_tools],
-                                   "policy_anchor": policy_anchor},
+                                   "policy_anchor": policy_anchor, "goal_ir": goal.to_dict()},
                             evidence=(goal.rtl_artifact,))
 
     def record_call(self, trace_id: str, state: DesignState, call: SemanticToolCall,
@@ -157,7 +157,8 @@ class L1TraceService:
             state_before_sha256=_hash(before), state_after_sha256=_hash(after), planner_summary=None,
             tool=None, policy_verdict=None, facts={"run_id": observation.run_id,
             "attempt_id": observation.attempt_id, "terminal_status": observation.terminal_status,
-            "metrics": observation.metrics}, hypotheses={}, evidence=observation.evidence,
+            "metrics": observation.metrics, "state_before": before.to_dict(),
+            "state_after": after.to_dict()}, hypotheses={}, evidence=observation.evidence,
             parent_event_id=previous.event_id if previous else None,
         )
         self.store.append_state_transition(event, before=before, after=after, observation=observation)
