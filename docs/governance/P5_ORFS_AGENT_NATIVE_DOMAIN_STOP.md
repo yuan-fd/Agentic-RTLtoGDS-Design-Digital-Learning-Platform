@@ -1,6 +1,13 @@
 # P5 native ORFS-Agent domain stop
 
-## Problem
+## Status
+
+**SUPERSEDED on 2026-09-02 by product direction:** the previous eight-field
+domain was historical scope error, not a protected product policy. ORFS-Agent
+L2 reproduction uses its complete upstream 12-field protocol. This record is
+retained as historical evidence; it must not constrain the active path.
+
+## Historical problem
 
 The admitted upstream ORFS-Agent GP/EI workbench searches its published,
 continuous 12-field domain. The product dataset bridge admits a frozen-clock,
