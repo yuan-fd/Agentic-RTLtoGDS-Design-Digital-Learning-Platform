@@ -15,6 +15,10 @@ from openroad_platform_contracts.learning import EvidencePointer
 class TrustedGoalPolicy:
     """Operator-owned data needed to turn an untrusted draft into a goal."""
 
+    policy_id: str
+    policy_version: str
+    issuer: str
+    provenance: EvidencePointer
     project_id: str
     design_id: str
     platform: str
@@ -29,6 +33,10 @@ class TrustedGoalPolicy:
     allowed_tools: tuple[ToolName, ...]
 
     def validate(self) -> None:
+        if not all(isinstance(value, str) and value and len(value) <= 128
+                   for value in (self.policy_id, self.policy_version, self.issuer)):
+            raise ValueError("verified goal policy requires bounded id, version, and issuer")
+        self.provenance.validate()
         # Reuse the public contract as the definitive policy validator.
         DesignGoal(
             goal_id="policy-validation", project_id=self.project_id, design_id=self.design_id,
@@ -57,7 +65,9 @@ class GoalFinalizer:
             hard_constraints=policy.hard_constraints, allowed_stages=policy.allowed_stages,
             allowed_parameters=policy.allowed_parameters, budget=policy.budget,
             allowed_tools=policy.allowed_tools,
-            labels={"l1_draft_sha256": draft.request_sha256, "l1_parser_id": draft.parser_id},
+            labels={"l1_draft_sha256": draft.request_sha256, "l1_parser_id": draft.parser_id,
+                    "l1_policy_id": policy.policy_id, "l1_policy_version": policy.policy_version,
+                    "l1_policy_issuer": policy.issuer, "l1_policy_provenance": policy.provenance.ref},
         )
         goal.validate()
         return goal

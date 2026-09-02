@@ -23,9 +23,13 @@ def test_registry_requires_all_and_only_tutorial_tools() -> None:
     assert SemanticToolRegistryContract.from_dict(registry.to_dict()) == registry
     with pytest.raises(ValueError, match="exactly the tutorial"):
         SemanticToolRegistryContract("l1-openroad-v1", registry.definitions[:-1]).validate()
+    with pytest.raises(ValueError, match="exactly the tutorial"):
+        SemanticToolRegistryContract("l1-openroad-v1", registry.definitions + (registry.definitions[0],)).validate()
 
 
 def test_definition_rejects_shell_surface() -> None:
     definition = _definition(ToolName.RUN_STAGE)
     with pytest.raises(ValueError, match="forbidden executable"):
         SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"shell": "string"}}).validate()
+    with pytest.raises(ValueError, match="forbidden executable"):
+        SemanticToolDefinition(**{**definition.__dict__, "input_schema": {"nested": {"shell_command": "string"}}}).validate()

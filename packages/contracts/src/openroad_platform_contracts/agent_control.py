@@ -44,6 +44,13 @@ class ToolName(str, Enum):
     STOP_OR_ESCALATE = "stop_or_escalate"
 
 
+DEFAULT_L1_TOOLS = (
+    ToolName.GET_DESIGN_SUMMARY, ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
+    ToolName.QUERY_DRC, ToolName.QUERY_POWER, ToolName.QUERY_STAGE_METRICS,
+    ToolName.QUERY_ARTIFACT_EXCERPT, ToolName.SET_FLOW_PARAMS, ToolName.RUN_STAGE,
+    ToolName.RUN_FULL_FLOW, ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE,
+)
+
 READ_ONLY_TOOLS = frozenset({
     ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION, ToolName.QUERY_DRC,
     ToolName.QUERY_POWER, ToolName.QUERY_ARTIFACT_EXCERPT,
@@ -152,7 +159,7 @@ class DesignGoal:
     allowed_stages: tuple[str, ...]
     allowed_parameters: tuple[str, ...]
     budget: AgentBudget
-    allowed_tools: tuple[ToolName, ...] = tuple(ToolName)
+    allowed_tools: tuple[ToolName, ...] = DEFAULT_L1_TOOLS
     labels: dict[str, str] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 

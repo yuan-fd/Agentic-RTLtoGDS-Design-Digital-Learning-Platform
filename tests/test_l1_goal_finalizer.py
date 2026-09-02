@@ -12,6 +12,8 @@ from openroad_platform_scheduler.l1_goal_finalizer import GoalFinalizer, Trusted
 
 def _policy() -> TrustedGoalPolicy:
     return TrustedGoalPolicy(
+        policy_id="l1-policy-1", policy_version="v1", issuer="platform-policy-service",
+        provenance=EvidencePointer("artifact:policy", "d" * 64),
         project_id="project-1", design_id="aes", platform="sky130hd", pdk_id="sky130hd",
         toolchain_id="pinned-toolchain", rtl_artifact=EvidencePointer("artifact:rtl", "a" * 64),
         preference=GoalPreference.PERFORMANCE,
@@ -37,4 +39,5 @@ def test_finalizer_requires_answered_draft_and_records_only_policy_facts() -> No
     goal = GoalFinalizer.finalize(_draft(True), _policy(), goal_id="goal-1")
     assert goal.design_id == "aes"
     assert goal.labels["l1_draft_sha256"] == _draft(True).request_sha256
+    assert goal.labels["l1_policy_provenance"] == "artifact:policy"
     assert goal.allowed_parameters == ("core_utilization_pct",)

@@ -34,9 +34,20 @@ def _identifier_list(name: str, values: tuple[str, ...]) -> None:
 
 def _schema(name: str, value: Mapping[str, Any]) -> None:
     _validate_mapping(name, value)
-    for key in value:
-        if key.lower() in _FORBIDDEN_SCHEMA_TERMS:
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValueError(f"{name} keys must be strings")
+        lowered = key.lower().replace("-", "_")
+        tokens = tuple(part for part in lowered.split("_") if part)
+        compact = "".join(tokens)
+        if lowered in _FORBIDDEN_SCHEMA_TERMS or compact in {term.replace("_", "") for term in _FORBIDDEN_SCHEMA_TERMS} or any(token in _FORBIDDEN_SCHEMA_TERMS for token in tokens):
             raise ValueError(f"{name} contains forbidden executable field {key!r}")
+        if isinstance(item, Mapping):
+            _schema(name, item)
+        elif isinstance(item, (tuple, list)):
+            for child in item:
+                if isinstance(child, Mapping):
+                    _schema(name, child)
 
 
 @dataclass(frozen=True)
@@ -101,7 +112,7 @@ class SemanticToolRegistryContract:
             if not isinstance(definition, SemanticToolDefinition):
                 raise ValueError("registry definitions must contain SemanticToolDefinition values")
             definition.validate()
-        if {item.name for item in self.definitions} != TUTORIAL_L1_TOOLS:
+        if len(self.definitions) != len(TUTORIAL_L1_TOOLS) or {item.name for item in self.definitions} != TUTORIAL_L1_TOOLS:
             raise ValueError("registry must define exactly the tutorial L1 tool surface")
 
     def to_dict(self) -> dict[str, Any]:
