@@ -1,9 +1,9 @@
 # P2a ORFS executable-admission stop record
 
-Status: blocked by missing license evidence
+Status: superseded by local-managed-toolchain authorization
 Date: 2026-09-02
 
-## Problem
+## Historical problem
 
 The historical `orfs@1.2.0` Runtime plugin cannot be admitted as an executable
 external integration under the repository intake gate.
@@ -34,7 +34,16 @@ gate.
   license, run the full intake, and adapt through the same bounded adapter
   boundary.
 
-## Current enforcement
+## Superseding local-toolchain decision
+
+On 2026-09-02 the project owner clarified that this is a server-managed local
+ORFS/OpenROAD installation, authorized for use by this platform.  The platform
+does not vendor or redistribute it.  The intake lock therefore permits only
+bounded server-local execution; it does not make a redistribution claim or
+waive the requirement for provenance, Attempt-local writes, raw logs, or
+native/platform smoke evidence.
+
+## Historical enforcement
 
 `integrations/orfs/orfs.intake.lock.json` marks the source `red` and
 `source-audit-only`; `orfs_plugin_manifest()` rejects executable registration.

@@ -26,8 +26,9 @@ def _require_executable_admission() -> None:
         payload = json.loads(lock.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise PermissionError("ORFS executable admission lock is missing or invalid") from exc
-    if payload.get("execution_class") != "admitted-bounded-runtime-plugin":
-        raise PermissionError("ORFS is source-audit-only; executable admission is not approved")
+    allowed = {"admitted-bounded-runtime-plugin", "local-managed-runtime-toolchain"}
+    if payload.get("execution_class") not in allowed:
+        raise PermissionError("ORFS executable admission is not approved")
 
 
 def build_orfs_task(

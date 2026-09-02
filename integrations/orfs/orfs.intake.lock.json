@@ -7,11 +7,16 @@
     "native_entrypoint": "flow/Makefile"
   },
   "license": {
-    "status": "red",
+    "status": "local-managed",
     "file": null,
-    "redistribution_conclusion": "No LICENSE/COPYING file was present in the inspected pinned checkout; executable admission is prohibited pending reviewed license evidence."
+    "redistribution_conclusion": "The platform neither vendors nor redistributes this server-managed installation. The project owner authorizes local execution; any future redistribution still requires a reviewed upstream license."
   },
-  "execution_class": "source-audit-only",
+  "execution_class": "local-managed-runtime-toolchain",
+  "authorization": {
+    "scope": "server-local execution only",
+    "authority": "project owner",
+    "evidence": "2026-09-02 user instruction: existing local ORFS/OpenROAD toolchain is authorized for platform integration"
+  },
   "environment": {
     "required_tools": ["make", "openroad", "yosys"],
     "network": "not required at execution time",
