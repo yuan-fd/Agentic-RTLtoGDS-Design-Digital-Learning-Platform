@@ -87,9 +87,13 @@ class L1RuntimeBridge:
         if set(values) - set(goal.allowed_parameters):
             raise ValueError("parameter patch is outside the DesignGoal policy")
         task = self._factory.reconfigure(self._base_task, values)
-        pointer = _evidence(f"task-spec:{task.task_id}", task.to_dict())
-        return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
-                           {"parameter_patch": dict(values), "task_spec_sha256": pointer.sha256}, (pointer,))
+        # This is a validated proposal, not an execution result.  S4 persists
+        # it in the plan/trace and supplies the same patch to a subsequent
+        # RUN_* call; claiming a completed EDA change here would be false.
+        proposal_sha256 = hashlib.sha256(json.dumps(task.to_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
+                           {"parameter_patch": dict(values), "task_spec_sha256": proposal_sha256,
+                            "requires_following_run": True}, (), None)
 
     def stop_or_escalate(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         self._binding(goal, state, call)

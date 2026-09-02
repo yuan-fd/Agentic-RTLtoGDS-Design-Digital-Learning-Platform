@@ -45,7 +45,7 @@ def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_cont
     summary = bridge.execute(goal, state, SemanticToolCall("call-2", "goal-1", "state-1", ToolName.GET_DESIGN_SUMMARY, {}, "planner"))
     assert summary.result["design_id"] == "top"
     patch = bridge.execute(goal, state, SemanticToolCall("call-3", "goal-1", "state-1", ToolName.SET_FLOW_PARAMS, {"values": {"core_utilization_pct": 30}}, "planner"))
-    assert patch.result["parameter_patch"]["core_utilization_pct"] == 30
+    assert patch.status == "accepted" and patch.result["requires_following_run"] is True
     assert not hasattr(bridge, "_experiments") and not hasattr(bridge, "_states")
     assert bridge.supported_tools() == TUTORIAL_L1_TOOLS
 
