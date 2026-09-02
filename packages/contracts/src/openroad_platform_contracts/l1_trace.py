@@ -90,6 +90,8 @@ class L1TraceEvent:
             raise ValueError("trace occurred_at must include a timezone")
         _digest("state_before_sha256", self.state_before_sha256)
         _digest("state_after_sha256", self.state_after_sha256)
+        if (self.state_before_sha256 is None) != (self.state_after_sha256 is None):
+            raise ValueError("trace state hashes must be supplied together")
         if self.planner_summary is not None and (not isinstance(self.planner_summary, str) or len(self.planner_summary) > 4000):
             raise ValueError("planner_summary must be bounded text")
         if self.tool is not None and not isinstance(self.tool, ToolName):

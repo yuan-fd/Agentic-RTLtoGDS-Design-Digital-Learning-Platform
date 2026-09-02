@@ -49,6 +49,9 @@ def test_store_rejects_state_hash_discontinuity(tmp_path: Path) -> None:
     broken = L1TraceEvent(**{**_event(1, "event-0").__dict__, "state_before_sha256": "c" * 64})
     with pytest.raises(ValueError, match="state does not continue"):
         store.append(broken)
+    partial = L1TraceEvent(**{**_event(1, "event-0").__dict__, "state_before_sha256": None})
+    with pytest.raises(ValueError, match="supplied together"):
+        store.append(partial)
 
 
 @pytest.mark.parametrize("column", ["event_json", "parent_event_id", "sequence"])
