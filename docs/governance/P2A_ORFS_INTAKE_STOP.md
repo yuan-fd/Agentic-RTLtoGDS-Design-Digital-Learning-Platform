@@ -45,8 +45,11 @@ native/platform smoke evidence.
 
 ## Historical enforcement
 
-`integrations/orfs/orfs.intake.lock.json` marks the source `red` and
-`source-audit-only`; `orfs_plugin_manifest()` rejects executable registration.
+Before the superseding local-toolchain decision, the intake lock marked this
+source `red` and `source-audit-only`, and `orfs_plugin_manifest()` rejected
+executable registration. The current lock instead permits the reviewed,
+server-local `local-managed-runtime-toolchain` class only; it does not widen
+admission to vendor, redistribute, or execute an unreviewed remote checkout.
 No historical code, raw logs, artifacts, or prior smoke results were deleted.
 
 ## Rollback
