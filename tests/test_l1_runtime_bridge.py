@@ -62,6 +62,21 @@ def test_runtime_bridge_enforces_goal_policy_and_runtime_artifact_read_contract(
         bridge.execute(goal, state, SemanticToolCall("call-5", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": "run-1", "artifact_id": "wrong", "max_bytes": 10}, "planner"))
 
 
+def test_runtime_bridge_rejects_foreign_query_and_accepts_runtime_timeout_attempt(tmp_path):
+    import pytest
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime(); bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    goal = DesignGoal("goal-1", "p1", "top", "nangate45", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("core_utilization_pct",), AgentBudget(2, 2, 60), allowed_tools=(ToolName.QUERY_TIMING,))
+    state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
+    runtime.describe = lambda run_id: {"run": {"status": "failed", "terminal_reason": "timed_out", "task_spec": {"labels": {"l1_goal_id": "other-goal"}}}, "stages": [{"stage_key": "route", "attempts": [{"attempt_id": "attempt-timeout", "status": "timed_out", "metrics": [], "artifacts": []}]}]}
+    with pytest.raises(ValueError, match="not owned"):
+        bridge.execute(goal, state, SemanticToolCall("call-foreign", "goal-1", "state-1", ToolName.QUERY_TIMING, {"run_id": "foreign"}, "planner"))
+    with pytest.raises(ValueError, match="not owned"):
+        bridge.reduce_and_trace(L1TraceService(L1TraceStore(tmp_path / "foreign.sqlite")), "trace-foreign", state, run_id="foreign", next_state_id="state-2")
+    runtime.describe = lambda run_id: {"run": {"status": "failed", "terminal_reason": "timed_out", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}}, "stages": [{"stage_key": "route", "attempts": [{"attempt_id": "attempt-timeout", "status": "timed_out", "metrics": [], "artifacts": []}]}]}
+    assert bridge.observation("run-timeout").attempt_id == "attempt-timeout"
+
+
 class _FixtureFactory:
     capability = "eda.rtl_to_gds"
     def validate_task(self, task): task.validate()
