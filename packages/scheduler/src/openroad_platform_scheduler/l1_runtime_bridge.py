@@ -157,7 +157,8 @@ class L1RuntimeBridge:
         evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
         if not evidence:
             evidence = (_evidence(f"runtime:{run_id}", view),)
-        return RuntimeObservation(run_id, attempt["attempt_id"], stage_view.get("stage_key"), run["status"], metrics, evidence)
+        terminal_status = run.get("terminal_reason") if run.get("terminal_reason") in {"timed_out", "lost"} else run["status"]
+        return RuntimeObservation(run_id, attempt["attempt_id"], stage_view.get("stage_key"), terminal_status, metrics, evidence)
 
     def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
                          *, run_id: str, next_state_id: str) -> DesignState:
