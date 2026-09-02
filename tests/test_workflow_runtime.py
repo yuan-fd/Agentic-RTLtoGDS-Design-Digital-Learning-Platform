@@ -89,6 +89,16 @@ def test_runtime_rejects_adapter_that_tampers_orfs_protocol_receipt(tmp_path):
     assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
 
 
+def test_runtime_rejects_adapter_claiming_its_reserved_receipt_artifact(tmp_path):
+    protocol = {"rtl_sha256":"a"*64,"pdk_id":"asap7","toolchain_id":"openroad","sdc_sha256":"b"*64,"evaluator_version":"v1","seed_policy":"fixed","timing":{"clock_period_ns":1.0,"clock_uncertainty_ns":.1,"io_delay_ns":.2}}
+    manifest = PluginManifest(plugin_id="orfs-agent", plugin_version="test", adapter_entry=(sys.executable, str(FIXTURES / "claim_receipt_adapter.py")), capabilities=("test.orfs",), supported_arch=(platform.machine(),), input_schema={"type":"object"}, output_schema={"type":"object"}, artifact_rules=({"kind":"report","required":True},{"kind":"runtime_protocol_receipt","required":False}))
+    task = TaskSpec(task_id="claim-receipt", project_id="p", design_id="d", plugin_id="orfs-agent", inputs={"parameter_domain":{"experiment_protocol":protocol}}, expected_artifacts=("report",))
+    runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([manifest]), workspace_root=tmp_path / "work")
+    run = runtime.submit(task, capability="test.orfs")
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+    assert not runtime.describe(run.run_id)["stages"][0]["attempts"][0]["artifacts"]
+
+
 def test_runtime_registers_post_execution_evaluator_evidence_after_adapter_success(tmp_path):
     store = RuntimeStore(tmp_path / "runtime.db")
     evaluator = _RecordingEvaluator()

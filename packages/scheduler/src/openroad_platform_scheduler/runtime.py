@@ -176,6 +176,8 @@ class WorkflowRuntime:
                 environment=environment,
             )
             if execution.result.status is RuntimeStatus.SUCCEEDED:
+                if any(item.get("kind") == "runtime_protocol_receipt" for item in execution.artifacts):
+                    raise ValueError("adapter declared Runtime-reserved artifact kind: runtime_protocol_receipt")
                 if runtime_receipt is not None and runtime_receipt_sha256 != hashlib.sha256(receipt.read_bytes()).hexdigest():
                     raise ValueError("adapter modified the Runtime protocol receipt")
                 runtime_artifacts = self.adapter.validate_additional_artifacts(
