@@ -40,7 +40,6 @@ class ToolName(str, Enum):
     QUERY_STAGE_METRICS = "query_stage_metrics"
     QUERY_ARTIFACT_EXCERPT = "query_artifact_excerpt"
     COMPARE_RUNS = "compare_runs"
-    PROPOSE_SEARCH_POLICY = "propose_search_policy"
     STOP_OR_ESCALATE = "stop_or_escalate"
 
 
@@ -54,7 +53,7 @@ DEFAULT_L1_TOOLS = (
 READ_ONLY_TOOLS = frozenset({
     ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION, ToolName.QUERY_DRC,
     ToolName.QUERY_POWER, ToolName.QUERY_ARTIFACT_EXCERPT,
-    ToolName.COMPARE_RUNS, ToolName.PROPOSE_SEARCH_POLICY,
+    ToolName.COMPARE_RUNS,
 })
 
 

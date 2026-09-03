@@ -52,7 +52,6 @@ class L1ORFSToolService:
             (ToolName.QUERY_POWER, False, self._query),
             (ToolName.QUERY_ARTIFACT_EXCERPT, False, self._query),
             (ToolName.COMPARE_RUNS, False, self._compare_runs),
-            (ToolName.PROPOSE_SEARCH_POLICY, False, self._policy_receipt),
             (ToolName.STOP_OR_ESCALATE, True, self._stop),
         ):
             self.registry.register(ToolDefinition(tool, mutates, handler))
@@ -163,14 +162,6 @@ class L1ORFSToolService:
                             "metrics": list(metrics), "comparison": "runtime views retained by reference"},
                            (self._view_evidence(call.arguments["left_run_id"], left),
                             self._view_evidence(call.arguments["right_run_id"], right)))
-
-    def _policy_receipt(self, goal: DesignGoal, state: DesignState,
-                        call: SemanticToolCall) -> ToolReceipt:
-        evidence = call.evidence or state.evidence
-        return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
-                           {"mode": call.arguments["mode"],
-                            "parameter_subset": list(call.arguments["parameter_subset"]),
-                            "execution_allowed": False}, evidence)
 
     def _stop(self, goal: DesignGoal, state: DesignState,
               call: SemanticToolCall) -> ToolReceipt:

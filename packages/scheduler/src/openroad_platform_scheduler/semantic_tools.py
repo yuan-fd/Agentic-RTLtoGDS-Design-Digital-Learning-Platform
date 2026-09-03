@@ -98,23 +98,6 @@ class SemanticToolPolicy:
             if call.arguments["left_run_id"] == call.arguments["right_run_id"]:
                 raise ValueError("compare_runs requires two distinct runs")
             _metric_list(call.arguments.get("metrics", ()))
-        elif call.tool is ToolName.PROPOSE_SEARCH_POLICY:
-            _exact(call.arguments, {"mode", "parameter_subset", "hypothesis", "stop_condition"},
-                   required={"mode", "parameter_subset", "hypothesis", "stop_condition"})
-            if call.arguments["mode"] not in {
-                "feasibility_recovery", "global_exploration", "interaction_screening",
-                "local_trust_region", "cost_aware_promotion", "replicated_confirmation",
-            }:
-                raise ValueError("propose_search_policy mode is unsupported")
-            subset = call.arguments["parameter_subset"]
-            if not isinstance(subset, list) or not subset or len(set(subset)) != len(subset):
-                raise ValueError("parameter_subset must be a unique non-empty list")
-            if any(item not in goal.allowed_parameters for item in subset):
-                raise ValueError("parameter_subset contains unallowlisted parameter")
-            _text(call.arguments["hypothesis"], "hypothesis", maximum=2000)
-            _text(call.arguments["stop_condition"], "stop_condition", maximum=1000)
-            if not call.evidence and not state.evidence:
-                raise ValueError("search policy proposal requires evidence")
         elif call.tool is ToolName.STOP_OR_ESCALATE:
             _exact(call.arguments, {"reason", "target_level"}, required={"reason"})
             _text(call.arguments["reason"], "reason", maximum=1000)

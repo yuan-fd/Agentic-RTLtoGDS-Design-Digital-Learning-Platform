@@ -135,8 +135,10 @@ class SearchPolicyDecision:
     @classmethod
     def from_l1_call(cls, call: SemanticToolCall, study: OptimizationStudy) -> "SearchPolicyDecision":
         call.validate(); study.validate()
-        if call.tool is not ToolName.PROPOSE_SEARCH_POLICY:
-            raise ValueError("only L1 propose_search_policy calls may set an L2 strategy")
+        # The L1 ``propose_search_policy`` tool was retired from the platform
+        # surface; this decoder is kept for historical study records only.
+        if call.tool.value != "propose_search_policy":
+            raise ValueError("only historical L1 propose_search_policy calls may decode an L2 strategy")
         arguments = call.arguments
         result = cls(
             mode=SearchMode(str(arguments["mode"])),

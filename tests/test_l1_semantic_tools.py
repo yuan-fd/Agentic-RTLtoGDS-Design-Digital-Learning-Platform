@@ -46,7 +46,7 @@ def _receipt(goal, state, call) -> ToolReceipt:
         next_state_id="state-2" if call.tool not in {
             ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION, ToolName.QUERY_DRC,
             ToolName.QUERY_POWER, ToolName.QUERY_ARTIFACT_EXCERPT,
-            ToolName.COMPARE_RUNS, ToolName.PROPOSE_SEARCH_POLICY,
+            ToolName.COMPARE_RUNS,
         } else None,
     )
 
@@ -57,7 +57,7 @@ def _registry(*tools: ToolName) -> SemanticToolRegistry:
         registry.register(ToolDefinition(tool, tool not in {
             ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION, ToolName.QUERY_DRC,
             ToolName.QUERY_POWER, ToolName.QUERY_ARTIFACT_EXCERPT,
-            ToolName.COMPARE_RUNS, ToolName.PROPOSE_SEARCH_POLICY,
+            ToolName.COMPARE_RUNS,
         }, _receipt))
     return registry
 
@@ -109,21 +109,3 @@ def test_read_only_tool_cannot_forge_successor_state():
                             {"run_id": "run-1", "limit": 10}, "policy")
     with pytest.raises(ValueError, match="read-only"):
         registry.execute(goal, state, call)
-
-
-def test_policy_proposal_requires_evidence_and_legal_subset():
-    goal = _goal(); state = _state(); registry = _registry(ToolName.PROPOSE_SEARCH_POLICY)
-    call = SemanticToolCall(
-        "call-5", goal.goal_id, state.state_id, ToolName.PROPOSE_SEARCH_POLICY,
-        {"mode": "interaction_screening", "parameter_subset": ["core_utilization_pct"],
-         "hypothesis": "placement density causes negative slack", "stop_condition": "8 trials"},
-        "policy",
-    )
-    assert registry.execute(goal, state, call).status == "completed"
-    bad = SemanticToolCall(
-        "call-6", goal.goal_id, state.state_id, ToolName.PROPOSE_SEARCH_POLICY,
-        {"mode": "interaction_screening", "parameter_subset": ["unknown"],
-         "hypothesis": "x", "stop_condition": "y"}, "policy",
-    )
-    with pytest.raises(ValueError, match="unallowlisted"):
-        registry.execute(goal, state, bad)

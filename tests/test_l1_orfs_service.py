@@ -35,6 +35,11 @@ def _goal():
         allowed_stages=("synth", "floorplan", "place", "cts", "route", "finish"),
         allowed_parameters=("core_utilization_pct",),
         budget=AgentBudget(2, 4, 3600, 1),
+        allowed_tools=(ToolName.CREATE_EXPERIMENT, ToolName.SET_FLOW_PARAMS,
+                       ToolName.RUN_STAGE, ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
+                       ToolName.QUERY_DRC, ToolName.QUERY_POWER,
+                       ToolName.QUERY_ARTIFACT_EXCERPT, ToolName.COMPARE_RUNS,
+                       ToolName.STOP_OR_ESCALATE),
     )
 
 
