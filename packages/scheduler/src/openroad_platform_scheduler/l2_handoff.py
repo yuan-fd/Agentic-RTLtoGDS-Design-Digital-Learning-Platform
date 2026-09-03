@@ -20,9 +20,12 @@ class OptimizationHandoffService:
         request.validate(); goal.validate(); state.validate(); manifest.validate()
         if request.goal_id != goal.goal_id or request.source_state_id != state.state_id or state.goal_id != goal.goal_id:
             raise ValueError("optimization request does not bind the finalized L1 goal/state")
-        if state.status not in {"observed", "completed"} or not state.evidence:
+        if state.status != "completed" or not state.evidence:
             raise ValueError("optimization handoff requires an evidence-backed terminal L1 state")
+        rule = self._surface.rule_for(ProductRole.L2_OPTIMIZATION)
         self._surface.authorize(ProductRole.L2_OPTIMIZATION, manifest)
+        if (request.plugin_id, request.capability) != (rule.plugin_id, rule.capability):
+            raise PermissionError("optimization request does not match the approved product capability")
         if manifest.plugin_id != request.plugin_id or request.capability not in manifest.capabilities:
             raise PermissionError("optimization request plugin/capability is not admitted")
         task = self._task_builder(request, goal, state)

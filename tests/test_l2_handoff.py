@@ -13,7 +13,7 @@ def _goal_state():
     goal = DesignGoal("goal-1", "project-1", "design-1", "platform-1", "pdk-1", "toolchain-1",
         EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED,
         (QoRConstraint("wns", ">=", 0),), ("finish",), ("density",), AgentBudget(4, 2, 60))
-    state = DesignState("state-1", goal.goal_id, 1, "observed", "finish", {"wns": 0.0},
+    state = DesignState("state-1", goal.goal_id, 1, "completed", "finish", {"wns": 0.0},
         AgentBudget(3, 2, 60), evidence=(EvidencePointer("run:verified", "b" * 64),))
     return goal, state
 
@@ -46,12 +46,25 @@ def test_handoff_rejects_unverified_state_foreign_plugin_and_foreign_task():
     service = OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE, _builder)
     with pytest.raises(ValueError, match="terminal"):
         service.task_for(request, goal, DesignState("state-1", goal.goal_id, 0, "running", None, {}, AgentBudget(4,2,60)), _manifest())
+    with pytest.raises(ValueError, match="terminal"):
+        service.task_for(request, goal, DesignState("state-1", goal.goal_id, 1, "observed", "finish", {"wns": 0.0},
+                                                    AgentBudget(3,2,60), evidence=(EvidencePointer("run:verified", "b" * 64),)), _manifest())
     with pytest.raises(PermissionError):
         service.task_for(request, goal, state, _manifest("local-bo"))
     foreign = OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,
         lambda r, g, s: TaskSpec("foreign", "other-project", g.design_id, plugin_id=r.plugin_id, inputs={}, timeout_seconds=60))
     with pytest.raises(ValueError, match="Goal identity"):
         foreign.task_for(request, goal, state, _manifest())
+
+
+def test_handoff_rejects_non_product_capability_from_an_admitted_manifest():
+    goal, state = _goal_state()
+    request = OptimizationRequest("request-1", "trace-1", "goal-1", "state-1", "orfs-agent",
+        "unapproved.l2.action", "minimize area subject to timing", EvidencePointer("artifact:protocol", "c" * 64),
+        EvidencePointer("artifact:search-space", "d" * 64), "fixed-seed-v1", AgentBudget(4, 2, 60))
+    with pytest.raises(PermissionError, match="approved product capability"):
+        OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE, _builder).task_for(
+            request, goal, state, _manifest(capabilities=("optimizer.l2.propose", "unapproved.l2.action")))
 
 
 def test_handoff_only_submits_through_runtime():
