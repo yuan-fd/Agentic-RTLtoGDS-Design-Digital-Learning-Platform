@@ -261,6 +261,7 @@ class WorkbenchService:
         """
         if self.backend != "orfs" or not self.orfs_agent_source:
             raise ValueError("L2 upgrade requires --backend orfs and an explicit admitted ORFS-Agent checkout")
+        raise ValueError("direct L2 submission is retired; create the frozen-domain Runtime campaign before invoking ORFS-Agent")
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
         transitions=[event for event in self.trace.store.read(session.trace_id)
                      if event.kind.value == "state_transition" and event.facts.get("terminal_status") == "succeeded"]
