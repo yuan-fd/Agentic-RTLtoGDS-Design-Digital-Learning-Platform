@@ -23,6 +23,7 @@ class TraceEventKind(str, Enum):
     STATE_TRANSITION = "state_transition"
     REFLECTION_RECORDED = "reflection_recorded"
     L2_HANDOFF_AUTHORIZED = "l2_handoff_authorized"
+    L2_RUNTIME_SUBMITTED = "l2_runtime_submitted"
     STOPPED = "stopped"
 
 

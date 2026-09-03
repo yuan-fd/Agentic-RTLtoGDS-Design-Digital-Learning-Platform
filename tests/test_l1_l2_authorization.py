@@ -13,6 +13,7 @@ from openroad_platform_scheduler.l1_state_reducer import L1StateReducer
 from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 from openroad_platform_scheduler.l2_handoff import OptimizationHandoffService
+from openroad_platform_scheduler.l2_handoff_store import L2HandoffStore
 
 
 def _goal():
@@ -61,6 +62,17 @@ def test_only_explicit_escalation_with_two_runtime_facts_can_authorize(tmp_path)
     assert task.labels["l2_authorization_id"] == auth.authorization_id
     assert L1L2AuthorizationService(trace).authorize("trace-1", goal, candidate) == auth
     assert len([e for e in trace.store.read("trace-1") if e.kind.value == "l2_handoff_authorized"]) == 1
+
+    class Runtime:
+        count = 0
+        def submit(self, task, *, capability): self.count += 1; return type("Run", (), {"run_id":"run-l2"})()
+    runtime=Runtime()
+    one_shot=OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,
+        lambda request, bound_goal, state: TaskSpec("task-2", bound_goal.project_id, bound_goal.design_id, plugin_id=request.plugin_id, inputs={"mode":"native_agent"}, timeout_seconds=60),
+        trace_store=trace.store, consumption_store=L2HandoffStore(tmp_path/"handoff.sqlite"))
+    assert one_shot.submit_authorized(runtime,_request(candidate),goal,candidate,auth,_manifest()).run_id == "run-l2"
+    assert one_shot.submit_authorized(runtime,_request(candidate),goal,candidate,auth,_manifest()).run_id == "run-l2"
+    assert runtime.count == 1
 
 
 def test_handoff_rejects_forged_or_missing_durable_authorization(tmp_path):

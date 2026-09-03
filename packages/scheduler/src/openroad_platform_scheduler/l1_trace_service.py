@@ -210,3 +210,13 @@ class L1TraceService:
                             goal_id=state.goal_id, state_before=state, state_after=state,
                             planner_summary="Measured L1 evidence authorized the bounded external L2 handoff.",
                             facts=dict(authorization), evidence=tuple(evidence))
+
+    def record_l2_runtime_submission(self, trace_id: str, state: DesignState, *, run_id: str,
+                                     handoff_id: str, evidence=()) -> L1TraceEvent:
+        self._require_current_state(trace_id, state)
+        if not isinstance(run_id, str) or not run_id or not isinstance(handoff_id, str) or not handoff_id:
+            raise ValueError("L2 Runtime submission identity is invalid")
+        return self._append(trace_id, kind=TraceEventKind.L2_RUNTIME_SUBMITTED,
+                            goal_id=state.goal_id, state_before=state, state_after=state,
+                            planner_summary="Runtime accepted the bounded admitted ORFS-Agent task.",
+                            facts={"run_id": run_id, "handoff_id": handoff_id}, evidence=tuple(evidence))

@@ -13,8 +13,8 @@ from openroad_platform_contracts.product_surface import ProductRole, ProductSurf
 
 class OptimizationHandoffService:
     """Authorize and correlate a TaskSpec; never implement an optimizer."""
-    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec], *, trace_store: Any | None = None) -> None:
-        self._surface, self._task_builder, self._trace_store = surface, task_builder, trace_store
+    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec], *, trace_store: Any | None = None, consumption_store: Any | None = None) -> None:
+        self._surface, self._task_builder, self._trace_store, self._consumption_store = surface, task_builder, trace_store, consumption_store
 
     def task_for(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
                  manifest: PluginManifest) -> TaskSpec:
@@ -92,3 +92,24 @@ class OptimizationHandoffService:
                state: DesignState, manifest: PluginManifest) -> Any:
         task = self.task_for(request, goal, state, manifest)
         return runtime.submit(task, capability=request.capability)
+
+    def submit_authorized(self, runtime: Any, request: OptimizationRequest, goal: DesignGoal,
+                          state: DesignState, authorization: L2HandoffAuthorization,
+                          manifest: PluginManifest) -> Any:
+        if self._consumption_store is None:
+            raise ValueError("authorized L2 handoff requires a durable consumption store")
+        prior = self._consumption_store.claim(authorization.authorization_id)
+        if prior:
+            return type("ExistingRun", (), {"run_id": prior})()
+        if prior == "":
+            raise ValueError("authorized L2 handoff submission is already in progress")
+        try:
+            task = self.task_for_authorized(request, goal, state, authorization, manifest)
+            run = runtime.submit(task, capability=request.capability)
+            if not isinstance(getattr(run, "run_id", None), str) or not run.run_id:
+                raise RuntimeError("Runtime submit returned no run_id")
+            self._consumption_store.bind(authorization.authorization_id, run.run_id)
+            return run
+        except Exception:
+            self._consumption_store.release(authorization.authorization_id)
+            raise

@@ -1,17 +1,19 @@
 """Operational L1 vertical slice; transport/UI are deliberately absent."""
 from __future__ import annotations
-import json, platform, sqlite3, sys, uuid, threading
+import json, platform, sqlite3, sys, uuid, threading, hashlib
 from pathlib import Path
 from dataclasses import replace
 from typing import Any
 
-from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec
+from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec, DEFAULT_PRODUCT_SURFACE
 from openroad_platform_contracts.agent_control import DEFAULT_L1_TOOLS, AgentBudget, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
 from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField, ClarificationQuestion
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 from openroad_platform_contracts.learning import EvidencePointer
+from openroad_platform_contracts.l2_optimization import OptimizationRequest
 from openroad_platform_execution import (ORFSRTLToGDSFactory, PluginRegistry,
-    ProcessAdapter, ProcessGuardian, ToolchainConfig, orfs_plugin_manifest)
+    ProcessAdapter, ProcessGuardian, ToolchainConfig, orfs_plugin_manifest,
+    orfs_agent_plugin_manifest, build_orfs_agent_native_task)
 from openroad_platform_scheduler.l1_goal_finalizer import TrustedGoalPolicy
 from openroad_platform_scheduler.l1_loop import L1DurableLoop
 from openroad_platform_scheduler.l1_loop_store import L1LoopStore
@@ -19,6 +21,9 @@ from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge
 from openroad_platform_scheduler.l1_session_service import L1SessionService, L1SessionStore
 from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
+from openroad_platform_scheduler.l1_l2_authorization import L1L2AuthorizationService
+from openroad_platform_scheduler.l2_handoff import OptimizationHandoffService
+from openroad_platform_scheduler.l2_handoff_store import L2HandoffStore
 from openroad_platform_scheduler.runtime import WorkflowRuntime
 from openroad_platform_scheduler.runtime_store import RuntimeStore
 try:
@@ -44,12 +49,14 @@ class _Provider:
 class WorkbenchService:
     """L1 composition root; ``orfs`` binds its typed loop to real EDA."""
     def __init__(self, root: str | Path, *, backend="smoke", rtl=None,
-                 top="mux_2to1", platform_name="nangate45", clock_period_ns=10.0):
+                 top="mux_2to1", platform_name="nangate45", clock_period_ns=10.0,
+                 orfs_agent_source: str | Path | None = None):
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         if backend not in {"smoke", "orfs"}: raise ValueError("backend must be smoke or orfs")
         self.backend, self.rtl, self.top = backend, Path(rtl).expanduser().resolve() if rtl else None, top
         self.platform_name, self.clock_period_ns = platform_name, clock_period_ns
         self.trace=L1TraceService(L1TraceStore(self.root/"trace.sqlite"))
+        self.orfs_agent_source = Path(orfs_agent_source).expanduser().resolve() if orfs_agent_source else None
         if backend == "orfs":
             if self.rtl is None or not self.rtl.is_file(): raise FileNotFoundError("ORFS workbench requires frozen RTL")
             self.toolchain=ToolchainConfig.from_environment(name="orfs-2d-baseline"); self.toolchain.validate()
@@ -60,8 +67,14 @@ class WorkbenchService:
         self.profile=ManagedTutorialProfile() if backend == "orfs" else None
         self.sessions=L1SessionService(L1SessionStore(self.root/"sessions.sqlite"),self.trace,
                                        goal_finalizer=self.profile.compile if self.profile else None)
-        self.runtime=WorkflowRuntime(RuntimeStore(self.root/"runtime.sqlite"),PluginRegistry([manifest]),workspace_root=self.root/"work",adapter=ProcessAdapter(ProcessGuardian(poll_interval=.01,terminate_grace=.1)))
+        manifests = [manifest]
+        if self.orfs_agent_source:
+            if backend != "orfs":
+                raise ValueError("ORFS-Agent requires the real ORFS workbench backend")
+            manifests.append(orfs_agent_plugin_manifest(self.orfs_agent_source))
+        self.runtime=WorkflowRuntime(RuntimeStore(self.root/"runtime.sqlite"),PluginRegistry(manifests),workspace_root=self.root/"work",adapter=ProcessAdapter(ProcessGuardian(poll_interval=.01,terminate_grace=.1)))
         self.loop_store=L1LoopStore(self.root/"loop.sqlite")
+        self.l2_handoff_store=L2HandoffStore(self.root/"l2_handoff.sqlite")
         with sqlite3.connect(self.root/"workbench.sqlite") as c: c.execute("CREATE TABLE IF NOT EXISTS session_state(session_id TEXT PRIMARY KEY,state_json TEXT,plan_id TEXT)")
     def policy(self):
         evidence=EvidencePointer("artifact:workbench-rtl","a"*64); provenance=EvidencePointer("artifact:workbench-policy","b"*64)
@@ -233,6 +246,55 @@ class WorkbenchService:
             payload["reflection_event_id"]=event.event_id
         else: raise RuntimeError("tutorial planner returned an unsupported action")
         return payload
+    def l2_upgrade(self, sid, *, wait=False):
+        """Submit one admitted upstream ORFS-Agent proposal task via Runtime.
+
+        This is deliberately an admission-sized L1→L2 handoff, not a local
+        optimizer and not a performance claim.  The separate external campaign
+        service owns any later multi-candidate orchestration.
+        """
+        if self.backend != "orfs" or not self.orfs_agent_source:
+            raise ValueError("L2 upgrade requires --backend orfs and an explicit admitted ORFS-Agent checkout")
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
+        transitions=[event for event in self.trace.store.read(session.trace_id)
+                     if event.kind.value == "state_transition" and event.facts.get("terminal_status") == "succeeded"]
+        if len({event.facts.get("run_id") for event in transitions}) < 2:
+            raise ValueError("L2 upgrade requires measured baseline and candidate Runtime observations")
+        reflections=[event for event in self.trace.store.read(session.trace_id) if event.kind.value == "reflection_recorded"]
+        if not reflections or reflections[-1].facts.get("decision") != "escalate":
+            self.trace.record_reflection(session.trace_id,state,
+                summary="Operator requested a bounded admitted ORFS-Agent search from measured L1 evidence.",
+                decision="escalate",evidence=state.evidence,
+                hypotheses={"scope":"admission-sized external optimizer proposal only"},
+                basis_event_ids=tuple(event.event_id for event in transitions[-2:]))
+        authorization=L1L2AuthorizationService(self.trace).authorize(session.trace_id,goal,state)
+        lock=Path(__file__).resolve().parents[2]/"integrations/orfs_agent/source.lock.json"
+        domain=Path(__file__).resolve().parents[2]/"packages/execution/src/openroad_platform_execution/orfs_agent_plugin.py"
+        protocol=EvidencePointer("artifact:orfs-agent-source-lock",hashlib.sha256(lock.read_bytes()).hexdigest())
+        search=EvidencePointer("artifact:orfs-agent-shared-domain",hashlib.sha256(domain.read_bytes()).hexdigest())
+        request=OptimizationRequest(f"l2-request-{uuid.uuid4().hex}",session.trace_id,goal.goal_id,state.state_id,
+            "orfs-agent","optimizer.l2.propose","maximize setup WNS subject to frozen L1 constraints",
+            protocol,search,"managed-seed-20260903",AgentBudget(2,goal.budget.max_llm_calls,goal.budget.max_wall_clock_seconds))
+        observations=[]
+        for event in transitions:
+            run_id=str(event.facts["run_id"]); successor=DesignState.from_dict(event.facts["state_after"])
+            run=self.runtime.store.get_run(run_id)
+            observations.append({"observation_id":run_id,"run_id":run_id,"status":event.facts["terminal_status"],
+                "parameters":dict(run.task_spec.parameters),"metrics":dict(successor.metrics),
+                "artifact_refs":[item.ref for item in successor.evidence],"feasible":True})
+        def builder(bound_request,bound_goal,_bound_state):
+            return build_orfs_agent_native_task(project_id=bound_goal.project_id,design_id=bound_goal.design_id,
+                platform_name=bound_goal.platform,objective=bound_request.objective,observations=observations,
+                n_suggestions=2,optimizer_seed=20260903,timeout_seconds=min(1800,bound_goal.budget.max_wall_clock_seconds))
+        manifest=orfs_agent_plugin_manifest(self.orfs_agent_source)
+        handoff=OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,builder,trace_store=self.trace.store,consumption_store=self.l2_handoff_store)
+        run=handoff.submit_authorized(self.runtime,request,goal,state,authorization,manifest)
+        receipt=self.trace.record_l2_runtime_submission(session.trace_id,state,run_id=run.run_id,
+            handoff_id=authorization.authorization_id,evidence=(EvidencePointer(f"run:{run.run_id}",hashlib.sha256(run.run_id.encode()).hexdigest()),))
+        if wait: self.runtime.execute_once(run.run_id)
+        return {"request":request.to_dict(),"authorization":authorization.to_dict(),"run_id":run.run_id,
+                "runtime":self.runtime.describe(run.run_id),"trace_event_id":receipt.event_id,
+                "claim_boundary":"admitted upstream proposal smoke; no candidate QoR claim"}
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):
