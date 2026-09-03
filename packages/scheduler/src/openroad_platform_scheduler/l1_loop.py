@@ -13,9 +13,32 @@ class L1DurableLoop:
     def __init__(self, store: L1LoopStore, bridge: L1RuntimeBridge, trace: L1TraceService) -> None:
         self.store, self.bridge, self.trace = store, bridge, trace
         self.tools = L1RuntimeToolRegistry(bridge)
+    def _record_visible_policy_denial(self, trace_id: str, goal: DesignGoal, state: DesignState,
+                                      call: SemanticToolCall, policy: TrustedPolicyIdentity,
+                                      summary: str) -> None:
+        """Persist one visible ``policy_decided(deny)`` before the caller raises.
+
+        The denial is a durable teaching/audit fact; it never replaces the
+        raised validation error and never weakens the typed boundary.  When
+        the rejected call itself cannot be recorded (for example it violates
+        the trace schema), the denial is intentionally omitted so the original
+        error propagates unchanged.
+        """
+        try:
+            self.trace.record_call(trace_id, state, call, planner_summary=summary)
+            self.trace.record_policy(trace_id, goal, state, call, policy, verdict="deny", summary=summary)
+        except Exception:
+            pass
     def plan_validate_execute(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall, policy: TrustedPolicyIdentity, *, planner_summary: str) -> dict:
-        self.tools.validate(goal, state, call)
+        try:
+            self.tools.validate(goal, state, call)
+        except Exception:
+            self._record_visible_policy_denial(trace_id, goal, state, call, policy,
+                "typed policy denied this tool call before any Runtime submission")
+            raise
         if call.tool.value in {"run_stage", "run_full_flow"} and state.remaining_budget.max_eda_runs < 1:
+            self._record_visible_policy_denial(trace_id, goal, state, call, policy,
+                "the frozen DesignGoal EDA-run budget is exhausted")
             raise ValueError("DesignGoal EDA-run budget is exhausted")
         plan_id = f"plan-{uuid4().hex}"
         self.store.propose(plan_id, trace_id, goal.goal_id, state.state_id, call.to_dict())
