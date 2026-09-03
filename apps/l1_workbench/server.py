@@ -10,8 +10,8 @@ except ImportError:
 def main():
  p=argparse.ArgumentParser();p.add_argument("--state-root",type=Path,required=True);p.add_argument("--port",type=int,default=8766)
  p.add_argument("--backend",choices=("smoke","orfs"),default="smoke",help="smoke is test-only; orfs executes the admitted local EDA toolchain")
- p.add_argument("--rtl",type=Path);p.add_argument("--top",default="mux_2to1");p.add_argument("--platform",default="nangate45");p.add_argument("--clock-period-ns",type=float,default=10.0);p.add_argument("--orfs-agent-source",type=Path)
- a=p.parse_args();svc=WorkbenchService(a.state_root,backend=a.backend,rtl=a.rtl,top=a.top,platform_name=a.platform,clock_period_ns=a.clock_period_ns,orfs_agent_source=a.orfs_agent_source)
+ p.add_argument("--rtl",type=Path);p.add_argument("--top",default="mux_2to1");p.add_argument("--platform",default="nangate45");p.add_argument("--clock-period-ns",type=float,default=10.0);p.add_argument("--orfs-agent-source",type=Path);p.add_argument("--goal-provider",choices=("tutorial","codex"),default="tutorial",help="tutorial=deterministic mux parser; codex=managed Codex CLI structured provider")
+ a=p.parse_args();svc=WorkbenchService(a.state_root,backend=a.backend,rtl=a.rtl,top=a.top,platform_name=a.platform,clock_period_ns=a.clock_period_ns,orfs_agent_source=a.orfs_agent_source,model_provider=a.goal_provider)
  class H(BaseHTTPRequestHandler):
   def reply(self,x,code=200):
    b=json.dumps(x).encode();self.send_response(code);self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(b)));self.end_headers();self.wfile.write(b)

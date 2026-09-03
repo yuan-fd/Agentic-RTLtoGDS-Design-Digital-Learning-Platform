@@ -36,11 +36,13 @@ try:
     from .tutorial_planner import TutorialEvidencePlanner
     from .tutorial_semantic import MuxHandsOnSemanticProvider
     from .m1_planner import M1EvidencePlanner
+    from .codex_goal_provider import CodexGoalDraftProvider
 except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
     from tutorial_profile import ManagedTutorialProfile
     from tutorial_planner import TutorialEvidencePlanner
     from tutorial_semantic import MuxHandsOnSemanticProvider
     from m1_planner import M1EvidencePlanner
+    from codex_goal_provider import CodexGoalDraftProvider
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
@@ -55,7 +57,12 @@ class WorkbenchService:
     """L1 composition root; ``orfs`` binds its typed loop to real EDA."""
     def __init__(self, root: str | Path, *, backend="smoke", rtl=None,
                  top="mux_2to1", platform_name="nangate45", clock_period_ns=10.0,
-                 orfs_agent_source: str | Path | None = None):
+                 orfs_agent_source: str | Path | None = None,
+                 model_provider="tutorial"):
+        if model_provider not in {"tutorial", "codex"}:
+            raise ValueError("model_provider must be tutorial or codex")
+        self.model_provider = model_provider
+        self._codex_provider = None
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         if backend not in {"smoke", "orfs"}: raise ValueError("backend must be smoke or orfs")
         self.backend, self.rtl, self.top = backend, Path(rtl).expanduser().resolve() if rtl else None, top
@@ -89,12 +96,26 @@ class WorkbenchService:
             digest=hashlib.sha256(self.rtl.read_bytes()).hexdigest(); evidence=EvidencePointer(f"artifact:rtl-{digest[:12]}",digest)
             return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("synth","floorplan","place","cts","route","finish"),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),DEFAULT_L1_TOOLS)
         return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("place_density",),AgentBudget(3,4,30),DEFAULT_L1_TOOLS)
+    def _goal_provider(self):
+        """Select the replaceable language front-end for this Session.
+
+        ``tutorial`` uses the deterministic mux parser; ``codex`` uses the
+        managed Codex CLI as a structured GoalDraft provider.  The provider
+        only proposes typed language facts: GoalFinalizer and Policy keep all
+        authority, and a failing model raises instead of silently falling back.
+        """
+        if self.model_provider == "codex":
+            if self._codex_provider is None:
+                self._codex_provider = CodexGoalDraftProvider()
+            return self._codex_provider
+        return MuxHandsOnSemanticProvider() if self.profile else _Provider()
+
     def start(self, text):
-        provider = MuxHandsOnSemanticProvider() if self.profile else _Provider()
+        provider = self._goal_provider()
         return self.sessions.start(text, provider, self.policy())
     def answer(self,sid,answers):
         rows=tuple(ClarificationAnswer(a["question_id"],ClarificationField(a["field"]),a["value"]) for a in answers)
-        provider = MuxHandsOnSemanticProvider() if self.profile else _Provider()
+        provider = self._goal_provider()
         session=self.sessions.answer(sid,provider,rows)
         if session.goal_id:
             goal=self._goal(session.trace_id,session.goal_id)
