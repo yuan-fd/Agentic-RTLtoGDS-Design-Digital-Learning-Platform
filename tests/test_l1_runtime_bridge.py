@@ -43,6 +43,27 @@ def test_runtime_bridge_only_submits_immutable_task_and_observes_runtime(tmp_pat
     assert successor.metrics["setup_wns_ns"] == -0.1
 
 
+def test_runtime_bridge_projects_admitted_orfs_metrics_to_m1_goal_metrics(tmp_path):
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime()
+    runtime.describe = lambda run_id: {
+        "run": {"status": "succeeded", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}},
+        "stages": [{"stage_key": "finish", "successful_attempt_id": "attempt-1", "attempts": [{
+            "attempt_id": "attempt-1",
+            "metrics": [
+                {"name": "finish__timing__setup__ws", "value": -0.18},
+                {"name": "finish__design__instance__area", "value": 100.0},
+                {"name": "detailedroute__route__drc_errors", "value": 0},
+            ],
+            "artifacts": [{"artifact_id": "report-1"}],
+        }]}],
+    }
+    bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    assert bridge.observation("run-1").metrics == {
+        "setup_wns_ns": -0.18, "area_um2": 100.0, "drc_errors": 0.0,
+    }
+
+
 def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_controls(tmp_path):
     rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
     runtime = _Runtime(); bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())

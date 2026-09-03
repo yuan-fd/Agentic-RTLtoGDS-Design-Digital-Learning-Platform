@@ -157,8 +157,21 @@ class L1RuntimeBridge:
                       or (run["status"] != "succeeded" and attempt.get("status") in {run["status"], run.get("terminal_reason")})]
         if len(candidates) != 1:
             raise ValueError("Runtime run has no attempt observation")
-        stage_view, attempt = candidates[0]; metrics = {item["name"]: float(item["value"]) for item in attempt.get("metrics", ())
-                                            if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
+        stage_view, attempt = candidates[0]
+        native_metrics = {
+            item["name"]: float(item["value"])
+            for item in attempt.get("metrics", ())
+            if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)
+        }
+        # Runtime has already verified the report artifact and parser identity.
+        # L1 maps only the fixed M1 Goal vocabulary, so Goal contracts do not
+        # depend on an ORFS report-key spelling.
+        aliases = {
+            "finish__timing__setup__ws": "setup_wns_ns",
+            "finish__design__instance__area": "area_um2",
+            "detailedroute__route__drc_errors": "drc_errors",
+        }
+        metrics = {aliases.get(name, name): value for name, value in native_metrics.items()}
         evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
         if not evidence:
             evidence = (_evidence(f"run:{run_id}", view),)
