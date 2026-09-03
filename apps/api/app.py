@@ -85,16 +85,6 @@ from openroad_platform_scheduler import (  # noqa: E402
     PatchRegistry, SpecProposal, PipelineCheckpointStore,
     objective_profile, profile_grid, profile_hard_constraints,
 )
-from openroad_platform_contracts.agent_control import AgentBudget, DesignGoal, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName  # noqa: E402
-from openroad_platform_execution.orfs_task_factory import ORFSRTLToGDSFactory  # noqa: E402
-from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge  # noqa: E402
-from openroad_platform_scheduler.l1_loop import L1DurableLoop  # noqa: E402
-from openroad_platform_scheduler.l1_loop_store import L1LoopStore  # noqa: E402
-from openroad_platform_scheduler.l1_trace_service import L1TraceService  # noqa: E402
-from openroad_platform_scheduler.l1_trace_store import L1TraceStore  # noqa: E402
-from openroad_platform_scheduler.l1_goal_finalizer import GoalFinalizer, TrustedGoalPolicy  # noqa: E402
-from openroad_platform_contracts.l1_goal_draft import GoalDraft, GoalIntent  # noqa: E402
-from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity  # noqa: E402
 try:  # Supports both `python apps/api/app.py` and package imports in tests.
     from .services import AuthSession, AuthStore, DesignService, PlatformReadModel  # type: ignore[attr-defined]
 except ImportError:
@@ -199,8 +189,6 @@ class ApiState:
                        if runtime_db_path is not None else local_state))
         self.local_state_root = state_root
         self.runtime_store = RuntimeStore(runtime_db_path or local_state / "runtime.db")
-        self.l1_trace = L1TraceService(L1TraceStore(state_root / "l1-trace.db"))
-        self.l1_loop_store = L1LoopStore(state_root / "l1-loop.db")
         self.spec_store = SpecConversationStore(spec_db_path or state_root / "spec.db")
         self.rtl_frontend = RTLFrontendStore(
             rtl_frontend_db_path or state_root / "rtl-frontend.db"
@@ -2921,24 +2909,11 @@ class ApiState:
                     "spec_id": spec_id, "candidate_id": check["candidate_id"],
                     **({"owner_id": owner_id} if owner_id else {})},
         )
-        rtl_evidence = EvidencePointer(ref=f"artifact:verified-rtl:{rtl['sha256']}", sha256=rtl["sha256"])
-        platform_name = str(spec["constraints"].get("platform") or "nangate45")
-        policy_provenance = EvidencePointer(ref=f"artifact:l1-api-policy-{spec_id}", sha256=hashlib.sha256(f"{spec_id}:{check['candidate_id']}:{rtl['sha256']}".encode()).hexdigest())
-        trusted_goal_policy = TrustedGoalPolicy("l1-api-promotion", "v1", "platform", policy_provenance, "openroad-platform", spec["design_id"], platform_name, platform_name, "orfs-runtime-bound", rtl_evidence, GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0.0), QoRConstraint("drc_errors", "<=", 0.0)), ("synth", "floorplan", "place", "cts", "route", "finish"), ("core_utilization_pct", "place_density", "minimum_die_size_um"), AgentBudget(1, 4, int(task.timeout_seconds), 1), (ToolName.RUN_STAGE,))
-        draft = GoalDraft(f"draft-{uuid.uuid4().hex}", "Promote verified RTL through the permitted finish stage.", GoalIntent.EXECUTE)
-        goal = GoalFinalizer.finalize(draft, trusted_goal_policy, goal_id=f"goal-{uuid.uuid4().hex}")
-        initial_state = DesignState(f"state-{uuid.uuid4().hex}", goal.goal_id, 0, "new", None, {}, goal.budget, evidence=(rtl_evidence,))
-        bridge = L1RuntimeBridge(self.runtime, task, ORFSRTLToGDSFactory(), cancel_port=self.runtime_store.request_cancel)
-        trace_id = f"l1-trace-{uuid.uuid4().hex}"
-        self.l1_trace.record_draft(trace_id, draft)
-        self.l1_trace.record_goal(trace_id, goal)
-        plan = L1DurableLoop(self.l1_loop_store, bridge, self.l1_trace).plan_validate_execute(trace_id, goal, initial_state, SemanticToolCall(call_id=f"call-{uuid.uuid4().hex}", goal_id=goal.goal_id, state_id=initial_state.state_id, tool=ToolName.RUN_STAGE, arguments={"stage": "finish"}, producer="rtl-to-l1-bridge", evidence=(rtl_evidence,)), TrustedPolicyIdentity("l1-api-promotion", "v1", "platform", policy_provenance), planner_summary="Submit the verified RTL through the permitted finish stage.")
-        run_id = str(plan["run_id"])
-        return {"run": self.get_runtime_run(run_id, owner_id=owner_id,
+        run = self.runtime.submit(task, capability="eda.rtl_to_gds")
+        return {"run": self.get_runtime_run(run.run_id, owner_id=owner_id,
                                              include_legacy=include_legacy),
                 "source_verification_run_id": verify_run_id,
-                "candidate_id": check["candidate_id"], "execution_started": False,
-                "l1": {"design_goal": goal.to_dict(), "trace_id": trace_id, "tool_receipts": [plan["receipt"]], "state_id": initial_state.state_id, "authority": "typed semantic tools; Runtime is sole executor"}}
+                "candidate_id": check["candidate_id"], "execution_started": False}
 
     def add_spec_turn(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         owner_id = _optional_string(payload.get("owner_id"))
