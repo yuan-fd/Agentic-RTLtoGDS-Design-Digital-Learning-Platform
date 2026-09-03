@@ -136,12 +136,16 @@ class WorkbenchService:
         threading.Thread(target=finish,daemon=True).start(); return plan,state
     def propose_m1_candidate(self,sid):
         """Create a visible, evidence-backed M1 proposal; it does not run EDA."""
+        if self.backend != "orfs":
+            raise ValueError("M1 QoR proposals require the artifact-backed ORFS backend")
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); baseline,_=self._load(sid)
         proposal=M1EvidencePlanner.propose(goal,baseline)
         plan=self.set_flow_params(sid,proposal.values,proposal.summary)
         return {"proposal": {"values":proposal.values,"summary":proposal.summary,"hypothesis":proposal.hypothesis}, **plan}
     def compare_m1_candidate(self,sid,baseline_run_id,summary=None):
         """Compare baseline and current candidate through the typed Runtime read surface."""
+        if self.backend != "orfs":
+            raise ValueError("M1 QoR comparison requires the artifact-backed ORFS backend")
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); candidate,_=self._load(sid)
         candidate_run_id=candidate.diagnosis.get("runtime_run_id")
         if not isinstance(baseline_run_id,str) or not baseline_run_id or not isinstance(candidate_run_id,str) or not candidate_run_id:

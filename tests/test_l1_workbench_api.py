@@ -1,6 +1,7 @@
 import json, os, socket, subprocess, sys, time
 from pathlib import Path
 from urllib.request import Request, urlopen
+import pytest
 
 ROOT = Path(__file__).parents[1]
 ENV = {**os.environ, "PYTHONPATH": ":".join(str(ROOT / path) for path in ("packages/contracts/src", "packages/scheduler/src", "packages/execution/src", "."))}
@@ -31,16 +32,14 @@ def test_real_l1_workbench_api_vertical_slice(tmp_path):
   query=_post(base+f"/api/l1/sessions/{sid}/queries",{"kind":"timing","limit":20,"decision_summary":"Read timing facts from the Runtime-owned baseline."})
   assert query["receipt"]["status"] == "completed"
   assert query["receipt"]["result"]["runs"][0]["run_id"] == result["plan"]["run_id"]
-  proposal=_post(base+f"/api/l1/sessions/{sid}/m1-proposal",{})
-  candidate=_post(base+f"/api/l1/sessions/{sid}/candidates",{"proposal_id":proposal["proposal_id"],"decision_summary":proposal["proposal"]["summary"]})
+  proposal=_post(base+f"/api/l1/sessions/{sid}/parameters",{"values":{"place_density":.5},"decision_summary":"Transport test only; no QoR claim."})
+  candidate=_post(base+f"/api/l1/sessions/{sid}/candidates",{"proposal_id":proposal["proposal_id"],"decision_summary":"Consume the approved transport-only proposal."})
   assert candidate["runtime"]["run"]["status"]=="succeeded"
   assert candidate["runtime"]["run"]["task_spec"]["parameters"]["place_density"] == .5
-  try:
+  import urllib.error
+  with pytest.raises(urllib.error.HTTPError) as duplicate:
    _post(base+f"/api/l1/sessions/{sid}/candidates",{"proposal_id":proposal["proposal_id"],"decision_summary":"must reject duplicate"})
-   raise AssertionError("proposal was consumed more than once")
-  except Exception: pass
-  comparison=_post(base+f"/api/l1/sessions/{sid}/m1-compare",{"baseline_run_id":result["plan"]["run_id"]})
-  assert comparison["decision"]=="stop" and comparison["area_baseline_ratio"] == 1
+  assert duplicate.value.code == 400
   excerpt=_post(base+f"/api/l1/sessions/{sid}/artifacts",{"kind":"report","max_bytes":128,"decision_summary":"Read the registered bounded report excerpt."})
   assert excerpt["receipt"]["status"] == "completed"
   assert excerpt["receipt"]["result"]["artifact_id"]
