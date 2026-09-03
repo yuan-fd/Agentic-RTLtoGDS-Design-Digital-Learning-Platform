@@ -24,14 +24,14 @@ Command:
 
     PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
       .tools/venvs/orfs-agent/bin/python scripts/run_l1_tutorial_acceptance.py \
-      --output-root /tmp/openroad-l1-m1-real-candidate-20260903
+      --output-root /tmp/openroad-l1-m1-http-verified-20260903
 
 Terminal result: exit code 0; the acceptance summary has accepted true.
 
 | role | Runtime run | terminal status | canonical QoR |
 | --- | --- | --- | --- |
-| baseline | c356dbc76a174dbe9ea4451a101f10bf | succeeded | WNS 5.90111 ns; area 6.118 um²; DRC 0 |
-| candidate | 16cd05e362bb4ab091c226c22df73bee | succeeded | WNS 5.90111 ns; area 6.118 um²; DRC 0 |
+| baseline | b94874d3c6244718a6b22084f8f94908 | succeeded | WNS 5.90111 ns; area 6.118 um²; DRC 0 |
+| candidate | 2e7c522cc409457cad721695fd5ccb5a | succeeded | WNS 5.90111 ns; area 6.118 um²; DRC 0 |
 
 The candidate Runtime TaskSpec contains place_density 0.5; the frozen
 baseline is 0.45. Its measured area ratio is 1.0, so the area and DRC
@@ -41,8 +41,8 @@ the platform does not invent a further change.
 Artifact evidence:
 
 - acceptance summary:
-  /tmp/openroad-l1-m1-real-candidate-20260903/l1_tutorial_acceptance_summary.json
-  SHA-256 c1be868b8c1920d61fe739b497d5b1e2f2bb0ac3fcbd41f881a81c1343faac78
+  /tmp/openroad-l1-m1-http-verified-20260903/l1_tutorial_acceptance_summary.json
+  SHA-256 2fc86da6157fb87aef3dd80a8e72aab1d71cce64dd8f24f50c72eb8fde663c6f
 - baseline native 6_report.json SHA-256
   fe6c95ff0b67bdf739c8818072e19ff320d75e9b4c7fcf19ba4603cbc26bea00
 - candidate native 6_report.json SHA-256
@@ -68,5 +68,9 @@ Focused contract/API tests:
 
 Result: 22 passed.
 
-Rollback: revert the M1 slice commit. Runtime evidence is under /tmp and is
+The acceptance script is an HTTP client: it starts the L1 server and calls
+only the published Session, answers, execute, M1 proposal, candidate, compare,
+and events routes. It never imports or calls WorkbenchService directly.
+
+Rollback: revert the M1 slice commits. Runtime evidence is under /tmp and is
 not part of the repository; no protected input was changed.
