@@ -236,8 +236,19 @@ class WorkbenchService:
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):
-        session=self.sessions.recover(sid); state,plan=self._load(sid)
-        if plan and self.loop_store.get(plan)["status"]=="prepared": self.loop_store.get(plan)
+        session=self.sessions.recover(sid); state,plan_id=self._load(sid)
+        if not plan_id: return session
+        plan=self.loop_store.get(plan_id)
+        goal=self._goal(session.trace_id,session.goal_id); bridge=self._bridge(goal)
+        loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        if plan["status"] == "prepared":
+            plan=loop.recover_submission(session.trace_id,plan_id)
+        if plan["status"] == "submitted" and plan["run_id"]:
+            terminal=self.runtime.describe(plan["run_id"])["run"].get("status")
+            already_observed=state.diagnosis.get("runtime_run_id") == plan["run_id"]
+            if terminal in {"succeeded","failed","cancelled","timed_out","lost"} and not already_observed:
+                successor=loop.observe(session.trace_id,state,plan_id,next_state_id=f"state-{uuid.uuid4().hex}")
+                self._save(sid,successor,plan_id)
         return session
     def events(self,sid,after=-1): return [e.to_dict() for e in self.sessions.events(sid,after_sequence=after)]
     def _goal(self,trace_id,gid):

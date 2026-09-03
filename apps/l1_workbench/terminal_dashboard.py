@@ -262,16 +262,30 @@ class Dashboard:
         draft = next((e for e in reversed(self.events) if e.get("kind") == "goal_drafted"), None)
         final = self._latest("goal_finalized")
         transitions = [e for e in self.events if e.get("kind") == "state_transition"]
-        proposal_call = next((e for e in reversed(self.events)
-                              if e.get("kind") == "tool_called" and e.get("tool") == "set_flow_params"), None)
+        reflections = [e for e in self.events if e.get("kind") == "reflection_recorded"]
+        proposal_receipt = next((e for e in reversed(self.events)
+                                 if e.get("kind") == "tool_receipt"
+                                 and e.get("tool") == "set_flow_params"), None)
+        candidate_call = next((e for e in reversed(self.events)
+                               if e.get("kind") == "tool_called"
+                               and (e.get("facts") or {}).get("arguments", {}).get("proposal_id")), None)
+        candidate_receipt = next((e for e in reversed(self.events)
+                                  if e.get("kind") == "tool_receipt"
+                                  and candidate_call
+                                  and (e.get("facts") or {}).get("call_id") == (candidate_call.get("facts") or {}).get("call_id")), None)
         if draft and not final:
             rows.extend(["Next: answer only durable pending clarifications."])
+        elif reflections:
+            rows.extend(["M1 terminal reflection recorded. Inspect evidence or start a new Session."])
         elif final and not transitions:
             rows.extend(["Next: :baseline"])
-        elif final and len(transitions) == 1 and not proposal_call:
+        elif candidate_receipt and len(transitions) == 1:
+            rows.extend(["Candidate submitted; poll cursor events before compare."])
+        elif final and len(transitions) == 1 and not proposal_receipt:
             rows.extend(["Next: :m1-propose"])
-        elif proposal_call and len(transitions) == 1:
-            rows.extend([f"Next: :candidate proposal-{proposal_call.get('facts', {}).get('call_id')}"])
+        elif proposal_receipt and not candidate_call:
+            proposal_id = (proposal_receipt.get("facts") or {}).get("result", {}).get("proposal_id", "recorded")
+            rows.extend([f"Next: :candidate {proposal_id}"])
         elif len(transitions) >= 2:
             baseline = transitions[0].get("facts", {}).get("run_id", "recorded")
             rows.extend([f"Next: :compare {baseline}"])

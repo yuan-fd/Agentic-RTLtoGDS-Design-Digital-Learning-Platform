@@ -60,10 +60,28 @@ def test_terminal_derives_m1_next_command_only_from_durable_events() -> None:
     }, {
         "kind": "state_transition", "facts": {"run_id": "baseline-run"}, "sequence": 2,
     }, {
-        "kind": "tool_called", "tool": "set_flow_params",
-        "facts": {"call_id": "call-proposal"}, "sequence": 3,
+        "kind": "tool_receipt", "tool": "set_flow_params",
+        "facts": {"call_id": "call-proposal", "result": {"proposal_id": "proposal-durable"}}, "sequence": 3,
     }]
-    assert "Next: :candidate proposal-call-proposal" in "\n".join(dashboard._client_rows())
+    assert "Next: :candidate proposal-durable" in "\n".join(dashboard._client_rows())
+
+
+def test_terminal_never_recommends_duplicate_candidate_or_compare() -> None:
+    dashboard = Dashboard(Client())
+    dashboard.events = [{
+        "kind": "goal_finalized", "facts": {"goal_ir": {}}, "sequence": 1,
+    }, {
+        "kind": "state_transition", "facts": {"run_id": "baseline-run"}, "sequence": 2,
+    }, {
+        "kind": "tool_called", "tool": "run_full_flow",
+        "facts": {"call_id": "candidate-call", "arguments": {"proposal_id": "proposal-1"}}, "sequence": 3,
+    }, {
+        "kind": "tool_receipt", "tool": "run_full_flow",
+        "facts": {"call_id": "candidate-call", "result": {"run_id": "candidate-run"}}, "sequence": 4,
+    }]
+    assert "Candidate submitted; poll" in "\n".join(dashboard._client_rows())
+    dashboard.events.append({"kind": "reflection_recorded", "facts": {"decision": "stop"}, "sequence": 5})
+    assert "terminal reflection recorded" in "\n".join(dashboard._client_rows())
 
 
 def test_terminal_teaching_projection_redacts_paths_commands_and_secrets() -> None:
