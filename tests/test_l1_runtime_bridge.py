@@ -5,7 +5,7 @@ import threading
 import time
 from pathlib import Path
 
-from openroad_platform_contracts.agent_control import AgentBudget, DesignGoal, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
+from openroad_platform_contracts.agent_control import AgentBudget, DesignGoal, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName, ToolReceipt
 from openroad_platform_contracts.l1_tool_contract import TUTORIAL_L1_TOOLS
 from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_execution.orfs_task_factory import ORFSRTLToGDSFactory
@@ -54,6 +54,23 @@ def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_cont
     assert not hasattr(bridge, "_experiments") and not hasattr(bridge, "_states")
     assert bridge.supported_tools() == TUTORIAL_L1_TOOLS
 
+def test_runtime_bridge_maps_each_tutorial_tool_to_a_bounded_surface(tmp_path, monkeypatch):
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    bridge = L1RuntimeBridge(_Runtime(), build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    goal = DesignGoal("goal-1", "p1", "top", "nangate45", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("core_utilization_pct",), AgentBudget(2, 2, 60))
+    state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
+    called = []
+    def route(name):
+        def handler(goal, state, call):
+            called.append(name); return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed", {}, (EvidencePointer("artifact:receipt", "c" * 64),))
+        return handler
+    monkeypatch.setattr(bridge, "submit", route("submit")); monkeypatch.setattr(bridge, "set_flow_params", route("set")); monkeypatch.setattr(bridge, "stop_or_escalate", route("stop")); monkeypatch.setattr(bridge, "design_summary", route("summary")); monkeypatch.setattr(bridge, "query", route("query"))
+    args = {ToolName.GET_DESIGN_SUMMARY:{}, ToolName.QUERY_TIMING:{"run_id":"run-1"}, ToolName.QUERY_CONGESTION:{"run_id":"run-1"}, ToolName.QUERY_DRC:{"run_id":"run-1"}, ToolName.QUERY_POWER:{"run_id":"run-1"}, ToolName.QUERY_STAGE_METRICS:{"run_id":"run-1"}, ToolName.QUERY_ARTIFACT_EXCERPT:{"run_id":"run-1","artifact_id":"artifact-1","max_bytes":1}, ToolName.SET_FLOW_PARAMS:{"values":{"core_utilization_pct":1}}, ToolName.RUN_STAGE:{"stage":"route"}, ToolName.RUN_FULL_FLOW:{}, ToolName.COMPARE_RUNS:{"left_run_id":"run-1","right_run_id":"run-2","metrics":["setup_wns_ns"]}, ToolName.STOP_OR_ESCALATE:{"run_id":"run-1","reason":"bounded stop"}}
+    expected = {ToolName.GET_DESIGN_SUMMARY:"summary", ToolName.SET_FLOW_PARAMS:"set", ToolName.RUN_STAGE:"submit", ToolName.RUN_FULL_FLOW:"submit", ToolName.STOP_OR_ESCALATE:"stop"}
+    for index, tool in enumerate(TUTORIAL_L1_TOOLS):
+        bridge.execute(goal, state, SemanticToolCall(f"call-surface-{index}", goal.goal_id, state.state_id, tool, args[tool], "planner"))
+        assert called.pop() == expected.get(tool, "query")
+
 
 def test_runtime_bridge_enforces_goal_policy_and_runtime_artifact_read_contract(tmp_path):
     import pytest
@@ -65,6 +82,28 @@ def test_runtime_bridge_enforces_goal_policy_and_runtime_artifact_read_contract(
         bridge.execute(goal, state, SemanticToolCall("call-4", "goal-1", "state-1", ToolName.GET_DESIGN_SUMMARY, {}, "planner"))
     with pytest.raises(ValueError, match="registered"):
         bridge.execute(goal, state, SemanticToolCall("call-5", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": "run-1", "artifact_id": "wrong", "max_bytes": 10}, "planner"))
+
+
+def test_runtime_queries_project_safe_tool_specific_facts(tmp_path):
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime()
+    bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    goal = DesignGoal("goal-1", "p1", "top", "nangate45", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("core_utilization_pct",), AgentBudget(2, 2, 60))
+    state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
+    # A Runtime description deliberately contains an implementation path; L1
+    # must not persist it in a visible receipt or trace projection.
+    base = runtime.describe("run-1")
+    base["stages"][0]["attempts"][0]["workspace"] = "/private/runtime/workspace"
+    runtime.describe = lambda _run_id: base
+    for index, tool in enumerate((ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
+                                   ToolName.QUERY_DRC, ToolName.QUERY_POWER,
+                                   ToolName.QUERY_STAGE_METRICS)):
+        receipt = bridge.execute(goal, state, SemanticToolCall(
+            f"query-{index}", goal.goal_id, state.state_id, tool, {"run_id": "run-1"}, "planner"))
+        assert "view" not in receipt.result
+        assert receipt.result["runs"][0]["run_id"] == "run-1"
+        assert receipt.result["runs"][0]["terminal_status"] == "succeeded"
+        assert "/private/runtime/workspace" not in str(receipt.to_dict())
 
 
 def test_runtime_bridge_rejects_foreign_query_and_accepts_runtime_timeout_attempt(tmp_path):
@@ -111,7 +150,7 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     runtime.execute_once(receipt.result["run_id"])
     artifact_id = runtime.describe(receipt.result["run_id"])["stages"][0]["attempts"][0]["artifacts"][0]["artifact_id"]
     excerpt = bridge.execute(goal, state, SemanticToolCall("call-excerpt", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": receipt.result["run_id"], "artifact_id": artifact_id, "max_bytes": 64}, "planner"))
-    assert "bytes" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
+    assert "text" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
 
 
 def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):

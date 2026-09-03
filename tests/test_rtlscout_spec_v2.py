@@ -337,8 +337,15 @@ def test_orfs_promotion_never_inherits_a_frontend_synthesis_only_target(tmp_path
     monkeypatch.setattr(state, "get_runtime_run", lambda *_a, **_k: {"run": {"run_id": "orfs"}})
     class Receipt: run_id = "orfs"
     monkeypatch.setattr(state.runtime, "submit", lambda task, **_k: submitted.update(task=task) or Receipt())
-    state.promote_verified_rtl_to_orfs("spec-1", candidate_id="candidate-1")
+    result = state.promote_verified_rtl_to_orfs("spec-1", candidate_id="candidate-1")
     assert submitted["task"].parameters["target_stage"] == "finish"
+    events = state.l1_trace.store.read(result["l1"]["trace_id"])
+    assert [event.kind.value for event in events] == ["goal_drafted", "goal_finalized", "tool_called", "policy_decided", "tool_receipt"]
+    assert events[3].policy_verdict == "allow"
+    assert events[4].facts["result"]["run_id"] == result["run"]["run"]["run_id"] == "orfs"
+    import sqlite3
+    with sqlite3.connect(state.l1_loop_store.database) as connection:
+        assert connection.execute("SELECT status FROM l1_loop_plan").fetchone()[0] == "submitted"
 
 
 def test_automated_pipeline_routes_weak_mutation_to_verification_revision(tmp_path, monkeypatch):

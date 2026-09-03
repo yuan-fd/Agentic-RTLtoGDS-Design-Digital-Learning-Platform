@@ -8,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -135,14 +136,14 @@ class L1RuntimeBridge:
         views = {run_id: self._runtime.describe(run_id) for run_id in run_ids}
         for view in views.values():
             self._require_owned_run(goal, view)
-        result: dict[str, Any] = {"run_ids": run_ids, "view": self._bounded(views)}
+        # Runtime's describe payload includes implementation-only workspace and
+        # store-key details.  It is evidence for this bridge, never a L1/UI
+        # payload.  Every read tool below returns a deliberately small,
+        # tool-specific projection of registered Runtime facts instead.
+        result: dict[str, Any] = self._read_projection(call, views)
         if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
             result = {"run_id": run_ids[0], **self._read_excerpt(views[run_ids[0]], call.arguments["artifact_id"],
                                                     offset=call.arguments.get("offset", 0), max_bytes=call.arguments["max_bytes"])}
-        elif call.tool is ToolName.COMPARE_RUNS:
-            metric_names = call.arguments["metrics"]
-            summary = {run_id: self._metrics(view) for run_id, view in views.items()}
-            result = {"left_run_id": run_ids[0], "right_run_id": run_ids[1], "metrics": {name: {run_id: summary[run_id].get(name) for run_id in run_ids} for name in metric_names}}
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
                            result,
                            tuple(_evidence(f"run:{run_id}", view) for run_id, view in views.items()))
@@ -176,9 +177,44 @@ class L1RuntimeBridge:
         trace.record_observation(trace_id, state, successor, observation)
         return successor
 
+    @classmethod
+    def _read_projection(cls, call: SemanticToolCall, views: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+        """Return visible Runtime facts without a workspace, log, or command.
+
+        A trace is a teaching/audit record rather than a Runtime debugging
+        dump.  The raw describe response remains inside the Runtime boundary;
+        references and hashes in the receipt evidence point back to it.
+        """
+        run_ids = tuple(views)
+        if call.tool is ToolName.COMPARE_RUNS:
+            names = tuple(call.arguments["metrics"])
+            metrics = {run_id: cls._metrics(view) for run_id, view in views.items()}
+            return {"left_run_id": run_ids[0], "right_run_id": run_ids[1],
+                    "metrics": {name: {run_id: metrics[run_id].get(name) for run_id in run_ids}
+                                for name in names}}
+        category = {
+            ToolName.QUERY_TIMING: ("timing", "wns", "tns", "slack", "delay"),
+            ToolName.QUERY_CONGESTION: ("congestion", "overflow", "density", "utilization"),
+            ToolName.QUERY_DRC: ("drc", "violation", "antenna"),
+            ToolName.QUERY_POWER: ("power", "ir_drop", "voltage"),
+        }.get(call.tool)
+        rows = []
+        for run_id, view in views.items():
+            metrics = cls._metrics(view)
+            selected = (metrics if call.tool is ToolName.QUERY_STAGE_METRICS else
+                        {name: value for name, value in metrics.items()
+                         if category and any(term in name.lower() for term in category)})
+            limit = call.arguments.get("limit")
+            if limit is not None:
+                selected = dict(list(sorted(selected.items()))[:limit])
+            rows.append({"run_id": run_id, "terminal_status": cls._terminal_status(view),
+                         "metrics": selected})
+        return {"runs": rows}
+
     @staticmethod
-    def _bounded(value: Mapping[str, Any]) -> dict[str, Any]:
-        return {key: value[key] for key in sorted(value)[:8]}
+    def _terminal_status(view: Mapping[str, Any]) -> str:
+        run = view.get("run", {})
+        return str(run.get("terminal_reason") or run.get("status") or "unknown")
 
     @staticmethod
     def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
@@ -194,7 +230,16 @@ class L1RuntimeBridge:
         except ValueError as exc: raise ValueError("registered artifact escapes Runtime workspace") from exc
         raw = path.read_bytes()
         if hashlib.sha256(raw).hexdigest() != artifact["sha256"]: raise ValueError("registered artifact content hash mismatch")
-        return {"artifact_id": artifact_id, "sha256": artifact["sha256"], "offset": offset, "bytes": raw[offset:offset + max_bytes].decode("utf-8", errors="replace")}
+        return {"artifact_id": artifact_id, "sha256": artifact["sha256"], "offset": offset,
+                "text": L1RuntimeBridge._visible_excerpt(
+                    raw[offset:offset + max_bytes].decode("utf-8", errors="replace"))}
+
+    @staticmethod
+    def _visible_excerpt(value: str) -> str:
+        """Keep a bounded source excerpt useful while removing local paths."""
+        # A report may include the Runtime workspace or another absolute local
+        # path.  Such a path is never a teachable L1 fact and is not exposed.
+        return re.sub(r"(?<![A-Za-z0-9_.-])/(?:[^\s'\"\\]+/?)+", "[redacted-path]", value)
 
     @staticmethod
     def _require_owned_run(goal: DesignGoal, view: Mapping[str, Any]) -> None:

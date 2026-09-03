@@ -6,14 +6,15 @@ from openroad_platform_contracts.agent_control import DesignGoal, DesignState, S
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 from .l1_loop_store import L1LoopStore
 from .l1_runtime_bridge import L1RuntimeBridge
-from .l1_semantic_policy import L1SemanticToolPolicy
 from .l1_trace_service import L1TraceService
+from .l1_tool_registry import L1RuntimeToolRegistry
 
 class L1DurableLoop:
     def __init__(self, store: L1LoopStore, bridge: L1RuntimeBridge, trace: L1TraceService) -> None:
         self.store, self.bridge, self.trace = store, bridge, trace
+        self.tools = L1RuntimeToolRegistry(bridge)
     def plan_validate_execute(self, trace_id: str, goal: DesignGoal, state: DesignState, call: SemanticToolCall, policy: TrustedPolicyIdentity, *, planner_summary: str) -> dict:
-        L1SemanticToolPolicy.validate(goal, state, call)
+        self.tools.validate(goal, state, call)
         if call.tool.value in {"run_stage", "run_full_flow"} and state.remaining_budget.max_eda_runs < 1:
             raise ValueError("DesignGoal EDA-run budget is exhausted")
         plan_id = f"plan-{uuid4().hex}"
@@ -24,6 +25,7 @@ class L1DurableLoop:
         if proposal_id:
             patch = self.store.reserve_proposal(proposal_id, trace_id, goal.goal_id, state.state_id, plan_id)
             call = replace(call, arguments={**call.arguments, "parameter_patch": patch})
+            self.tools.validate(goal, state, call)
         # The persisted call is exactly the call that will reach the bridge.
         self.store.prepare_execution(plan_id, call.to_dict())
         try:
@@ -33,7 +35,7 @@ class L1DurableLoop:
             self.store.release_reservation(plan_id)
             raise
         try:
-            receipt = self.bridge.execute(goal, state, call)
+            receipt = self.tools.execute(goal, state, call)
         except Exception:
             # No accepted Runtime receipt exists, so a new plan may safely reuse it.
             self.store.release_reservation(plan_id)
