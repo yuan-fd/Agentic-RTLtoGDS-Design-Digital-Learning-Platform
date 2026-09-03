@@ -32,7 +32,12 @@ def _wrap(value: object, width: int) -> list[str]:
 
 
 class Dashboard:
-    COMMANDS = (":new <goal>", ":answer <question_id> <answer>", ":run [decision summary]", ":cancel [reason]", ":recover   :refresh   :quit")
+    COMMANDS = (
+        ":new <goal>", ":answer <question_id> <answer>", ":advance",
+        ":query <timing|congestion|drc|power|metrics>",
+        ":artifact <report|log|run_result|config>", ":stage <allowed-stage>",
+        ":cancel [reason]", ":recover   :refresh   :quit",
+    )
 
     def __init__(self, client: Client):
         self.client, self.sid, self.after, self.events = client, None, -1, []
@@ -71,6 +76,35 @@ class Dashboard:
                 self._need_session()
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/execute", {"decision_summary": argument or "Execute one bounded typed Runtime tool."})
                 self.notice = f"Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+            elif op == "advance":
+                self._need_session()
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/advance", {})
+                decision = result.get("decision", {})
+                self.notice = f"Teaching planner: {decision.get('action', 'recorded')} — {decision.get('summary', '')}"; self.refresh()
+            elif op == "query":
+                self._need_session()
+                kind = argument.strip()
+                if kind not in {"timing", "congestion", "drc", "power", "metrics"}:
+                    raise ValueError("Usage: :query <timing|congestion|drc|power|metrics>")
+                self.client.post(f"/api/l1/sessions/{self.sid}/queries", {
+                    "kind": kind, "decision_summary": f"Operator requested typed {kind} evidence."})
+                self.notice = f"Typed {kind} query recorded through Policy."; self.refresh()
+            elif op == "artifact":
+                self._need_session()
+                kind = argument.strip()
+                if kind not in {"report", "log", "run_result", "config"}:
+                    raise ValueError("Usage: :artifact <report|log|run_result|config>")
+                self.client.post(f"/api/l1/sessions/{self.sid}/artifacts", {
+                    "kind": kind, "decision_summary": f"Operator requested approved {kind} excerpt."})
+                self.notice = f"Approved {kind} excerpt receipt recorded."; self.refresh()
+            elif op == "stage":
+                self._need_session()
+                stage = argument.strip()
+                if not stage:
+                    raise ValueError("Usage: :stage <allowed-stage>")
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/stages", {
+                    "stage": stage, "decision_summary": f"Operator requested permitted {stage} stage."})
+                self.notice = f"Stage Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
             elif op == "cancel":
                 self._need_session(); self.client.post(f"/api/l1/sessions/{self.sid}/cancel", {"reason": argument or "operator cancellation"})
                 self.notice = "Cancellation requested through Runtime authority."; self.refresh()
@@ -94,6 +128,74 @@ class Dashboard:
         if "goal_drafted" in kinds: return "WAITING FOR CLARIFICATION"
         return "WAITING FOR USER GOAL"
 
+    def _latest(self, kind: str):
+        return next((event for event in reversed(self.events) if event.get("kind") == kind), None)
+
+    def _goal_rows(self) -> list[str]:
+        draft, final = self._latest("goal_drafted"), self._latest("goal_finalized")
+        rows = ["User request / typed interpretation"]
+        if draft:
+            facts = draft.get("facts") or {}
+            rows.append("Request: " + str(facts.get("request_text") or "recorded"))
+            questions = facts.get("clarification_questions") or []
+            answers = facts.get("clarification_answers") or []
+            rows.append(f"Clarifications: {len(answers)}/{len(questions)} persisted")
+        else:
+            rows.append("No durable request yet.")
+        if final:
+            goal = (final.get("facts") or {}).get("goal_ir") or {}
+            rows.extend(["", "Frozen Goal IR (authoritative)",
+                         "goal_id: " + str(goal.get("goal_id") or final.get("goal_id") or "recorded"),
+                         "objective: " + str(goal.get("objective") or "recorded"),
+                         "allowed tools: " + ", ".join(goal.get("allowed_tools") or [])])
+        else:
+            rows.append("Goal IR remains mutable until blocking answers are complete.")
+        return rows
+
+    def _tool_rows(self) -> list[str]:
+        rows = ["Typed call → Policy → Runtime receipt"]
+        selected = [e for e in self.events if e.get("kind") in {"tool_called", "policy_decided", "tool_receipt"}]
+        if not selected:
+            return rows + ["No admitted tool transaction yet.", "Use :advance after the Goal is frozen."]
+        for event in selected[-9:]:
+            facts = event.get("facts") or {}; kind = event.get("kind")
+            if kind == "tool_called":
+                rows.append("CALL: " + str(event.get("tool") or facts.get("tool") or "typed tool"))
+                rows.append("  " + str(event.get("planner_summary") or "visible decision persisted"))
+            elif kind == "policy_decided":
+                rows.append("POLICY: " + str(event.get("policy_verdict") or facts.get("verdict") or "recorded").upper())
+            else:
+                result = facts.get("result") or {}
+                rows.append("RECEIPT: " + str(facts.get("status") or "recorded") + "; run=" + str(result.get("run_id") or "n/a"))
+        return rows
+
+    def _state_rows(self) -> list[str]:
+        transition = self._latest("state_transition")
+        rows = ["Runtime authority / DesignState / evidence"]
+        if not transition:
+            return rows + ["No observed state transition yet.", "Runtime, not this client, owns terminal state."]
+        facts = transition.get("facts") or {}
+        state_after = facts.get("state_after") or {}
+        rows.extend(["terminal: " + str(facts.get("terminal_status") or facts.get("status") or "recorded"),
+                     "runtime run: " + str(facts.get("run_id") or "recorded"),
+                     "state: " + str(state_after.get("state_id") or "recorded"),
+                     "evidence refs: " + str(len(transition.get("evidence") or state_after.get("evidence") or []))])
+        receipt = self._latest("tool_receipt")
+        if receipt:
+            rows.append("last receipt sequence: " + str(receipt.get("sequence", "?")))
+        return rows
+
+    def _decision_rows(self) -> list[str]:
+        reflections = [e for e in self.events if e.get("kind") == "reflection_recorded"]
+        rows = ["Decision / reflection / teaching replay", "Visible summaries, never hidden chain-of-thought."]
+        if not reflections:
+            return rows + ["No reflection is durable yet.", "Use :advance to follow the evidence-backed tutorial policy."]
+        for event in reflections[-4:]:
+            facts = event.get("facts") or {}
+            rows.extend([str(facts.get("decision") or "reflection").upper() + ": " + str(event.get("planner_summary") or facts.get("summary") or "recorded"),
+                         "basis events: " + ", ".join(facts.get("basis_event_ids") or [])])
+        return rows
+
     def _harness_rows(self) -> list[str]:
         if not self.events:
             return ["[1] Goal draft       waiting for user request", "[2] Frozen Goal IR   created after typed clarification", "[3] Visible plan     structured decision summary", "[4] Policy verdict   ALLOW / DENY / NEEDS_CLARIFICATION", "[5] Typed tool call  validated before Runtime", "[6] Runtime receipt  exit status + artifact references", "[7] State transition durable terminal evidence", "", "This panel shows observable decisions, not hidden model reasoning."]
@@ -114,7 +216,7 @@ class Dashboard:
         return rows
 
     def _client_rows(self) -> list[str]:
-        rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Start:", "  :new Improve timing; preserve constraints", "Answer each typed clarification:", "  :answer <question_id> <answer>", "Then permit visible bounded action:", "  :run <decision summary>", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
+        rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Guided tutorial:", "  :new Improve timing; retain evidence", "  :answer objective timing", "  :answer constraints drc_zero_area_plus_3pct", "  :answer clock_sdc protect_clock_sdc", "  :answer change_scope registered_parameters_only", "  :answer budget 3", "  :advance   (repeat until STOP)", "", "Manual typed access: :query timing | :artifact report | :stage route", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
         rows.extend(f"  {command}" for command in self.COMMANDS)
         draft = next((e for e in reversed(self.events) if e.get("kind") == "goal_drafted"), None)
         if draft and (draft.get("facts") or {}).get("blocking_fields"):
@@ -151,8 +253,13 @@ class Dashboard:
         self._put(win, 0, 0, "OpenROAD Platform / L1 Agent Workbench", width - 1, curses.A_BOLD)
         self._put(win, 1, 0, f"API: {self.connection}  |  durable facts only  |  Runtime authority enabled", width - 1)
         self._put(win, 2, 0, f"Phase: {self._phase()}  |  {self.notice}", width - 1, curses.A_REVERSE)
-        panel_y, panel_h, left_w = 4, height - 7, max(46, (width * 65) // 100)
-        self._panel(win, "L1 AGENT HARNESS — observable execution facts", 0, panel_y, left_w, panel_h, self._harness_rows())
+        panel_y, panel_h, left_w = 4, height - 7, max(52, (width * 68) // 100)
+        half_h = max(5, panel_h // 2)
+        left_half = left_w // 2
+        self._panel(win, "1 GOAL / IR", 0, panel_y, left_half, half_h, self._goal_rows())
+        self._panel(win, "2 TOOL / POLICY", left_half, panel_y, left_w - left_half, half_h, self._tool_rows())
+        self._panel(win, "3 STATE / EVIDENCE", 0, panel_y + half_h, left_half, panel_h - half_h, self._state_rows())
+        self._panel(win, "4 REFLECTION / REPLAY", left_half, panel_y + half_h, left_w - left_half, panel_h - half_h, self._decision_rows())
         self._panel(win, "USER CLIENT — input & control", left_w, panel_y, width - left_w, panel_h, self._client_rows())
         self._put(win, height - 2, 0, "Command> " + self.input_buffer, width - 1, curses.A_BOLD)
         self._put(win, height - 1, 0, "Enter submits · Backspace edits · Ctrl-C or :quit exits · Client never owns API state", width - 1)

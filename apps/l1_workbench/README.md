@@ -36,24 +36,33 @@ PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:
   --state-root /tmp/l1-workbench --port 8766
 ```
 
-Routes:
+Routes (each reads or mutates the durable Session through the same Policy and
+Runtime boundary):
 
 - `POST /api/l1/sessions` `{ "text": "Run one bounded implementation flow." }`
 - `POST /api/l1/sessions/{session_id}/answers` with typed clarification answers
 - `POST /api/l1/sessions/{session_id}/execute` with a bounded visible decision summary
+- `POST /api/l1/sessions/{session_id}/advance` for the evidence-backed tutorial step
+- `POST /api/l1/sessions/{session_id}/queries` for a typed timing/congestion/DRC/power/metrics read
+- `POST /api/l1/sessions/{session_id}/artifacts` for an allowlisted excerpt
+- `POST /api/l1/sessions/{session_id}/stages` for a permitted Runtime stage
 - `GET /api/l1/sessions/{session_id}/events?after={sequence}`
 - `POST /api/l1/sessions/{session_id}/cancel`
 - `POST /api/l1/sessions/{session_id}/recover`
 
-The integration test runs the full chain against a real `WorkflowRuntime`
-subprocess adapter. Its artifact is `l1_tool_receipt.txt`; the adapter command
-has Runtime-recorded exit code `0`. The resulting trace is:
+The smoke backend runs the full chain against a real `WorkflowRuntime`
+subprocess adapter.  The `orfs` profile instead launches the admitted local
+ORFS/OpenROAD backend.  In both cases the Runtime store records the process
+receipt and artifacts; the L1 trace records the resulting facts.  The basic
+trace is:
 
 `goal_drafted → goal_finalized → tool_called → policy_decided(allow) →
 tool_receipt → state_transition`.
 
-The bounded adapter is an execution-protocol smoke, not an OpenROAD QoR claim.
-P5 replaces this admitted smoke surface with the pinned ORFS-Agent adapter.
+The smoke adapter is an execution-protocol smoke, not an OpenROAD QoR claim.
+The `orfs` profile is a real baseline EDA flow, not ORFS-Agent optimization:
+ORFS-Agent remains an external L2 capability and is intentionally outside this
+L1 workbench.
 Cancellation uses Runtime's controlled cancel port; recovery resumes only the
 durable session/plan records and never emits a duplicate Runtime submission.
 
@@ -72,10 +81,13 @@ surface for requests, clarification answers, and control. It never displays
 hidden chain-of-thought, raw provider transcripts, shell commands, secrets, or
 workspace paths.
 
-Commands are `:new <natural-language goal>`, `:answer <clarification>`,
-`:run [visible decision summary]`, `:cancel [reason]`, `:recover`,
-`:refresh`, and `:quit`. It polls the cursor API and displays only returned
-durable facts; it does not use a browser, local trace, or local state.
+Commands are `:new <natural-language goal>`, `:answer <question_id> <answer>`,
+`:advance`, `:query <kind>`, `:artifact <kind>`, `:stage <stage>`,
+`:cancel [reason]`, `:recover`, `:refresh`, and `:quit`.  It polls the cursor
+API and displays only returned durable facts; it does not use a browser, local
+trace, or local state.  The left-hand Harness is split into four teaching
+panels: Goal/IR, Tool/Policy, Runtime DesignState/Evidence, and
+Reflection/Replay.  The right-hand Client is the only input surface.
 
 ### A concrete teaching flow
 
@@ -83,24 +95,25 @@ With the real EDA tutorial profile above, try the following in the right-hand
 **USER CLIENT** pane:
 
 ```text
-Command> :new Implement the managed tutorial mux and retain QoR evidence.
+Command> :new Improve setup timing while preserving DRC and area evidence.
 ```
 
-The API creates a durable Session and records `goal_drafted`.  The current
-teaching provider asks a real blocking typed confirmation about the fixed
-operator profile:
+The API creates a durable Session and records `goal_drafted`.  The managed
+tutorial profile asks these five blocking typed questions:
 
 ```text
-Client status: WAITING FOR CLARIFICATION
-Question: Confirm baseline implementation of frozen mux_2to1 RTL on nangate45,
-          clock period 10.0 ns. This will run the admitted local
-          ORFS/OpenROAD toolchain.
+objective, constraints, clock/SDC protection, permitted change scope, and the
+EDA-run budget.  Answer them through the same Session:
 ```
 
 The operator answers it through the same Session:
 
 ```text
-Command> :answer Run one baseline RTL-to-GDS implementation and retain reports.
+Command> :answer objective timing
+Command> :answer constraints drc_zero_area_plus_3pct
+Command> :answer clock_sdc protect_clock_sdc
+Command> :answer change_scope registered_parameters_only
+Command> :answer budget 3
 ```
 
 The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
@@ -109,23 +122,21 @@ The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
 #  0 GOAL DRAFT
       clarification requested
 #  1 FROZEN GOAL IR
-      objective=Run one baseline RTL-to-GDS implementation and retain reports.
+      objective=timing
 ```
 
-The operator explicitly requests the visible bounded decision:
+Then use the guided evidence loop; each call performs exactly one visible,
+Policy-gated action and persists its result:
 
 ```text
-Command> :run Run the admitted ORFS baseline for frozen mux RTL at 10 ns.
+Command> :advance
 ```
 
-It produces the following durable event categories, in order (identifiers and
-timestamps vary):
+Repeat `:advance` until the Harness shows its terminal reflection.  The real
+acceptance sequence is (identifiers and timestamps vary):
 
 ```text
-TYPED TOOL / PLAN       Run the admitted ORFS baseline for frozen mux RTL at 10 ns.
-POLICY                  verdict=allow
-RUNTIME RECEIPT         status=accepted; run_id=<runtime-id>
-RUNTIME STATE           terminal_status=succeeded
+run_full_flow → query_timing → reflect_continue → run_route → query_drc → stop
 ```
 
 For the `--backend orfs` profile, the final state is produced by real ORFS
