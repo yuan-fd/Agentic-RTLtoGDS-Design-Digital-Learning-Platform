@@ -106,6 +106,11 @@ def main() -> int:
       if args.failure_candidate and (comparison["decision"] != "stop" or comparison["area_baseline_ratio"] is not None
           or comparison["decision_reason"] != "candidate_not_observable"):
         raise RuntimeError("failed candidate was not returned as an auditable stop/unknown comparison")
+      if args.failure_candidate and (candidate["runtime"]["run"]["status"] != "failed"
+          or candidate["runtime"]["stages"][0]["attempts"][0]["exit_code"] == 0
+          or any(value[candidate_run_id] is not None
+                 for value in comparison["comparison"]["receipt"]["result"]["metrics"].values())):
+        raise RuntimeError("failed candidate incorrectly produced a canonical QoR value")
       if not any(event["kind"] == "reflection_recorded" and event["facts"].get("decision") == comparison["decision"] for event in events):
         raise RuntimeError("M1 comparison has no durable evidence-backed final reflection")
       summary = {
@@ -119,7 +124,10 @@ def main() -> int:
         "baseline_state": baseline["state"],
         "candidate_state": state,
         "candidate_task_parameters": candidate_task["parameters"],
-        "m1_proposal": proposal["proposal"],
+        "m1_proposal": proposal.get("proposal", {
+            "values": {"minimum_die_size_um": 1.0},
+            "summary": "Failure-exit acceptance proposal; not a QoR optimization.",
+        }),
         "comparison": comparison,
         "final_state": state,
         "event_kinds": [event["kind"] for event in events],

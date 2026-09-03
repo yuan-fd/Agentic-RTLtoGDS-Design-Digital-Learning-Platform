@@ -72,5 +72,26 @@ The acceptance script is an HTTP client: it starts the L1 server and calls
 only the published Session, answers, execute, M1 proposal, candidate, compare,
 and events routes. It never imports or calls WorkbenchService directly.
 
+## Real failed-candidate exit
+
+The same HTTP client can exercise an actual ORFS failed candidate without
+inventing QoR:
+
+    PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
+      .tools/venvs/orfs-agent/bin/python scripts/run_l1_tutorial_acceptance.py \
+      --failure-candidate \
+      --output-root /tmp/openroad-l1-m1-http-failure-passed-20260903
+
+It uses the Goal's registered minimum_die_size_um parameter set to 1.0; the
+Runtime baseline succeeds and the candidate attempt exits 1. It does not alter
+protected inputs or assert a QoR result. The exit-0 acceptance summary SHA-256
+is 57953a6d91bea08dbcf8d21a6dd9a1146256af18191928fc21679865a07dd482.
+
+Its API result is decision=stop, decision_reason=candidate_not_observable, and
+area_baseline_ratio=null. The Runtime compare receipt has null candidate
+WNS/area/DRC entries, and a durable reflection_recorded(stop) event remains in
+the trace. This proves the failure path is not promoted to a QoR success or
+converted into an HTTP 500.
+
 Rollback: revert the M1 slice commits. Runtime evidence is under /tmp and is
 not part of the repository; no protected input was changed.
