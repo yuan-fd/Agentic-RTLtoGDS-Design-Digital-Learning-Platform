@@ -33,3 +33,17 @@ The bounded adapter is an execution-protocol smoke, not an OpenROAD QoR claim.
 P5 replaces this admitted smoke surface with the pinned ORFS-Agent adapter.
 Cancellation uses Runtime's controlled cancel port; recovery resumes only the
 durable session/plan records and never emits a duplicate Runtime submission.
+
+## Terminal dashboard
+
+In a second terminal, run:
+
+```bash
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
+  .tools/venvs/orfs-agent/bin/python apps/l1_workbench/terminal_dashboard.py
+```
+
+Commands are `:new <natural-language goal>`, `:answer <clarification>`,
+`:run [visible decision summary]`, `:cancel [reason]`, `:recover`,
+`:refresh`, and `:quit`. It polls the cursor API and displays only returned
+durable facts; it does not use a browser, local trace, or local state.
