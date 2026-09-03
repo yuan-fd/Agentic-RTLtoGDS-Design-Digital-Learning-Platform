@@ -96,7 +96,7 @@ class L1RuntimeBridge:
         # RUN_* call; claiming a completed EDA change here would be false.
         proposal_sha256 = hashlib.sha256(json.dumps(task.to_dict(), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "accepted",
-                           {"parameter_patch": dict(values), "task_spec_sha256": proposal_sha256,
+                           {"proposal_id": f"proposal-{call.call_id}", "parameter_patch": dict(values), "task_spec_sha256": proposal_sha256,
                             "requires_following_run": True}, (goal.rtl_artifact,), None)
 
     def stop_or_escalate(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:

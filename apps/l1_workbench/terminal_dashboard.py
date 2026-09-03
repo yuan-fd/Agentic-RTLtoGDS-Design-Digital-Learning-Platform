@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import curses
 import json
+import re
 import textwrap
 import time
 from urllib.parse import quote
@@ -29,6 +30,14 @@ class Client:
 
 def _wrap(value: object, width: int) -> list[str]:
     return [line for part in str(value or "").splitlines() or [""] for line in textwrap.wrap(part, width=max(12, width))] or [""]
+
+def _safe_text(value: object) -> str:
+    """Teaching projection: preserve meaning while withholding unsafe literals."""
+    text = str(value or "")
+    text = re.sub(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*\S+", r"\1=<redacted>", text)
+    text = re.sub(r"(?<!\w)/(?:[^\s'\"]+)", "<path-redacted>", text)
+    text = re.sub(r"(?i)(?:^|\s)(?:\$|bash\b|sh\b|openroad\b|python(?:3)?\b)", " <command-redacted>", text)
+    return text
 
 
 class Dashboard:
@@ -162,7 +171,7 @@ class Dashboard:
         rows = ["User request / typed interpretation"]
         if draft:
             facts = draft.get("facts") or {}
-            rows.append("Request: " + str(facts.get("request_text") or "recorded"))
+            rows.append("Request: " + _safe_text(facts.get("request_text") or "recorded"))
             questions = facts.get("clarification_questions") or []
             answers = facts.get("clarification_answers") or []
             rows.append(f"Clarifications: {len(answers)}/{len(questions)} persisted")
@@ -190,7 +199,7 @@ class Dashboard:
             facts = event.get("facts") or {}; kind = event.get("kind")
             if kind == "tool_called":
                 rows.append("CALL: " + str(event.get("tool") or facts.get("tool") or "typed tool"))
-                rows.append("  " + str(event.get("planner_summary") or "visible decision persisted"))
+                rows.append("  " + _safe_text(event.get("planner_summary") or "visible decision persisted"))
             elif kind == "policy_decided":
                 rows.append("POLICY: " + str(event.get("policy_verdict") or facts.get("verdict") or "recorded").upper())
             else:
@@ -224,7 +233,7 @@ class Dashboard:
             return rows + ["No reflection is durable yet.", "Use :advance to follow the evidence-backed tutorial policy."]
         for event in reflections[-4:]:
             facts = event.get("facts") or {}
-            rows.extend([str(facts.get("decision") or "reflection").upper() + ": " + str(event.get("planner_summary") or facts.get("summary") or "recorded"),
+            rows.extend([str(facts.get("decision") or "reflection").upper() + ": " + _safe_text(event.get("planner_summary") or facts.get("summary") or "recorded"),
                          "basis events: " + ", ".join(facts.get("basis_event_ids") or [])])
         return rows
 
@@ -237,26 +246,45 @@ class Dashboard:
             kind, facts = event.get("kind", "event"), event.get("facts") or {}
             if kind == "goal_drafted": detail = "clarification requested"
             elif kind == "goal_finalized": detail = f"objective={(facts.get('goal_ir') or {}).get('objective') or 'recorded'}"
-            elif kind == "tool_called": detail = event.get("planner_summary") or "structured decision persisted"
+            elif kind == "tool_called": detail = _safe_text(event.get("planner_summary") or "structured decision persisted")
             elif kind == "policy_decided": detail = f"verdict={event.get('policy_verdict') or facts.get('verdict') or 'recorded'}"
             elif kind == "tool_receipt":
                 result = facts.get("result") or {}
                 detail = f"status={facts.get('status') or 'accepted'}; run_id={result.get('run_id') or 'recorded'}"
             elif kind == "state_transition": detail = f"terminal_status={facts.get('terminal_status') or facts.get('status') or 'recorded'}"
-            else: detail = event.get("planner_summary") or "durable event recorded"
+            else: detail = _safe_text(event.get("planner_summary") or "durable event recorded")
             rows.extend([f"#{event.get('sequence', '?'):>3} {labels.get(kind, kind)}", f"      {detail}"])
         return rows
 
     def _client_rows(self) -> list[str]:
-        rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Guided tutorial:", "  :new Improve timing; retain evidence", "  :answer objective timing", "  :answer constraints drc_zero_area_plus_3pct", "  :answer clock_sdc protect_clock_sdc", "  :answer change_scope registered_parameters_only", "  :answer budget 3", "  :advance   (repeat until STOP)", "", "Manual typed access: :query timing | :artifact report | :stage route", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
-        rows.extend(f"  {command}" for command in self.COMMANDS)
+        rows = ["You control the durable L1 Session here.",
+                "Natural language becomes typed Goal IR; never shell text.", ""]
         draft = next((e for e in reversed(self.events) if e.get("kind") == "goal_drafted"), None)
+        final = self._latest("goal_finalized")
+        transitions = [e for e in self.events if e.get("kind") == "state_transition"]
+        proposal_call = next((e for e in reversed(self.events)
+                              if e.get("kind") == "tool_called" and e.get("tool") == "set_flow_params"), None)
+        if draft and not final:
+            rows.extend(["Next: answer only durable pending clarifications."])
+        elif final and not transitions:
+            rows.extend(["Next: :baseline"])
+        elif final and len(transitions) == 1 and not proposal_call:
+            rows.extend(["Next: :m1-propose"])
+        elif proposal_call and len(transitions) == 1:
+            rows.extend([f"Next: :candidate proposal-{proposal_call.get('facts', {}).get('call_id')}"])
+        elif len(transitions) >= 2:
+            baseline = transitions[0].get("facts", {}).get("run_id", "recorded")
+            rows.extend([f"Next: :compare {baseline}"])
+        rows.extend(["", "Optional typed evidence: :query timing | :artifact report", "",
+                     "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}",
+                     f"  event cursor: {self.after}", "", "Controls"])
+        rows.extend(f"  {command}" for command in self.COMMANDS)
         if draft and (draft.get("facts") or {}).get("blocking_fields"):
             answered = {item.get("question_id") for item in (draft.get("facts") or {}).get("clarification_answers", [])}
             pending = [item for item in (draft.get("facts") or {}).get("clarification_questions", []) if item.get("question_id") not in answered]
             rows.extend(["", "Clarification pending"])
             for question in pending:
-                rows.extend([f"  [{question.get('question_id')}] {question.get('prompt')}", f"  Reply: :answer {question.get('question_id')} <answer>"])
+                rows.extend([f"  [{question.get('question_id')}] {_safe_text(question.get('prompt'))}", f"  Reply: :answer {question.get('question_id')} <answer>"])
         return rows
 
     @staticmethod

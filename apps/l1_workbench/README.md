@@ -84,8 +84,8 @@ surface for requests, clarification answers, and control. It never displays
 hidden chain-of-thought, raw provider transcripts, shell commands, secrets, or
 workspace paths.
 
-Commands are `:new <natural-language goal>`, `:answer <question_id> <answer>`,
-`:advance`, `:query <kind>`, `:artifact <kind>`, `:stage <stage>`,
+Commands include `:new <natural-language goal>`, `:answer <question_id> <answer>`,
+`:baseline`, `:m1-propose`, `:candidate <proposal-id>`, and `:compare <baseline-run-id>`.
 `:cancel [reason]`, `:recover`, `:refresh`, and `:quit`.  It polls the cursor
 API and displays only returned durable facts; it does not use a browser, local
 trace, or local state.  The left-hand Harness is split into four teaching
@@ -98,25 +98,22 @@ With the real EDA tutorial profile above, try the following in the right-hand
 **USER CLIENT** pane:
 
 ```text
-Command> :new Improve setup timing while preserving DRC and area evidence.
+Command> :new 帮我改善 mux 的 setup timing，但面积不能比 baseline 增加超过 3%，不许修改 RTL/SDC，最多跑 3 次。
 ```
 
-The API creates a durable Session and records `goal_drafted`.  The managed
-tutorial profile asks these five blocking typed questions:
+The API creates a durable Session and records `goal_drafted`. The right pane
+shows only the actually pending typed questions; for this request they are:
 
 ```text
-objective, constraints, clock/SDC protection, permitted change scope, and the
-EDA-run budget.  Answer them through the same Session:
+permitted change scope and the managed baseline/corner. Answer them through
+the same Session:
 ```
 
 The operator answers it through the same Session:
 
 ```text
-Command> :answer objective timing
-Command> :answer constraints drc_zero_area_plus_3pct
-Command> :answer clock_sdc protect_clock_sdc
 Command> :answer change_scope registered_parameters_only
-Command> :answer budget 3
+Command> :answer design_context managed_mux_default_corner_baseline
 ```
 
 The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
@@ -128,18 +125,21 @@ The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
       objective=timing
 ```
 
-Then use the guided evidence loop; each call performs exactly one visible,
-Policy-gated action and persists its result:
+Then use the real M1 evidence loop. Each action is visible, Policy-gated, and
+persists a Runtime/trace fact:
 
 ```text
-Command> :advance
+Command> :baseline
+Command> :m1-propose
+Command> :candidate <proposal-id shown by the right pane>
+Command> :compare <baseline-run-id shown by the STATE panel>
 ```
 
-Repeat `:advance` until the Harness shows its terminal reflection.  The real
-acceptance sequence is (identifiers and timestamps vary):
+The real acceptance sequence is (identifiers and timestamps vary):
 
 ```text
-run_full_flow → query_timing → reflect_continue → run_route → query_drc → stop
+baseline run_full_flow → set_flow_params → candidate run_full_flow
+→ compare_runs → reflection stop
 ```
 
 For the `--backend orfs` profile, the final state is produced by real ORFS

@@ -1,4 +1,4 @@
-from apps.l1_workbench.terminal_dashboard import Dashboard
+from apps.l1_workbench.terminal_dashboard import Dashboard, _safe_text
 
 
 class Client:
@@ -51,3 +51,22 @@ def test_terminal_baseline_returns_to_cursor_polling_without_waiting_for_runtime
     dashboard.command(":baseline")
     assert client.calls[0][1]["wait"] is False
     assert "polling durable cursor events" in dashboard.notice
+
+
+def test_terminal_derives_m1_next_command_only_from_durable_events() -> None:
+    dashboard = Dashboard(Client())
+    dashboard.events = [{
+        "kind": "goal_finalized", "facts": {"goal_ir": {}}, "sequence": 1,
+    }, {
+        "kind": "state_transition", "facts": {"run_id": "baseline-run"}, "sequence": 2,
+    }, {
+        "kind": "tool_called", "tool": "set_flow_params",
+        "facts": {"call_id": "call-proposal"}, "sequence": 3,
+    }]
+    assert "Next: :candidate proposal-call-proposal" in "\n".join(dashboard._client_rows())
+
+
+def test_terminal_teaching_projection_redacts_paths_commands_and_secrets() -> None:
+    visible = _safe_text("token=abc /private/work $ openroad python3 secret: xyz")
+    assert "abc" not in visible and "/private/work" not in visible and "openroad" not in visible
+    assert "<redacted>" in visible and "<path-redacted>" in visible and "<command-redacted>" in visible
