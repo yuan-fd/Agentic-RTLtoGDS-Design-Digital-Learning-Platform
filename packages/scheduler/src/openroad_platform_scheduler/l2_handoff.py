@@ -25,8 +25,8 @@ class OptimizationHandoffService:
             raise ValueError("optimization handoff requires an evidence-backed terminal L1 state")
         return self._task_for_bound(request, goal, state, manifest)
 
-    def task_for_authorized(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
-                            authorization: L2HandoffAuthorization, manifest: PluginManifest) -> TaskSpec:
+    def _task_for_authorized(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
+                             authorization: L2HandoffAuthorization, manifest: PluginManifest) -> TaskSpec:
         """Accept only the explicit audited L1→L2 escalation projection.
 
         This does *not* weaken :meth:`task_for`: arbitrary observed states are
@@ -104,7 +104,7 @@ class OptimizationHandoffService:
         if prior == "":
             raise ValueError("authorized L2 handoff submission is already in progress")
         try:
-            task = self.task_for_authorized(request, goal, state, authorization, manifest)
+            task = self._task_for_authorized(request, goal, state, authorization, manifest)
             run = runtime.submit(task, capability=request.capability)
             if not isinstance(getattr(run, "run_id", None), str) or not run.run_id:
                 raise RuntimeError("Runtime submit returned no run_id")

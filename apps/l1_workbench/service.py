@@ -262,11 +262,7 @@ class WorkbenchService:
             raise ValueError("L2 upgrade requires measured baseline and candidate Runtime observations")
         reflections=[event for event in self.trace.store.read(session.trace_id) if event.kind.value == "reflection_recorded"]
         if not reflections or reflections[-1].facts.get("decision") != "escalate":
-            self.trace.record_reflection(session.trace_id,state,
-                summary="Operator requested a bounded admitted ORFS-Agent search from measured L1 evidence.",
-                decision="escalate",evidence=state.evidence,
-                hypotheses={"scope":"admission-sized external optimizer proposal only"},
-                basis_event_ids=tuple(event.event_id for event in transitions[-2:]))
+            raise ValueError("L2 upgrade requires an existing Planner/Policy-approved durable escalate reflection")
         authorization=L1L2AuthorizationService(self.trace).authorize(session.trace_id,goal,state)
         lock=Path(__file__).resolve().parents[2]/"integrations/orfs_agent/source.lock.json"
         domain=Path(__file__).resolve().parents[2]/"packages/execution/src/openroad_platform_execution/orfs_agent_plugin.py"
