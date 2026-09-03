@@ -1,6 +1,6 @@
 """Operational L1 vertical slice; transport/UI are deliberately absent."""
 from __future__ import annotations
-import json, platform, sqlite3, sys, uuid
+import json, platform, sqlite3, sys, uuid, threading
 from pathlib import Path
 from dataclasses import replace
 from typing import Any
@@ -44,9 +44,9 @@ class WorkbenchService:
         rows=tuple(ClarificationAnswer(a["question_id"],ClarificationField(a["field"]),a["value"]) for a in answers); session=self.sessions.answer(sid,_Provider(),rows)
         if session.goal_id: self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},AgentBudget(1,4,30),evidence=(EvidencePointer("artifact:workbench-rtl","a"*64),)),None)
         return session
-    def execute(self,sid,summary):
+    def execute(self,sid,summary,*,wait=True):
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
-        task=TaskSpec(f"l1-workbench-{uuid.uuid4().hex}",goal.project_id,goal.design_id,plugin_id="l1-runtime-smoke",inputs={"kind":"bounded_l1_tool"},expected_artifacts=("report",),timeout_seconds=30)
+        task=TaskSpec(f"l1-workbench-{uuid.uuid4().hex}",goal.project_id,goal.design_id,plugin_id="l1-runtime-smoke",inputs={"kind":"bounded_l1_tool","bounded_mode":"normal" if wait else "cancellable"},expected_artifacts=("report",),timeout_seconds=30)
         class Factory:
             capability="eda.rtl_to_gds"
             def validate_task(self,t): t.validate()
@@ -55,8 +55,13 @@ class WorkbenchService:
         loop=L1DurableLoop(self.loop_store,bridge,self.trace); call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{},"l1-workbench")
         identity=TrustedPolicyIdentity("workbench-policy","v1","platform",self.policy().provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
-        self.runtime.execute_once(plan["run_id"]); successor=loop.observe(session.trace_id,state,plan["plan_id"],next_state_id=f"state-{uuid.uuid4().hex}")
-        self._save(sid,successor,plan["plan_id"]); return plan, successor
+        self._save(sid,state,plan["plan_id"])
+        def finish():
+            self.runtime.execute_once(plan["run_id"])
+            successor=loop.observe(session.trace_id,state,plan["plan_id"],next_state_id=f"state-{uuid.uuid4().hex}")
+            self._save(sid,successor,plan["plan_id"])
+        if wait: finish(); return plan, self._load(sid)[0]
+        threading.Thread(target=finish,daemon=True).start(); return plan, state
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):

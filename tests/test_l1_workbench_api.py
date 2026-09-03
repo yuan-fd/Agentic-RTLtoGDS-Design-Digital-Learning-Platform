@@ -33,5 +33,17 @@ def test_real_l1_workbench_api_vertical_slice(tmp_path):
   assert "goal_finalized" in kinds and "tool_called" in kinds and "policy_decided" in kinds and "tool_receipt" in kinds and "state_transition" in kinds
   assert all(event.get("planner_summary") != "hidden reasoning" for event in events)
   assert _post(base+f"/api/l1/sessions/{sid}/recover",{})["status"]=="goal_finalized"
+  # A second real session keeps its Runtime subprocess active long enough for
+  # the API cancellation route to reach Runtime's controlled cancel port.
+  second=_post(base+"/api/l1/sessions",{"text":"Run a cancellable bounded flow."}); sid2=second["session_id"]
+  _post(base+f"/api/l1/sessions/{sid2}/answers",{"answers":[{"question_id":"objective-1","field":"objective","value":"cancel the bounded run"}]})
+  pending=_post(base+f"/api/l1/sessions/{sid2}/execute",{"decision_summary":"Start bounded run for cancellation.","wait":False})
+  assert _post(base+f"/api/l1/sessions/{sid2}/cancel",{"reason":"operator cancellation smoke"})["status"]=="cancel_requested"
+  for _ in range(100):
+   view=json.loads(urlopen(base+f"/api/l1/sessions/{sid2}/events",timeout=10).read())["events"]
+   if any(event["kind"]=="state_transition" for event in view): break
+   time.sleep(.05)
+  cancelled=[event for event in view if event["kind"]=="state_transition"]
+  assert cancelled and cancelled[-1]["facts"]["terminal_status"] == "cancelled"
  finally:
   proc.terminate();proc.wait(timeout=5)

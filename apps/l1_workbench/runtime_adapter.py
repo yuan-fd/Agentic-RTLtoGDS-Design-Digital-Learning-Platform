@@ -5,12 +5,14 @@ It is a real subprocess protocol endpoint, not a fake trace producer: Runtime
 creates the workspace, invokes this program, records its exit code and admits
 the returned artifact under the manifest allowlist.
 """
-import argparse, json
+import argparse, json, time
 from datetime import datetime, timezone
 from pathlib import Path
 
 parser = argparse.ArgumentParser(); parser.add_argument("--request", type=Path, required=True); parser.add_argument("--result", type=Path, required=True)
 args = parser.parse_args(); request = json.loads(args.request.read_text())
+if request["task"]["inputs"].get("bounded_mode") == "cancellable":
+    time.sleep(4)
 artifact = args.result.parent / "l1_tool_receipt.txt"
 artifact.write_text("L1 bounded typed tool completed\n", encoding="utf-8")
 now = datetime.now(timezone.utc).isoformat()
