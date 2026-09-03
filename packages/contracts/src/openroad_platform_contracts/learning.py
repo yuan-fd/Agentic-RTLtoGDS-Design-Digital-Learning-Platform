@@ -81,7 +81,7 @@ class EvidencePointer:
     def validate(self) -> None:
         _version(self.schema_version)
         if not isinstance(self.ref, str) or not self.ref.startswith(
-            ("artifact:", "run:", "docs/evidence/", "source:")
+            ("artifact:", "run:", "edair:", "docs/evidence/", "source:")
         ):
             raise ValueError("EvidencePointer requires a durable reference")
         if not SHA256.fullmatch(self.sha256):
@@ -143,7 +143,7 @@ class LearningContext:
 class LearningObservation:
     observation_id: str
     context: LearningContext
-    parameters: dict[str, float]
+    parameters: dict[str, Any]
     metrics: dict[str, float]
     metric_units: dict[str, str]
     status: str
@@ -172,7 +172,10 @@ class LearningObservation:
         for name, value in self.parameters.items():
             if not STAGE.fullmatch(name):
                 raise ValueError(f"Invalid parameter name: {name!r}")
-            _number(f"parameter {name}", value)
+            if not isinstance(value, (str, int, float, bool)) or (
+                isinstance(value, float) and not math.isfinite(value)
+            ):
+                raise ValueError(f"parameter {name} must be a finite scalar")
         for name, value in self.metrics.items():
             if not STAGE.fullmatch(name):
                 raise ValueError(f"Invalid metric name: {name!r}")
@@ -211,18 +214,45 @@ class LearningObservation:
 @dataclass(frozen=True)
 class ParameterSpec:
     name: str
-    lower: float
-    upper: float
+    lower: float | None
+    upper: float | None
+    kind: str = "float"
+    choices: tuple[Any, ...] = ()
+    step: float | None = None
+    stage: str | None = None
+    active_when: dict[str, Any] = field(default_factory=dict)
+    less_than_or_equal_to: str | None = None
     schema_version: int = SCHEMA_VERSION
 
     def validate(self) -> None:
         _version(self.schema_version)
         if not STAGE.fullmatch(self.name):
             raise ValueError("Invalid parameter name")
-        low = _number("lower", self.lower)
-        high = _number("upper", self.upper)
-        if not low < high:
-            raise ValueError("Parameter lower must be less than upper")
+        if self.kind not in {"float", "int", "bool", "categorical"}:
+            raise ValueError("Parameter kind is unsupported")
+        if self.kind in {"float", "int"}:
+            low = _number("lower", self.lower)
+            high = _number("upper", self.upper)
+            if not low < high:
+                raise ValueError("Parameter lower must be less than upper")
+            if self.kind == "int" and (int(low) != low or int(high) != high):
+                raise ValueError("Integer parameter bounds must be integers")
+        elif self.lower is not None or self.upper is not None:
+            raise ValueError("Boolean/categorical parameters do not use numeric bounds")
+        if self.kind == "bool" and self.choices not in {(), (0, 1), (False, True)}:
+            raise ValueError("Boolean parameter choices must be empty or binary")
+        if self.kind == "categorical" and len(self.choices) < 2:
+            raise ValueError("Categorical parameters require at least two choices")
+        if self.step is not None and (_number("step", self.step) <= 0
+                                      or self.kind not in {"float", "int"}):
+            raise ValueError("step applies only to numeric parameters and must be positive")
+        if self.stage is not None and not STAGE.fullmatch(self.stage):
+            raise ValueError("Invalid parameter stage")
+        if not isinstance(self.active_when, dict):
+            raise ValueError("active_when must be a mapping")
+        if (self.less_than_or_equal_to is not None
+                and not STAGE.fullmatch(self.less_than_or_equal_to)):
+            raise ValueError("less_than_or_equal_to must name another parameter")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -230,7 +260,9 @@ class ParameterSpec:
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "ParameterSpec":
-        result = cls(**_known(cls, payload))
+        value = _known(cls, payload)
+        value["choices"] = tuple(value.get("choices", ()))
+        result = cls(**value)
         result.validate()
         return result
 
@@ -240,6 +272,7 @@ class ObjectiveSpec:
     metric_name: str
     direction: str
     weight: float = 1.0
+    normalization_scale: float | None = None
     schema_version: int = SCHEMA_VERSION
 
     def validate(self) -> None:
@@ -250,6 +283,10 @@ class ObjectiveSpec:
             raise ValueError("Objective direction must be min or max")
         if _number("weight", self.weight, nonnegative=True) <= 0:
             raise ValueError("Objective weight must be positive")
+        if self.normalization_scale is not None and _number(
+            "normalization_scale", self.normalization_scale
+        ) <= 0:
+            raise ValueError("Objective normalization_scale must be positive")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -272,6 +309,7 @@ class OptimizationStudy:
     max_runs: int
     seed: int
     status: str = "planned"
+    hard_constraints: tuple[dict[str, Any], ...] = ()
     schema_version: int = SCHEMA_VERSION
 
     def validate(self) -> None:
@@ -280,20 +318,37 @@ class OptimizationStudy:
         _identifier("design_id", self.design_id)
         if not SHA256.fullmatch(self.context_fingerprint):
             raise ValueError("context_fingerprint must be a lowercase SHA-256")
-        if not self.parameter_space or len(self.parameter_space) > 16:
-            raise ValueError("parameter_space must contain 1-16 parameters")
+        if not self.parameter_space or len(self.parameter_space) > 32:
+            raise ValueError("parameter_space must contain 1-32 parameters")
         if not self.objectives or len(self.objectives) > 16:
             raise ValueError("objectives must contain 1-16 metrics")
         for item in self.parameter_space:
             item.validate()
         for item in self.objectives:
             item.validate()
+        for rule in self.hard_constraints:
+            if not isinstance(rule, dict):
+                raise ValueError("hard constraints must be mappings")
+            if (not isinstance(rule.get("metric"), str)
+                    or rule.get("operator") not in {"<=", ">=", "=="}
+                    or isinstance(rule.get("threshold"), bool)
+                    or not isinstance(rule.get("threshold"), (int, float))):
+                raise ValueError("invalid optimization hard constraint")
         if len({item.name for item in self.parameter_space}) != len(self.parameter_space):
             raise ValueError("parameter_space names must be unique")
+        parameter_by_name = {item.name: item for item in self.parameter_space}
+        for item in self.parameter_space:
+            if item.less_than_or_equal_to is None:
+                continue
+            target = parameter_by_name.get(item.less_than_or_equal_to)
+            if target is None:
+                raise ValueError("Parameter relational constraint references an unknown parameter")
+            if item.kind not in {"float", "int"} or target.kind not in {"float", "int"}:
+                raise ValueError("Relational parameter constraints require numeric parameters")
         if len({item.metric_name for item in self.objectives}) != len(self.objectives):
             raise ValueError("objective names must be unique")
-        if not isinstance(self.max_runs, int) or not 1 <= self.max_runs <= 64:
-            raise ValueError("max_runs must be between 1 and 64")
+        if not isinstance(self.max_runs, int) or not 1 <= self.max_runs <= 10_000:
+            raise ValueError("max_runs must be between 1 and 10000")
         if not isinstance(self.seed, int) or self.seed < 0:
             raise ValueError("seed must be a nonnegative integer")
         if self.status not in {"planned", "active", "completed", "stopped"}:
@@ -310,6 +365,8 @@ class OptimizationStudy:
                                          for item in value.get("parameter_space", ()))
         value["objectives"] = tuple(ObjectiveSpec.from_dict(item)
                                     for item in value.get("objectives", ()))
+        value["hard_constraints"] = tuple(dict(item)
+                                          for item in value.get("hard_constraints", ()))
         result = cls(**value)
         result.validate()
         return result
@@ -361,10 +418,11 @@ class OptimizerProposal:
     study_id: str
     candidate_id: str
     iteration: int
-    parameters: dict[str, float]
+    parameters: dict[str, Any]
     predictions: tuple[Prediction, ...]
     acquisition_value: float
     evidence: tuple[EvidencePointer, ...]
+    model_metadata: dict[str, Any] = field(default_factory=dict)
     execution_allowed: bool = False
     schema_version: int = SCHEMA_VERSION
 
@@ -380,7 +438,10 @@ class OptimizerProposal:
         for name, value in self.parameters.items():
             if not STAGE.fullmatch(name):
                 raise ValueError("Invalid proposal parameter name")
-            _number(f"parameter {name}", value)
+            if not isinstance(value, (str, int, float, bool)) or (
+                isinstance(value, float) and not math.isfinite(value)
+            ):
+                raise ValueError(f"parameter {name} must be a finite scalar")
         for prediction in self.predictions:
             prediction.validate()
             if prediction.study_id != self.study_id or prediction.candidate_id != self.candidate_id:
@@ -388,6 +449,7 @@ class OptimizerProposal:
         _number("acquisition_value", self.acquisition_value)
         for item in self.evidence:
             item.validate()
+        _object("model_metadata", self.model_metadata)
         if self.execution_allowed is not False:
             raise ValueError("OptimizerProposal is data only and cannot execute")
 

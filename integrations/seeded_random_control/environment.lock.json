@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "plugin_id": "seeded-random-control",
+  "plugin_version": "1.0.0",
+  "kind": "platform-internal-evaluation-control",
+  "dependencies": "Python standard library only",
+  "isolation": "dedicated virtual environment required by campaign launcher",
+  "network": "not required",
+  "qor_access": false
+}

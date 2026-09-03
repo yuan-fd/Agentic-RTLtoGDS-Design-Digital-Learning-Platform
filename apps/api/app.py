@@ -42,13 +42,16 @@ for package_root in reversed(PACKAGE_ROOTS):
         sys.path.insert(0, str(package_root))
 
 from openroad_platform_contracts import (  # noqa: E402
-    ActionSpec, EvidencePointer, ExperimentEdge, ExperimentNode, ExperimentNodeKind,
+    ActionSpec, AgentBudget, DesignGoal, DesignState, EvidencePointer, ExperimentEdge, ExperimentNode, ExperimentNodeKind,
+    DEFAULT_PRODUCT_SURFACE, GoalPreference, ProductRole, QoRConstraint,
+    SemanticToolCall, ToolName,
     LearningContext, LearningObservation, PortSpec, RTLCandidate, SpecIR, TaskSpec,
     VerificationPackage,
 )
 from openroad_platform_analysis import (  # noqa: E402
     EvidenceKnowledgeRecordV2, EvidenceRAG, RuntimeEvidenceExporter,
     LearningCollector, OptimizationStudyStore, PublicKnowledgeRegistry,
+    PersistentOptimizationMemory,
     TenantLearningStore, load_public_manifest,
     build_run_evidence_ir, evidence_cards_from_run_ir, followup_from_interaction,
     teacher_context_from_holdout,
@@ -56,23 +59,32 @@ from openroad_platform_analysis import (  # noqa: E402
     agent_evidence_view, build_design_ir, build_edair, evidence_packet, physical_ir, timing_ir,
     HypothesisLedger, assess_hypothesis, reflection_hypothesis, promote_after_holdout,
     PaperProtocolStore, preregister_protocol, summarize_arm, compare_arms,
-    MultiObjectiveBayesianOptimizer, summarize_replicates, relative_utility,
-    stalled_decision, diagnosis_packet,
+    MultiObjectiveBayesianOptimizer, MixedParameterEncoder, default_optimizer_registry,
+    summarize_replicates, relative_utility,
+    stalled_decision, diagnosis_packet, intermediate_proxy_score,
+    observed_hypervolume_trace,
+    ORFSProtectedEvaluator,
 )
 from openroad_platform_analysis.parsers.cell_coords import read_def  # noqa: E402
 from openroad_platform_analysis.parsers.opensta_timing import parse_opensta_paths  # noqa: E402
 from openroad_platform_execution import (  # noqa: E402
     PluginRegistry, ToolchainConfig, build_craft_flow_plan, build_orfs_task,
+    ORFSRTLToGDSFactory,
     build_rtlscout_spec_task,
     build_edacraft_task, craft_capability_matrix, craft_plan_to_task,
     edacraft_catalog, edacraft_component, edacraft_plugin_manifest,
     implcraft_plugin_manifest, orfs_plugin_manifest, rtlscout_plugin_manifest,
+    orfs_agent_plugin_manifest, build_orfs_agent_native_task,
+    build_orfs_agent_initial_warmup_recipes,
     TaiWeiToolchainProfile, TAIWEI_3D_PLATFORMS, build_taiwei_task, taiwei_plugin_manifest,
     taiwei_technology_profiles,
     build_rtl_verify_task, rtl_verify_plugin_manifest, build_rtl_sim_task,
     rtl_sim_plugin_manifest,
     build_rtl_mutation_task, rtl_mutation_plugin_manifest,
     build_rtl_formal_task, rtl_formal_plugin_manifest,
+    apply_parameter_calibration, apply_parameter_search_allowlist,
+    official_autotuner_independent_parameter_names,
+    orfs_optimization_profile, effective_configuration_id,
 )
 from openroad_platform_analysis.agent_trace import AgentTraceStore
 from openroad_platform_analysis.iterative_agent import (
@@ -83,12 +95,28 @@ from openroad_platform_scheduler import (  # noqa: E402
     SpecConversationManager, SpecConversationStore,
     WorkflowRuntime, RTLFrontendStore, ExperimentGraphStore,
     PatchRegistry, SpecProposal, PipelineCheckpointStore,
+    FidelityPolicy, MultiFidelityScheduler, MultiFidelityStore,
+    default_execution_backend_registry,
     objective_profile, profile_grid, profile_hard_constraints,
+    EXTERNAL_L2_KIND, ExternalOptimizerLoopService,
 )
+from openroad_platform_scheduler.l1_runtime_bridge import L1RuntimeBridge  # noqa: E402
+from openroad_platform_scheduler.l1_tool_registry import L1RuntimeToolRegistry  # noqa: E402
+from openroad_platform_scheduler.l1_loop import L1DurableLoop  # noqa: E402
+from openroad_platform_scheduler.l1_loop_store import L1LoopStore  # noqa: E402
+from openroad_platform_scheduler.l1_trace_service import L1TraceService  # noqa: E402
+from openroad_platform_scheduler.l1_trace_store import L1TraceStore  # noqa: E402
+from openroad_platform_scheduler.l1_goal_finalizer import GoalFinalizer, TrustedGoalPolicy  # noqa: E402
+from openroad_platform_contracts.l1_goal_draft import GoalDraft, GoalIntent  # noqa: E402
+from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity  # noqa: E402
 try:  # Supports both `python apps/api/app.py` and package imports in tests.
-    from .services import AuthSession, AuthStore, DesignService, PlatformReadModel  # type: ignore[attr-defined]
+    from .services import (  # type: ignore[attr-defined]
+        AuthSession, AuthStore, DesignService, PlatformReadModel,
+    )
 except ImportError:
-    from services import AuthSession, AuthStore, DesignService, PlatformReadModel  # type: ignore[no-redef]
+    from services import (  # type: ignore[no-redef]
+        AuthSession, AuthStore, DesignService, PlatformReadModel,
+    )
 
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -175,11 +203,20 @@ class ApiState:
         optimization_db_path: Path | None = None,
         rtl_frontend_db_path: Path | None = None,
         auth_db_path: Path | None = None,
+        runtime_workspace_root: Path | None = None,
         load_taiwei_plugin: bool = True,
     ):
         self.db_path = db_path.expanduser().resolve()
         self.upload_root = upload_root.expanduser().resolve()
         self.orfs_root = orfs_root.expanduser().resolve()
+        self.parameter_calibration_path = Path(os.environ.get(
+            "OPENROAD_PLATFORM_PARAMETER_CALIBRATION",
+            self.db_path.parent /
+            "calibration/orfs-parameters-v2/parameter_calibration_report.json",
+        )).expanduser().resolve()
+        self.require_parameter_calibration = os.environ.get(
+            "OPENROAD_PLATFORM_REQUIRE_PARAMETER_CALIBRATION", "0"
+        ).strip().lower() in {"1", "true", "yes", "on"}
         self.store = JobStore(self.db_path)
         local_state = Path(os.environ.get(
             "OPENROAD_PLATFORM_LOCAL_STATE",
@@ -189,6 +226,8 @@ class ApiState:
                        if runtime_db_path is not None else local_state))
         self.local_state_root = state_root
         self.runtime_store = RuntimeStore(runtime_db_path or local_state / "runtime.db")
+        self.l1_trace = L1TraceService(L1TraceStore(state_root / "l1-trace.db"))
+        self.l1_loop_store = L1LoopStore(state_root / "l1-loop.db")
         self.spec_store = SpecConversationStore(spec_db_path or state_root / "spec.db")
         self.rtl_frontend = RTLFrontendStore(
             rtl_frontend_db_path or state_root / "rtl-frontend.db"
@@ -209,6 +248,13 @@ class ApiState:
         self.evidence_rag_root.mkdir(parents=True, exist_ok=True)
         self.optimization_store = OptimizationStudyStore(
             optimization_db_path or state_root / "optimization.db"
+        )
+        self.optimization_memory = PersistentOptimizationMemory(
+            state_root / "optimization-memory.db",
+            evidence_verifier=self._verify_optimization_memory_evidence,
+        )
+        self.multifidelity_store = MultiFidelityStore(
+            state_root / "multifidelity-campaigns.db"
         )
         self.knowledge_registry = PublicKnowledgeRegistry(state_root / "public-knowledge.db")
         self.knowledge_registry.import_manifest(load_public_manifest(
@@ -242,6 +288,22 @@ class ApiState:
             or ROOT.parent / "bin" / "klayout",
         )
         manifests = [orfs_plugin_manifest(toolchain)]
+        # ORFS-Agent is admitted only through its reviewed source lock.  The
+        # adapter still checks the exact commit and BSD license at execution
+        # time; a missing or altered cache therefore fails closed rather than
+        # falling back to an in-tree optimiser.
+        try:
+            orfs_agent_lock = json.loads((ROOT / "integrations/orfs_agent/source.lock.json").read_text())
+            if orfs_agent_lock.get("admission_status") != \
+                    "admitted-bounded-runtime-smoke-no-performance-claim":
+                raise ValueError("ORFS-Agent source is not admitted")
+            orfs_agent_python = ROOT / ".tools" / "venvs" / "orfs-agent" / "bin" / "python"
+            manifests.append(orfs_agent_plugin_manifest(
+                ROOT / str(orfs_agent_lock["cache_path"]),
+                python_executable=(orfs_agent_python if orfs_agent_python.is_file() else sys.executable),
+            ))
+        except (FileNotFoundError, KeyError, ValueError, json.JSONDecodeError):
+            pass
         # These user-space tools are provisioned by the supported non-sudo
         # installer (micromamba + Icarus source build).  A service process
         # must not depend on an interactive shell PATH to find them.
@@ -336,8 +398,19 @@ class ApiState:
             self.taiwei_readiness["reason"] = "Pinned 3D plugin loads on demand in this worker"
         self.runtime = WorkflowRuntime(
             self.runtime_store, PluginRegistry(manifests),
-            workspace_root=state_root / "runtime-workspaces",
+            workspace_root=(runtime_workspace_root or state_root / "runtime-workspaces"),
             environment_resolver=self._runtime_environment,
+            protected_evaluator=ORFSProtectedEvaluator(),
+        )
+        execution_backend_id = os.environ.get(
+            "OPENROAD_PLATFORM_DSE_EXECUTION_BACKEND", "local-thread-v1"
+        ).strip()
+        self.dse_execution_backend = default_execution_backend_registry(
+            ray_address=os.environ.get("OPENROAD_PLATFORM_RAY_ADDRESS") or None,
+        ).resolve(execution_backend_id)
+        self.multifidelity_scheduler = MultiFidelityScheduler(
+            self.multifidelity_store, self.runtime,
+            execution_backend=self.dse_execution_backend,
         )
         self.platform = PlatformReadModel(
             designs=self.designs,
@@ -352,6 +425,34 @@ class ApiState:
     def _runtime_environment(self, run) -> dict[str, str]:
         """No user credential is ever injected into a v2 Runtime task."""
         return {}
+
+    def _verify_optimization_memory_evidence(
+        self, observation: LearningObservation,
+    ) -> bool:
+        """Resolve the immutable run pointer before memory may ingest it."""
+        try:
+            run = self.runtime_store.get_run(observation.run_id)
+            if run.status.value not in {
+                "succeeded", "failed", "cancelled", "timed_out", "lost"
+            }:
+                return False
+            attempts = [
+                attempt
+                for stage in self.runtime_store.list_stages(observation.run_id)
+                for attempt in self.runtime_store.list_attempts(stage.stage_run_id)
+            ]
+            if observation.attempt_id not in {item.attempt_id for item in attempts}:
+                return False
+            description = self.runtime_store.describe_run(observation.run_id)
+            digest = hashlib.sha256(json.dumps(
+                description, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            ).encode()).hexdigest()
+            pointer = next((item for item in observation.evidence
+                            if item.ref == f"run:{observation.run_id}"), None)
+            return pointer is not None and pointer.sha256 == digest
+        except (KeyError, ValueError):
+            return False
 
     def ensure_taiwei_plugin(self) -> None:
         """Load the expensive optional 3D manifest only when a worker needs it."""
@@ -384,6 +485,25 @@ class ApiState:
             self.local_state_root / "runtime-worker.heartbeat.json",
         ))
         worker = _read_worker_heartbeat(heartbeat_path)
+        dse_heartbeat_path = Path(os.environ.get(
+            "OPENROAD_PLATFORM_DSE_CONTROLLER_HEARTBEAT",
+            self.local_state_root / "dse-controller.heartbeat.json",
+        ))
+        dse_worker = _read_worker_heartbeat(dse_heartbeat_path)
+        calibration_ready = False
+        calibration_error = None
+        try:
+            calibration = json.loads(
+                self.parameter_calibration_path.read_text(encoding="utf-8"))
+            calibration_ready = (
+                calibration.get("protocol") ==
+                "single-knob-low-mid-high-three-paired-seeds-v1"
+                and int(calibration.get("evaluation_count") or 0) > 0
+            )
+            if not calibration_ready:
+                calibration_error = "calibration report is incomplete or unsupported"
+        except (OSError, ValueError, TypeError) as exc:
+            calibration_error = f"{type(exc).__name__}: {exc}"
         payload = {
             "ok": True,
             "service": "openroad-platform",
@@ -398,6 +518,10 @@ class ApiState:
             "runtime_worker_status": worker["status"],
             "runtime_worker_active_run": worker.get("active_run"),
             "runtime_worker_last_seen": worker.get("updated_at"),
+            "dse_controller_ready": dse_worker["ready"],
+            "dse_controller_status": dse_worker["status"],
+            "dse_controller_active_pipeline": dse_worker.get("active_run"),
+            "dse_controller_last_seen": dse_worker.get("updated_at"),
             "server_spec_model_ready": self.server_spec_model_ready,
             "server_spec_model": self.server_spec_model,
             "taiwei_3d_ready": self.taiwei_readiness["ready"],
@@ -408,6 +532,12 @@ class ApiState:
             "rtl_simulation_reason": self.rtl_sim_readiness["reason"],
             "rtl_formal_ready": self.rtl_formal_readiness["ready"],
             "rtl_formal_reason": self.rtl_formal_readiness["reason"],
+            "dse_execution_backend": self.dse_execution_backend.backend_id,
+            "dse_distributed": self.dse_execution_backend.backend_id == "ray-runtime-v1",
+            "parameter_calibration_ready": calibration_ready,
+            "parameter_calibration_required": self.require_parameter_calibration,
+            "parameter_calibration_path": str(self.parameter_calibration_path),
+            "parameter_calibration_error": calibration_error,
         }
         payload.update(self.designs.readiness())
         return payload
@@ -1155,10 +1285,10 @@ class ApiState:
         from openroad_platform_contracts import ObjectiveSpec
         profiles = {
             "area": (ObjectiveSpec("area_um2", "min", 1.0),),
-            "timing": (ObjectiveSpec("setup_wns_ns", "max", 1.0),),
+            "timing": (ObjectiveSpec("setup_wns_ns", "max", 1.0, 1.0),),
             "power": (ObjectiveSpec("power_W", "min", 1.0),),
-            "performance": (ObjectiveSpec("setup_wns_ns", "max", 1.0),),
-            "balanced": (ObjectiveSpec("setup_wns_ns", "max", .40),
+            "performance": (ObjectiveSpec("setup_wns_ns", "max", 1.0, 1.0),),
+            "balanced": (ObjectiveSpec("setup_wns_ns", "max", .40, 1.0),
                          ObjectiveSpec("area_um2", "min", .35),
                          ObjectiveSpec("power_W", "min", .25)),
         }
@@ -1166,38 +1296,417 @@ class ApiState:
             raise ValueError("objective_profile must be balanced, area, timing, performance, or power")
         return profiles[profile]
 
+    # --- v2 rebuilt product path -------------------------------------------------
+    # The legacy BO implementation below is intentionally retained only to read
+    # old checkpoints and to reproduce past studies.  New product requests use
+    # this small external-optimizer orchestration boundary instead.
+
+    def _external_l2_service(self) -> ExternalOptimizerLoopService:
+        return ExternalOptimizerLoopService(
+            checkpoints=self.pipeline_checkpoints, runtime=self.runtime,
+            runtime_store=self.runtime_store,
+            observation_for_run=self._external_l2_observation,
+            optimizer_task=self._external_l2_optimizer_task,
+            candidates_for_run=self._external_l2_candidates,
+        )
+
+    def _external_l2_observation(self, run_id: str,
+                                 _state: dict[str, Any]) -> dict[str, Any]:
+        """Export a raw Runtime observation; no LLM summary is in this path."""
+        run = self.runtime_store.get_run(run_id)
+        observation = RuntimeEvidenceExporter(
+            self.runtime_store, use_common_evaluation=True,
+        ).export_run(run_id, self._learning_context_for_run(run))
+        metrics = dict(observation.metrics)
+        feasible = (
+            observation.status == "succeeded"
+            and isinstance(metrics.get("setup_wns_ns"), (int, float))
+            and float(metrics["setup_wns_ns"]) >= 0
+            and isinstance(metrics.get("drc_errors"), (int, float))
+            and float(metrics["drc_errors"]) == 0
+        )
+        return {
+            "observation_id": observation.observation_id,
+            "run_id": run_id, "status": observation.status,
+            "parameters": dict(observation.parameters), "metrics": metrics,
+            "artifact_refs": [item.ref for item in observation.evidence],
+            "feasible": feasible, "failure_category": observation.failure_category,
+        }
+
+    def _external_l2_optimizer_task(
+        self, observations: list[dict[str, Any]], state: dict[str, Any],
+    ) -> TaskSpec:
+        """Create an upstream ORFS-Agent task from observed evidence only."""
+        # The numeric proposal remains inside the pinned upstream workbench.
+        # This call used to build only the dataset bridge and then relied on a
+        # mode override; constructing the native task directly makes the
+        # algorithm boundary and the per-round seed explicit in the TaskSpec.
+        task = build_orfs_agent_native_task(
+            project_id="openroad-platform", design_id=str(state["design_id"]),
+            platform_name=str(state["platform"]), objective="optimizer_objective",
+            observations=observations,
+            n_suggestions=int(state["candidates_per_round"]),
+            optimizer_seed=int(state["optimizer_seed"]) + int(state.get("round") or 0),
+            timeout_seconds=1800,
+        )
+        return task
+
+    def _external_l2_candidates(self, run_id: str) -> list[dict[str, Any]]:
+        """Read one integrity-checked candidate artifact from Runtime storage."""
+        description = self.runtime_store.describe_run(run_id)
+        for stage in description.get("stages", []):
+            for attempt in stage.get("attempts", []):
+                if attempt.get("status") != "succeeded":
+                    continue
+                workspace = Path(attempt["workspace"]).expanduser().resolve()
+                for artifact in attempt.get("artifacts", []):
+                    if artifact.get("kind") != "optimizer_candidates":
+                        continue
+                    path = (workspace / str(artifact["store_key"])).resolve()
+                    try:
+                        path.relative_to(workspace)
+                    except ValueError as exc:
+                        raise ValueError("optimizer artifact escapes Runtime workspace") from exc
+                    if (not path.is_file() or path.stat().st_size != artifact.get("size_bytes")
+                            or _sha256(path) != artifact.get("sha256")):
+                        raise ValueError("optimizer candidate artifact failed integrity check")
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    if (not isinstance(payload, list)
+                            or not all(isinstance(item, dict) for item in payload)):
+                        raise ValueError("optimizer candidate artifact must be a JSON list")
+                    return payload
+        raise KeyError("optimizer_candidates artifact is missing")
+
+    def _resolve_verified_rtl_for_l2(
+        self, spec_id: str, *, candidate_id: str | None, owner_id: str | None,
+        include_legacy: bool,
+    ) -> dict[str, Any]:
+        """Resolve the only admissible product-L2 input from verified lineage.
+
+        Product L2 deliberately does not consume a ``DesignService`` upload.
+        It consumes the immutable RTLScout candidate plus Runtime-backed
+        compile and functional evidence already owned by the RTL frontend.
+        """
+        lineage = self.get_rtl_lineage(
+            spec_id, owner_id=owner_id, include_legacy=include_legacy,
+        )
+        candidate = self._pinned_rtl_candidate(lineage, candidate_id)
+        if not str(candidate.get("generator") or "").startswith("rtlscout-v2"):
+            raise ValueError("Product L2 requires an RTLScout-v2 candidate")
+        candidate_path = self._rtlscout_candidate_path(candidate)
+        candidate_sha256 = _sha256(candidate_path)
+        checks = [item for item in lineage["checks"]
+                  if item["candidate_id"] == candidate["candidate_id"]]
+        compile_checks = [item for item in checks
+                          if item["check_kind"] == "compile_lint"
+                          and item["status"] == "passed"]
+        if not compile_checks:
+            raise ValueError("Product L2 requires a recorded RTL compile/lint pass")
+        functional_checks = [item for item in checks
+                             if item["check_kind"] in {"simulation", "formal", "equivalence"}
+                             and item["status"] == "passed"]
+        if not functional_checks:
+            raise ValueError("Product L2 requires a recorded functional verification pass")
+        verify_run_id = str(compile_checks[-1]["detail"].get("run_id") or "")
+        if not verify_run_id:
+            raise ValueError("RTL compile/lint evidence lacks Runtime provenance")
+        self._require_runtime_candidate_evidence(
+            verify_run_id, candidate_id=str(candidate["candidate_id"]), spec_id=spec_id,
+            expected_plugins={"rtl-verify"}, expected_artifact_kind="rtl",
+            expected_artifact_sha256=candidate_sha256,
+        )
+        # A lineage row is only an index.  Each claimed functional pass must
+        # resolve to the terminal Runtime task, its candidate/spec labels and
+        # the exact artifact digest recorded by the check.
+        if not all(self._functional_runtime_evidence_is_valid(
+                item, candidate_id=str(candidate["candidate_id"]), spec_id=spec_id)
+                   for item in functional_checks):
+            raise ValueError("Product L2 requires Runtime-backed functional verification evidence")
+        view = self.runtime.describe(verify_run_id)
+        attempts = [attempt for stage in view["stages"] for attempt in stage["attempts"]
+                    if attempt["status"] == "succeeded"]
+        for attempt in attempts:
+            workspace = Path(attempt["workspace"]).resolve()
+            for artifact in attempt.get("artifacts", []):
+                if artifact.get("kind") != "rtl" or artifact.get("sha256") != candidate_sha256:
+                    continue
+                artifact_path = (workspace / str(artifact["store_key"])).resolve()
+                try:
+                    artifact_path.relative_to(workspace)
+                except ValueError as exc:
+                    raise ValueError("Verified RTL artifact escapes Runtime workspace") from exc
+                if artifact_path.is_file() and _sha256(artifact_path) == candidate_sha256:
+                    spec = lineage["spec"]
+                    return {
+                        "spec_id": spec_id, "candidate_id": candidate["candidate_id"],
+                        "verification_id": candidate["verification_id"],
+                        "verification_run_id": verify_run_id,
+                        "design_id": spec["design_id"], "top": spec["top"],
+                        "clock": spec.get("clock"),
+                        "constraints": dict(spec.get("constraints") or {}),
+                        "rtl_path": artifact_path,
+                        "rtl_sha256": candidate_sha256,
+                    }
+        raise ValueError("Verified RTL Runtime artifact is missing, changed, or mismatched")
+
+    def _require_runtime_candidate_evidence(
+        self, run_id: str, *, candidate_id: str, spec_id: str,
+        expected_plugins: set[str], expected_artifact_kind: str,
+        expected_artifact_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve immutable Runtime evidence; lineage detail is never authority."""
+        run = self.runtime_store.get_run(run_id)
+        status = getattr(run.status, "value", run.status)
+        task = run.task_spec
+        if (status != "succeeded" or task.plugin_id not in expected_plugins
+                or task.labels.get("candidate_id") != candidate_id
+                or task.labels.get("spec_id") != spec_id):
+            raise ValueError("Runtime verification provenance does not match the RTL candidate")
+        view = self.runtime.describe(run_id)
+        attempts = [attempt for stage in view["stages"] for attempt in stage["attempts"]
+                    if attempt["status"] == "succeeded"]
+        for attempt in attempts:
+            workspace = Path(attempt["workspace"]).resolve()
+            for artifact in attempt.get("artifacts", []):
+                if artifact.get("kind") != expected_artifact_kind:
+                    continue
+                if expected_artifact_sha256 and artifact.get("sha256") != expected_artifact_sha256:
+                    continue
+                artifact_path = (workspace / str(artifact["store_key"])).resolve()
+                try:
+                    artifact_path.relative_to(workspace)
+                except ValueError as exc:
+                    raise ValueError("Runtime evidence artifact escapes its workspace") from exc
+                if artifact_path.is_file() and _sha256(artifact_path) == artifact.get("sha256"):
+                    return artifact
+        raise ValueError("Runtime verification evidence is missing, changed, or mismatched")
+
+    def _functional_runtime_evidence_is_valid(
+        self, check: dict[str, Any], *, candidate_id: str, spec_id: str,
+    ) -> bool:
+        run_id = str(check.get("detail", {}).get("run_id") or "")
+        plugin = {"simulation": "rtl-sim", "formal": "rtl-formal"}.get(
+            str(check.get("check_kind")))
+        if not run_id or plugin is None:
+            return False
+        try:
+            artifact = self._require_runtime_candidate_evidence(
+                run_id, candidate_id=candidate_id, spec_id=spec_id,
+                expected_plugins={plugin},
+                expected_artifact_kind=("simulation_report" if plugin == "rtl-sim" else "formal_report"),
+            )
+        except (KeyError, ValueError):
+            return False
+        return (check.get("evidence_ref") == f"artifact:runtime:{run_id}:{artifact.get('artifact_id')}"
+                and check.get("evidence_sha256") == artifact.get("sha256"))
+
+    def start_external_optimizer_loop(self, payload: dict[str, Any], *,
+                                      owner_id: str | None = None,
+                                      include_legacy: bool = False) -> dict[str, Any]:
+        """Start the sole new L2 product path: Runtime evidence + ORFS-Agent."""
+        unexpected = sorted(set(payload) - {"spec_id", "candidate_id", "objective_profile"})
+        if unexpected:
+            raise ValueError("the autonomous v2 entry does not accept manual search controls: "
+                             + ", ".join(unexpected))
+        try:
+            manifest = self.runtime.registry.resolve("orfs-agent", version="2025.1")
+            DEFAULT_PRODUCT_SURFACE.authorize(ProductRole.L2_OPTIMIZATION, manifest)
+        except LookupError as exc:
+            raise ValueError("ORFS-Agent is not admitted on this Runtime") from exc
+        except PermissionError as exc:
+            raise ValueError("ORFS-Agent is not approved for the L2 product role") from exc
+        spec_id = str(payload.get("spec_id") or "").strip()
+        verified = self._resolve_verified_rtl_for_l2(
+            spec_id, candidate_id=_optional_string(payload.get("candidate_id")),
+            owner_id=owner_id, include_legacy=include_legacy,
+        )
+        design_id = str(verified["design_id"])
+        constraints = verified["constraints"]
+        platform = str(constraints.get("platform") or "nangate45")
+        profile = str(payload.get("objective_profile") or "balanced")
+        self._v2_objectives(profile)  # validate the public vocabulary once
+        optimization_profile = orfs_optimization_profile(platform)
+        baseline = dict(optimization_profile["baseline"])
+        # The admitted ORFS-Agent shared domain inherits the upstream CTS
+        # diameter lower bound (80).  Seed the repeated baseline *inside* the
+        # same domain; otherwise the upstream GP legitimately refuses to fit
+        # an observation outside its published search space.
+        baseline["cts_cluster_diameter"] = max(
+            float(baseline.get("cts_cluster_diameter", 80.0)), 80.0)
+        # These values reproduce the published campaign *shape*: a large
+        # diverse initial data set followed by five 50-point GP/EI rounds.
+        # The exact upstream paper uses its own ORFS commit/design/PDK and is
+        # therefore an alignment target, not a license to copy its PPA claim.
+        replicas = (101, 211, 307)
+        warmup_seed = 401
+        confirmation_seeds = (503, 601, 701)
+        warmup_recipes = build_orfs_agent_initial_warmup_recipes(
+            platform_name=platform, count=50, seed=warmup_seed,
+        )
+        base = build_orfs_task(
+            verified["rtl_path"], project_id="openroad-platform", design_id=design_id,
+            top=str(verified["top"]), clock=verified["clock"],
+            platform_name=platform, target_stage="finish",
+            clock_period_ns=float(constraints.get("clock_period_ns") or 10.0),
+            core_utilization_pct=float(baseline["core_utilization_pct"]),
+            place_density=.55, or_seed=replicas[0], stage_timeout_seconds=3600,
+            timeout_seconds=7200, flow_parameters=baseline,
+            labels={"owner_id": owner_id or "", "l2_path": "external-orfs-agent-v1",
+                    "protocol": "paper-comparable-external-l2-v1",
+                    "spec_id": str(verified["spec_id"]),
+                    "candidate_id": str(verified["candidate_id"]),
+                    "verification_run_id": str(verified["verification_run_id"]),
+                    "rtl_sha256": str(verified["rtl_sha256"])},
+        )
+        initial = {
+            "status": "baseline_running", "protocol_mode": "paper_comparable_external_l2_v1",
+            "design_id": design_id, "verified_rtl": {
+                name: verified[name] for name in (
+                    "spec_id", "candidate_id", "verification_id",
+                    "verification_run_id", "rtl_sha256",
+                )},
+            "platform": platform, "objective_profile": profile,
+            "frozen_spec_constraints": constraints,
+            "optimizer_plugin": "orfs-agent@2025.1",
+            "base_task": base.to_dict(), "baseline_parameters": baseline,
+            "baseline_run_ids": [], "replica_or_seeds": list(replicas),
+            "warmup_recipes": warmup_recipes, "warmup_runs": [], "warmup_seed": warmup_seed,
+            "minimum_distinct_feasible_observations": 12,
+            "confirmation_seeds": list(confirmation_seeds),
+            "optimizer_seed": 20260830,
+            "max_candidates": 250, "candidates_per_round": 50, "max_parallel": 50,
+            "minimum_relative_improvement": .005,
+            "frozen_constraints": list(optimization_profile["frozen_constraints"]),
+            "round": 0, "candidate_count": 0, "stalled_rounds": 0,
+            "history": [], "agent_events": [{
+                "phase": "map", "claim": "bound registered RTL, pinned PDK, Runtime and frozen timing constraints",
+                "execution_allowed": False,
+            }, {
+                "phase": "protocol", "claim": "frozen three baseline replicas, 50 diverse upstream-derived warm-ups, five 50-candidate GP/EI rounds, and three independent final confirmations",
+                "execution_allowed": False,
+            }],
+        }
+        subject = str(payload.get("experiment_key") or f"external-{spec_id}-{verified['candidate_id']}-{uuid.uuid4().hex}")
+        checkpoint = self._external_l2_service().create(
+            subject_id=subject, owner_id=owner_id, initial_state=initial,
+        )
+        if owner_id:
+            self.auth.bind_resource("external_l2_loop", checkpoint["pipeline_id"], owner_id)
+        return {**checkpoint, "execution_started": True,
+                "authority": "ORFS-Agent upstream GP/EI proposes; Runtime/OpenROAD is the sole QoR evaluator"}
+
+    def advance_external_optimizer_loop(self, pipeline_id: str, *,
+                                        owner_id: str | None = None,
+                                        include_legacy: bool = False,
+                                        execute: bool = False) -> dict[str, Any]:
+        checkpoint = self.pipeline_checkpoints.get(pipeline_id)
+        if checkpoint["pipeline_kind"] != EXTERNAL_L2_KIND:
+            raise KeyError(pipeline_id)
+        if (owner_id and checkpoint.get("owner_id") not in {None, owner_id}
+                and not include_legacy):
+            raise KeyError(pipeline_id)
+        max_parallel = max(1, min(int(checkpoint["state"].get("max_parallel") or 3), 50))
+        return self._external_l2_service().advance(
+            pipeline_id, execute=execute, max_parallel=max_parallel,
+        )
+
     def start_bayesian_closed_loop(self, payload: dict[str, Any], *,
                                    owner_id: str | None = None,
                                    include_legacy: bool = False) -> dict[str, Any]:
         """Create a durable, multi-parameter BO/GP experiment with R replicas."""
         from openroad_platform_contracts import ParameterSpec
-        design_id = str(payload.get("design_id") or "")
-        design = self._owned_design(design_id, owner_id, include_legacy=include_legacy)
+        reference_name = str(payload.get("reference_design") or "").strip()
+        reference = None
+        if reference_name:
+            # Server-pinned paper blocks are recipes, never client-provided
+            # filesystem paths.  This lets the same API/Runtime loop exercise
+            # ordered multi-file SystemVerilog (including complete Ibex).
+            from openroad_platform_execution import load_orfs_reference_design
+            reference_platform = str(payload.get("platform") or "")
+            reference = load_orfs_reference_design(
+                self.orfs_root, platform=reference_platform,
+                design=reference_name,
+            )
+            design_id = (f"orfs-ref-{reference.platform}-{reference.design}-"
+                         f"{reference.source_fingerprint[:12]}")
+            design = {"id": design_id, "module": reference.top}
+        else:
+            design_id = str(payload.get("design_id") or "")
+            design = self._owned_design(
+                design_id, owner_id, include_legacy=include_legacy)
         profile = str(payload.get("objective_profile") or "balanced")
         objectives = self._v2_objectives(profile)
-        requested_space = payload.get("parameter_space") or {
-            "core_utilization_pct": [5.0, 80.0],
-            "place_density": [.30, .80],
+        ablation_id = str(payload.get("ablation_id") or "none")
+        allowed_ablations = {
+            "none", "no_gp", "no_multifidelity", "no_feasibility",
+            "no_trust_region", "no_memory", "no_stage_focus", "no_edair",
+            "no_safe_initialization", "no_state_policy",
+            "single_replica_error_control",
         }
-        if not isinstance(requested_space, dict) or not 1 <= len(requested_space) <= 8:
-            raise ValueError("parameter_space must define one to eight bounded parameters")
-        allowed = {"core_utilization_pct": (1.0, 99.0),
-                   "place_density": (.01, 1.0)}
-        parameters = []
-        for name, bounds in requested_space.items():
-            if name not in allowed or not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
-                raise ValueError(f"unsupported or malformed BO parameter: {name}")
-            low, high = float(bounds[0]), float(bounds[1]); policy_low, policy_high = allowed[name]
-            if not policy_low <= low < high <= policy_high:
-                raise ValueError(f"BO bounds for {name} are outside platform policy")
-            parameters.append(ParameterSpec(str(name), low, high))
+        if ablation_id not in allowed_ablations:
+            raise ValueError("unknown preregistered v2 ablation_id")
+        platform = str(payload.get("platform") or "nangate45")
+        if "parameter_space" in payload:
+            requested = payload.get("parameter_space")
+            names = ", ".join(sorted(requested)) if isinstance(requested, dict) else "malformed"
+            raise ValueError(
+                f"unsupported manual parameter_space ({names}); v2 uses the server-owned ORFS profile"
+            )
+        optimization_profile = orfs_optimization_profile(platform)
+        if self.parameter_calibration_path.is_file():
+            try:
+                calibration_report = json.loads(
+                    self.parameter_calibration_path.read_text(encoding="utf-8"))
+                optimization_profile = apply_parameter_calibration(
+                    optimization_profile, calibration_report)
+            except (OSError, ValueError, TypeError) as exc:
+                raise ValueError(f"invalid ORFS parameter calibration: {exc}") from exc
+        elif self.require_parameter_calibration:
+            raise ValueError(
+                "industrial DSE is blocked until the controlled ORFS parameter "
+                f"calibration exists: {self.parameter_calibration_path}"
+            )
+        if reference is not None:
+            reference_flow_baseline = {
+                key: value for key, value in reference.native_baseline_overrides.items()
+                if key != "place_density"
+            }
+            optimization_profile = {
+                **optimization_profile,
+                "baseline": {
+                    **optimization_profile["baseline"],
+                    **reference_flow_baseline,
+                },
+            }
+        search_domain = str(payload.get("search_domain") or "calibrated_full")
+        if search_domain == "official_autotuner_independent_v2":
+            common_names = official_autotuner_independent_parameter_names(
+                optimization_profile, self.orfs_root / "flow/scripts/variables.yaml")
+            optimization_profile = apply_parameter_search_allowlist(
+                optimization_profile, common_names,
+                domain_id="official_autotuner_independent_v2")
+        elif search_domain != "calibrated_full":
+            raise ValueError(
+                "search_domain must be calibrated_full or official_autotuner_independent_v2"
+            )
+        parameters = [ParameterSpec(**item) for item in optimization_profile["parameter_space"]]
+        optimizer_backend = str(payload.get("optimizer_backend") or
+                                "industrial-dse-portfolio-v1")
+        if ablation_id == "no_gp":
+            optimizer_backend = "sobol-scrambled-mixed-v1"
+        if optimizer_backend != "stateful-l2-portfolio-v1":
+            default_optimizer_registry().resolve(optimizer_backend)
         repetitions = int(payload.get("repetitions") or 3)
-        rounds = int(payload.get("max_rounds") or 12)
+        rounds = int(payload.get("max_rounds") or 200)
         stall_window = int(payload.get("stall_window") or 3)
-        if not 2 <= repetitions <= 8 or not 1 <= rounds <= 20 or stall_window != 3:
-            raise ValueError("v2 requires 2-8 repetitions, 1-20 rounds, and a fixed 3-round stall window")
-        if repetitions * (rounds + 1) > 64:
-            raise ValueError("baseline plus all repeated BO rounds must fit the 64-run study budget")
+        minimum_repetitions = 1 if ablation_id == "single_replica_error_control" else 2
+        if not minimum_repetitions <= repetitions <= 8 or not 1 <= rounds <= 600 or stall_window != 3:
+            raise ValueError(
+                "v2 requires 2-8 repetitions (exactly one is allowed only for the "
+                "single-replica error-control ablation), 1-600 rounds, and a fixed "
+                "3-round stall window")
+        if (ablation_id == "single_replica_error_control" and repetitions != 1):
+            raise ValueError("single-replica error-control ablation requires repetitions=1")
         optimizer_seed = int(payload.get("optimizer_seed") or 20260824)
         if not 0 <= optimizer_seed <= 2_147_483_647:
             raise ValueError("optimizer_seed must be between 0 and 2147483647")
@@ -1214,7 +1723,6 @@ class ApiState:
         minimum_improvement = float(payload.get("minimum_relative_improvement") or .005)
         if not 0 <= minimum_improvement <= .25:
             raise ValueError("minimum_relative_improvement must be between 0 and 0.25")
-        platform = str(payload.get("platform") or "nangate45")
         stage_timeout_seconds = int(payload.get("stage_timeout_seconds") or 3600)
         flow_timeout_seconds = int(payload.get("flow_timeout_seconds") or 7200)
         if not 60 <= stage_timeout_seconds <= 14_400:
@@ -1223,40 +1731,109 @@ class ApiState:
             raise ValueError(
                 "flow_timeout_seconds must cover one stage and be at most 28800"
             )
+        rtl_path = (next(path for path in reference.rtl_files
+                         if path.stem == reference.top)
+                    if reference is not None else
+                    self.designs.rtl_path(
+                        design_id, owner_id=owner_id, include_legacy=include_legacy))
         base = build_orfs_task(
-            self.designs.rtl_path(design_id, owner_id=owner_id, include_legacy=include_legacy),
+            rtl_path,
             project_id="openroad-platform", design_id=design_id, top=design["module"],
-            clock=_optional_string(payload.get("clock")), platform_name=platform,
+            clock=(reference.clock if reference is not None else
+                   _optional_string(payload.get("clock"))), platform_name=platform,
             target_stage=str(payload.get("target_stage") or "finish"),
-            clock_period_ns=float(payload.get("clock_period_ns") or 10),
-            core_utilization_pct=float(payload.get("core_utilization_pct") or 30),
-            place_density=float(payload.get("place_density") or .55),
+            clock_period_ns=(reference.clock_period_ns if reference is not None else
+                             float(payload.get("clock_period_ns") or 10)),
+            core_utilization_pct=float(optimization_profile["baseline"].get(
+                "core_utilization_pct", payload.get("core_utilization_pct") or 30)),
+            place_density=float(optimization_profile["baseline"].get(
+                "place_density", (reference.native_baseline_overrides.get(
+                    "place_density", .55) if reference is not None else
+                    payload.get("place_density") or .55))),
             or_seed=replica_or_seeds[0],
             stage_timeout_seconds=stage_timeout_seconds,
             timeout_seconds=flow_timeout_seconds,
-            labels={"v2_closed_loop": "baseline", **({"owner_id": owner_id} if owner_id else {})},
+            flow_parameters=optimization_profile["baseline"],
+            labels={
+                "v2_closed_loop": "baseline",
+                **({"owner_id": owner_id} if owner_id else {}),
+                **({"reference_design": reference.design,
+                    "design_bundle_sha256": reference.source_fingerprint,
+                    "orfs_commit": reference.orfs_commit}
+                   if reference is not None else {}),
+            },
+            rtl_files=reference.rtl_files if reference is not None else None,
+            rtl_root=reference.rtl_root if reference is not None else None,
+            rtl_include_dirs=reference.include_dirs if reference is not None else (),
+            synth_hdl_frontend=(reference.synth_hdl_frontend
+                                if reference is not None else None),
+            design_options=(dict(reference.design_options)
+                            if reference is not None else None),
+            sdc_path=reference.sdc_path if reference is not None else None,
         )
         hard_constraints = list(payload.get("hard_constraints") or [
             {"metric": "setup_wns_ns", "operator": ">=", "threshold": 0.0},
             {"metric": "drc_errors", "operator": "<=", "threshold": 0.0},
         ])
         subject = str(payload.get("experiment_key") or f"{design_id}-{uuid.uuid4().hex}")
+        max_parallel = max(1, min(int(payload.get("max_parallel") or
+                                      max(repetitions, 4)), 16))
+        # Batch width is a model/search decision, not the worker concurrency.
+        # Eight logical candidates may execute through four local workers;
+        # conflating these values previously made calibrated promotion unable
+        # to prune anything when minimum_full_evaluations was four.
+        optimizer_batch_size = min(8, rounds)
+        fidelity_policy = FidelityPolicy(
+            quick_stage="cts", full_stage="finish", promotion_fraction=.30,
+            minimum_full_evaluations=min(4, optimizer_batch_size),
+            minimum_calibration_pairs=12, minimum_rank_correlation=.60,
+            max_parallel=max_parallel, quick_repetitions=1,
+            full_repetitions=repetitions,
+            skip_quick=ablation_id == "no_multifidelity",
+        )
         initial = {
             "status": "baseline_running", "design_id": design_id, "profile": profile,
             "base_task": base.to_dict(), "parameter_space": [item.to_dict() for item in parameters],
             "objectives": [item.to_dict() for item in objectives],
             "hard_constraints": hard_constraints, "repetitions": repetitions,
             "optimizer_seed": optimizer_seed,
+            "ablation_id": ablation_id,
+            "ablation_policy": {
+                "use_feasibility_model": ablation_id != "no_feasibility",
+                "use_trust_region": ablation_id != "no_trust_region",
+                "use_memory": ablation_id != "no_memory",
+                "use_stage_focus": ablation_id != "no_stage_focus",
+                "use_edair_diagnosis": ablation_id != "no_edair",
+                "use_gp": ablation_id != "no_gp",
+                "use_multifidelity": ablation_id != "no_multifidelity",
+                "use_safe_initialization": ablation_id != "no_safe_initialization",
+                "use_state_policy": ablation_id != "no_state_policy",
+            },
             "replica_or_seeds": replica_or_seeds,
             "max_rounds": rounds, "stall_window": 3,
             "minimum_relative_improvement": minimum_improvement,
-            "max_parallel": max(1, min(int(payload.get("max_parallel") or repetitions), 16)),
+            "max_parallel": max_parallel,
+            "optimizer_batch_size": optimizer_batch_size,
+            "fidelity_policy": fidelity_policy.to_dict(),
+            "proxy_calibration_records": [],
+            "promotion_history": [],
+            "active_multifidelity_campaign_id": None,
+            "active_proposals": [], "batch_index": 0,
+            "execution_backend_id": self.dse_execution_backend.backend_id,
+            "execution_backend_events": [],
             "round": 0, "stalled_rounds": 0, "best_utility": -1.0,
             "best_feasible": False,
             "best_round": 0, "study_id": None, "history": [], "diagnosis": None,
+            "stall_diagnoses": [],
             "active_kind": "baseline", "active_parameters": {
-                item.name: base.parameters[item.name] for item in parameters
+                **optimization_profile["baseline"]
             },
+            "optimizer_backend": optimizer_backend,
+            "search_domain": search_domain,
+            "optimizer_initialization": "sobol-scrambled-mixed-v1",
+            "optimizer_minimum_initial": max(4, int(payload.get(
+                "optimizer_minimum_initial") or max(32, 4 * len(parameters)))),
+            "optimization_profile": optimization_profile,
             "active_proposal_id": None, "active_run_ids": [],
             "agent_events": [
                 {"phase": "map", "claim": "bound design, platform, Runtime and run budget",
@@ -1269,11 +1846,33 @@ class ApiState:
                  "execution_allowed": False},
             ],
         }
+        protocol_material = {
+            key: initial[key] for key in (
+                "design_id", "profile", "parameter_space", "objectives",
+                "hard_constraints", "repetitions", "replica_or_seeds",
+                "max_rounds", "stall_window", "minimum_relative_improvement",
+                "optimizer_seed", "optimizer_backend", "search_domain",
+                "optimizer_minimum_initial", "fidelity_policy",
+                "optimization_profile", "ablation_id", "ablation_policy",
+            )
+        }
+        protocol_material["task"] = {
+            key: value for key, value in initial["base_task"].items()
+            if key not in {"task_id"}
+        }
+        initial["protocol_fingerprint"] = hashlib.sha256(json.dumps(
+            protocol_material, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()).hexdigest()
         checkpoint = self.pipeline_checkpoints.create_or_get(
             pipeline_kind="bo-gp-closed-loop-v2", subject_id=subject,
             owner_id=owner_id, initial_state=initial,
         )
         state = checkpoint["state"]
+        if state.get("protocol_fingerprint") != initial["protocol_fingerprint"]:
+            raise ValueError(
+                "experiment_key already exists with a different frozen DSE protocol"
+            )
         if len(state["active_run_ids"]) > state["repetitions"]:
             raise RuntimeError("closed-loop checkpoint contains too many baseline replicas")
         if len(state["active_run_ids"]) < state["repetitions"]:
@@ -1312,7 +1911,11 @@ class ApiState:
         state = checkpoint["state"]
         objectives = tuple(ObjectiveSpec.from_dict(item) for item in state["objectives"])
         parameters = tuple(ParameterSpec.from_dict(item) for item in state["parameter_space"])
-        exporter = RuntimeEvidenceExporter(self.runtime_store)
+        exporter = RuntimeEvidenceExporter(
+            self.runtime_store,
+            use_common_evaluation=bool((state.get("ablation_policy") or {}).get(
+                "use_edair_diagnosis", True)),
+        )
         transitions = max(1, min(int(payload.get("max_transitions") or 64), 256))
 
         def save() -> None:
@@ -1320,9 +1923,583 @@ class ApiState:
             checkpoint = self.pipeline_checkpoints.save(
                 pipeline_id, state, expected_revision=checkpoint["revision"])
 
+        def schedule_next_batch(study: OptimizationStudy) -> None:
+            """Persist a unique proposal batch before any Runtime child exists."""
+            remaining = int(state["max_rounds"]) - int(state["round"])
+            if remaining <= 0:
+                return
+            observations_all = self.optimization_store.observations(study.study_id)
+            ablation_policy = state.get("ablation_policy") or {}
+            use_memory = bool(ablation_policy.get("use_memory", True))
+            memory_priors = ([LearningObservation.from_dict(item) for item in
+                              state.get("memory_prior_observations", [])]
+                             if use_memory else [])
+            backend_id = state["optimizer_backend"]
+            backend = (None if backend_id == "stateful-l2-portfolio-v1"
+                       else default_optimizer_registry().resolve(backend_id))
+            if backend_id in {
+                "botorch-ard-matern-qlognehvi-mixed-v2",
+                "adaptive-trust-region-qlognehvi-mixed-v2",
+                "industrial-dse-portfolio-v1",
+            }:
+                from openroad_platform_analysis import (
+                    AdaptiveTrustRegionQNEHVIOptimizer, BoTorchQNEHVIOptimizer,
+                    IndustrialOptimizerPortfolio,
+                )
+                forbidden = ({
+                    item["payload"]["configuration_id"]
+                    for item in (state.get("optimization_memory") or {}).get(
+                        "active_artifacts", [])
+                    if item["kind"] == "failure_region"
+                } if use_memory else set())
+                constructors = {
+                    "botorch-ard-matern-qlognehvi-mixed-v2": BoTorchQNEHVIOptimizer,
+                    "adaptive-trust-region-qlognehvi-mixed-v2":
+                        AdaptiveTrustRegionQNEHVIOptimizer,
+                    "industrial-dse-portfolio-v1": IndustrialOptimizerPortfolio,
+                }
+                backend_kwargs = {
+                    "minimum_initial": int(state["optimizer_minimum_initial"]),
+                    "forbidden_configuration_ids": forbidden,
+                    "minimum_anchor_replicas": int(state["repetitions"]),
+                }
+                if state["optimizer_backend"] in {
+                    "botorch-ard-matern-qlognehvi-mixed-v2",
+                    "adaptive-trust-region-qlognehvi-mixed-v2",
+                    "industrial-dse-portfolio-v1",
+                }:
+                    backend_kwargs["use_feasibility_model"] = bool(
+                        ablation_policy.get("use_feasibility_model", True))
+                    backend_kwargs["use_safe_initialization"] = bool(
+                        ablation_policy.get("use_safe_initialization", True))
+                if state["optimizer_backend"] == "adaptive-trust-region-qlognehvi-mixed-v2":
+                    if not ablation_policy.get("use_trust_region", True):
+                        backend = BoTorchQNEHVIOptimizer(**backend_kwargs)
+                    else:
+                        backend = constructors[state["optimizer_backend"]](**backend_kwargs)
+                if state["optimizer_backend"] == "industrial-dse-portfolio-v1":
+                    backend_kwargs["routing_hints"] = ((
+                        (state.get("optimization_memory") or {}).get(
+                            "active_artifacts", [])) if use_memory else ())
+                    backend_kwargs["use_trust_region"] = bool(
+                        ablation_policy.get("use_trust_region", True))
+                    backend_kwargs["use_stage_focus"] = bool(
+                        ablation_policy.get("use_stage_focus", True))
+                if not (state["optimizer_backend"] ==
+                        "adaptive-trust-region-qlognehvi-mixed-v2" and
+                        not ablation_policy.get("use_trust_region", True)):
+                    backend = constructors[state["optimizer_backend"]](**backend_kwargs)
+            baseline_metrics = {
+                objective.metric_name:
+                    state["baseline_summary"]["metrics"][objective.metric_name]["median"]
+                for objective in objectives
+            }
+            previous = self.optimization_store.proposals(study.study_id)
+            iteration_start = (max(item.iteration for item in previous) + 1
+                               if previous else len(observations_all))
+            excluded = [item["parameters"] for item in state["history"]
+                        if item.get("kind") != "baseline" and item.get("parameters")]
+            batch_size = min(int(state["optimizer_batch_size"]), remaining)
+            if backend_id == "stateful-l2-portfolio-v1":
+                # LLM policy is constrained to the L1 semantic-tool contract;
+                # when none is supplied, the evidence-bound deterministic
+                # fallback selects a mode/subspace.  BO still owns numeric
+                # candidate generation and Runtime remains the sole executor.
+                from openroad_platform_analysis import (
+                    compact_policy_evidence, SearchMode, SearchPolicyDecision,
+                    StatefulL2Controller,
+                )
+                from openroad_platform_contracts import AgentBudget, DesignState, EvidencePointer
+                latest_edair = None
+                latest_evidence = observations_all[-1].evidence if observations_all else ()
+                if (ablation_policy.get("use_edair_diagnosis", True)
+                        and observations_all and observations_all[-1].run_id):
+                    # EDAIR is the loss-accounted bridge between raw tool
+                    # artifacts and L1 policy.  If a historical/runtime edge
+                    # lacks an accessible packet we retain its raw provenance
+                    # and explicitly fall back; a missing packet is never
+                    # fabricated from a model summary.
+                    try:
+                        packet = self.runtime_edair(
+                            observations_all[-1].run_id, owner_id=owner_id,
+                            include_legacy=include_legacy,
+                            focus="diagnosis")["evidence_packet"]
+                        latest_edair = EvidencePointer(
+                            ref=f"edair:{observations_all[-1].run_id}",
+                            sha256=str(packet["edair_fingerprint"]),
+                        )
+                        latest_evidence = (*latest_evidence, latest_edair)
+                    except (KeyError, ValueError):
+                        pass
+                state_evidence = compact_policy_evidence(latest_evidence)
+                if not state_evidence:
+                    state_evidence = (EvidencePointer(
+                        ref=f"artifact:protocol-{state['protocol_fingerprint'][:24]}",
+                        sha256=state["protocol_fingerprint"]),)
+                diagnosis = state.get("diagnosis")
+                diagnosis_payload = (dict(diagnosis) if isinstance(diagnosis, dict) else {})
+                agent_state = DesignState(
+                    state_id=f"state-{pipeline_id[-24:]}-{state['round']}",
+                    goal_id=f"goal-{pipeline_id[-24:]}", revision=int(state["round"]),
+                    status="observed", completed_stage="finish",
+                    metrics={name: float(value) for name, value in baseline_metrics.items()},
+                    remaining_budget=AgentBudget(
+                        max(0, int(state["max_rounds"]) - int(state["round"])),
+                        max(1, int(state["max_rounds"])),
+                        min(7 * 86_400, max(1, int(state["max_rounds"]) * int(
+                            state.get("flow_timeout_seconds") or 7200))),
+                        int(state["max_parallel"]),
+                    ), edair_ref=latest_edair, evidence=tuple(state_evidence),
+                    diagnosis=diagnosis_payload,
+                )
+                controller = StatefulL2Controller(
+                    minimum_initial=int(state["optimizer_minimum_initial"]))
+                decision = None
+                if not ablation_policy.get("use_state_policy", True):
+                    decision = SearchPolicyDecision(
+                        mode=SearchMode.GLOBAL_EXPLORATION,
+                        parameter_subset=tuple(item.name for item in parameters),
+                        hypothesis="Ablation: disable state-dependent L1 strategy and retain a fixed global BO subspace.",
+                        stop_condition="fixed protocol budget",
+                        evidence_refs=tuple(item.ref for item in state_evidence),
+                        source="ablation:no_state_policy",
+                    )
+                proposals = controller.propose(
+                    study, agent_state, observations_all, batch_size=batch_size,
+                    baseline_metrics=baseline_metrics,
+                    decision=decision,
+                    memory_snapshot=(state.get("optimization_memory") if use_memory else None),
+                    historical_observations=memory_priors,
+                    excluded_parameters=excluded,
+                    iteration_start=iteration_start,
+                )
+            else:
+                assert backend is not None
+                proposals = backend.propose_batch(
+                    study, observations_all, batch_size=batch_size,
+                    baseline_metrics=baseline_metrics,
+                    historical_observations=memory_priors,
+                    excluded_parameters=excluded,
+                    iteration_start=iteration_start,
+                )
+            for proposal in proposals:
+                self.optimization_store.save_proposal(proposal)
+            start_round = int(state["round"]) + 1
+            state["batch_index"] = int(state.get("batch_index") or 0) + 1
+            state["round"] += len(proposals)
+            state["active_proposals"] = [
+                {**proposal.to_dict(), "configuration_round": start_round + index}
+                for index, proposal in enumerate(proposals)
+            ]
+            state["active_multifidelity_campaign_id"] = (
+                f"{pipeline_id}-batch-{state['batch_index']}"
+            )
+            state["active_kind"] = "candidate_batch"
+            state["active_run_ids"] = []
+            state["status"] = "batch_running"
+            for item in state["active_proposals"]:
+                state["agent_events"].extend((
+                    {"phase": "hypothesis", "round": item["configuration_round"],
+                     "claim": "the BO/GP coupled parameter vector may improve weighted QoR",
+                     "proposal_id": item["proposal_id"],
+                     "parameters": item["parameters"], "execution_allowed": False},
+                    {"phase": "implement", "round": item["configuration_round"],
+                     "claim": "queued an allowlisted logical configuration for quick-to-full evaluation",
+                     "proposal_id": item["proposal_id"],
+                     "parameters": item["parameters"],
+                     "evidence_refs": item["evidence"],
+                     "execution_allowed": True,
+                     "authority": "only the typed ORFS parameter vector may reach Runtime"},
+                ))
+            save()
+
+        def ensure_active_campaign() -> str:
+            campaign_id = str(state["active_multifidelity_campaign_id"])
+            try:
+                self.multifidelity_store.campaign(campaign_id)
+                return campaign_id
+            except KeyError:
+                pass
+            platform = str(state["base_task"]["parameters"]["platform"])
+            rows = []
+            for item in state["active_proposals"]:
+                effective_parameters = {
+                    **state["optimization_profile"].get("fixed_parameters", {}),
+                    **item["parameters"],
+                }
+                task = TaskSpec.from_dict({
+                    **state["base_task"],
+                    "task_id": f"{campaign_id}-{item['candidate_id']}-template",
+                    "parameters": {
+                        **state["base_task"]["parameters"],
+                        "flow_parameters": effective_parameters,
+                    },
+                    "labels": {
+                        **state["base_task"].get("labels", {}),
+                        "v2_pipeline_id": pipeline_id,
+                        "v2_batch": str(state["batch_index"]),
+                        "v2_round": str(item["configuration_round"]),
+                        "optimizer_proposal_id": item["proposal_id"],
+                    },
+                })
+                rows.append({
+                    "candidate_id": item["candidate_id"], "task": task,
+                    "effective_configuration_id": effective_configuration_id(
+                        effective_parameters, platform=platform),
+                    "effective_parameters": effective_parameters,
+                    "proposal_acquisition": item["acquisition_value"],
+                    "replica_or_seeds": state["replica_or_seeds"],
+                })
+            return self.multifidelity_store.create(
+                FidelityPolicy(**state["fidelity_policy"]), rows,
+                campaign_id=campaign_id,
+            )
+
+        def record_stall_diagnosis(study: OptimizationStudy,
+                                   evidence_run_ids: list[str]) -> None:
+            packet = diagnosis_packet(state["history"], objectives)
+            evidence_packets = []
+            if (state.get("ablation_policy") or {}).get(
+                    "use_edair_diagnosis", True):
+                for run_id in evidence_run_ids[:3]:
+                    try:
+                        evidence_packets.append(self.runtime_edair(
+                            run_id, owner_id=owner_id, include_legacy=include_legacy,
+                            focus="diagnosis")["evidence_packet"])
+                    except (KeyError, ValueError):
+                        continue
+            packet["evidence_packets"] = evidence_packets
+            packet["edair_diagnosis_enabled"] = bool(
+                (state.get("ablation_policy") or {}).get(
+                    "use_edair_diagnosis", True))
+            if not packet["edair_diagnosis_enabled"]:
+                packet["diagnosis_claim_boundary"] = (
+                    "EDAIR evidence conversion disabled by preregistered ablation; "
+                    "diagnosis uses only aggregate Runtime KPI/report evidence"
+                )
+            parameter_names = [item.name for item in parameters]
+            if len(parameter_names) >= 2:
+                first, second = parameter_names[:2]
+                bounds = {item.name: [item.lower, item.upper] for item in parameters}
+                evidence_refs = []
+                causal_observations = self.optimization_store.observations(study.study_id)
+                for observation in causal_observations[-min(12, len(causal_observations)):]:
+                    pointer = next((item for item in observation.evidence
+                                    if item.ref.startswith("run:")), None)
+                    if pointer:
+                        evidence_refs.append(pointer.to_dict())
+                if evidence_refs:
+                    hypothesis = reflection_hypothesis(
+                        claim=(f"The stalled QoR response may depend on an interaction "
+                               f"between {first} and {second}, not either parameter alone."),
+                        mechanism=("Physical-design parameters jointly change placement and "
+                                   "routing freedom; marginal effects may reverse conditionally."),
+                        context={"pipeline_id": pipeline_id, "study_id": study.study_id,
+                                 "design_id": state["design_id"],
+                                 "context_fingerprint": study.context_fingerprint,
+                                 "status": "three_round_stall"},
+                        evidence_refs=evidence_refs,
+                        producer="closed-loop-diagnosis-v2",
+                        proposed_intervention={
+                            "kind": "preregistered_2x2_interaction",
+                            "parameters": [first, second],
+                            "levels": {first: bounds[first], second: bounds[second]},
+                            "repetitions": state["repetitions"],
+                            "randomized_order": True, "execution_allowed": False,
+                        },
+                    )
+                    event_id = self.hypothesis_ledger.append(hypothesis)
+                    packet["causal_hypothesis"] = {
+                        **hypothesis, "ledger_event_id": event_id}
+            state["agent_events"].append({
+                "phase": "diagnosis", "round": state["round"],
+                "claim": "three consecutive full-flow configurations missed the preregistered threshold",
+                "next": "repair_agent_stage_localization",
+                **({"hypothesis_id": packet["causal_hypothesis"]["hypothesis_id"]}
+                   if packet.get("causal_hypothesis") else {}),
+                "execution_allowed": False,
+            })
+            state.setdefault("stall_diagnoses", []).append({
+                "batch_index": state["batch_index"], "round": state["round"],
+                "packet": packet,
+                "routing_effect": (
+                    "industrial portfolio re-evaluates failure/stall evidence and may "
+                    "select robust TPE or a stage-focused trust region; fixed baseline "
+                    "arms retain their preregistered optimizer"
+                ),
+            })
+            state["diagnosis"] = packet
+            # A stall is a routing event, never an early stopping rule.  Count
+            # the next three full configurations as a fresh window while the
+            # portfolio itself retains the complete history for route choice.
+            state["stalled_rounds"] = 0
+            save()
+
+        def execute_active_batch(study: OptimizationStudy) -> list[str]:
+            """Run/resume quick screening and replicated full replay for one batch."""
+            campaign_id = ensure_active_campaign()
+            policy = FidelityPolicy(**state["fidelity_policy"])
+            quick_ids = list(self.multifidelity_scheduler.ensure_quick_runs(campaign_id))
+            state["active_run_ids"] = quick_ids
+            save()
+            quick_execution = self.multifidelity_scheduler.run_bound(
+                quick_ids, max_parallel=policy.max_parallel)
+            state["execution_backend_events"].append({
+                **quick_execution, "batch_index": state["batch_index"],
+                "fidelity": "quick"})
+            rows = self.multifidelity_store.candidates(campaign_id)
+            quick_proxies: dict[str, dict[str, Any]] = {}
+            quick_scores: dict[str, float | None] = {}
+            target_context = self._learning_context_for_run(
+                self.runtime_store.get_run(
+                    state["baseline_summary"]["run_ids"][0]))
+            existing_observation_ids = {
+                item.observation_id for item in
+                self.optimization_store.observations(study.study_id)
+            }
+            for row in rows:
+                quick_observations = []
+                for run_id in row["quick_run_ids"]:
+                    run = self.runtime_store.get_run(run_id)
+                    context = self._learning_context_for_run(run)
+                    observation = exporter.export_run(run_id, context)
+                    quick_observations.append(observation)
+                    # A genuine ORFS stage failure proves that this effective
+                    # configuration cannot reach the study's finish target.
+                    # Timeout, cancellation, worker loss and protocol errors
+                    # are infrastructure evidence and must never bias the GP.
+                    if (observation.status == "failed"
+                            and observation.failure_category == "orfs_failure"
+                            and observation.observation_id not in
+                            existing_observation_ids):
+                        projected_failure = dataclasses.replace(
+                            observation,
+                            context=target_context,
+                            parameters={item.name: observation.parameters[item.name]
+                                        for item in parameters},
+                        )
+                        self.optimization_store.add_observation(
+                            study.study_id, projected_failure)
+                        existing_observation_ids.add(observation.observation_id)
+                        if (state.get("ablation_policy") or {}).get(
+                                "use_memory", True):
+                            state["optimization_memory"] = (
+                                self.optimization_memory.ingest(
+                                    projected_failure, objectives))
+                        state["agent_events"].append({
+                            "phase": "validate",
+                            "round": next((
+                                item["configuration_round"]
+                                for item in state["active_proposals"]
+                                if item["candidate_id"] == row["candidate_id"]
+                            ), None),
+                            "claim": (
+                                "registered a configuration-caused quick-stage "
+                                "failure as a finish-target feasibility negative"
+                            ),
+                            "run_ids": [run_id],
+                            "failure_category": observation.failure_category,
+                            "optimizer_observation_id": observation.observation_id,
+                            "execution_allowed": False,
+                        })
+                proxy = intermediate_proxy_score(
+                    quick_observations, state["baseline_summary"], objectives)
+                quick_proxies[row["candidate_id"]] = proxy
+                quick_scores[row["candidate_id"]] = proxy["score"]
+            state["active_quick_proxies"] = quick_proxies
+            save()
+            calibration_pairs = [
+                (float(item["quick_score"]), float(item["full_score"]))
+                for item in state.get("proxy_calibration_records", [])
+            ]
+            decision = self.multifidelity_scheduler.promote(
+                campaign_id, calibration_pairs=calibration_pairs,
+                quick_scores=quick_scores,
+            )
+            state["active_promotion_decision"] = decision
+            if not any(item.get("batch_index") == state["batch_index"]
+                       for item in state["promotion_history"]):
+                state["promotion_history"].append({
+                    "batch_index": state["batch_index"], **decision})
+            full_ids = list(self.multifidelity_scheduler.ensure_full_runs(campaign_id))
+            state["active_run_ids"] = full_ids
+            save()
+            full_execution = self.multifidelity_scheduler.run_bound(
+                full_ids, max_parallel=policy.max_parallel)
+            state["execution_backend_events"].append({
+                **full_execution, "batch_index": state["batch_index"],
+                "fidelity": "full"})
+            rows = {item["candidate_id"]: item
+                    for item in self.multifidelity_store.candidates(campaign_id)}
+            last_full_ids: list[str] = []
+            for proposal in state["active_proposals"]:
+                candidate_id = proposal["candidate_id"]
+                if any(item.get("candidate_id") == candidate_id
+                       for item in state["history"]):
+                    continue
+                row = rows[candidate_id]
+                proxy = quick_proxies[candidate_id]
+                if not row["decision"]["promoted"]:
+                    state["history"].append({
+                        "round": proposal["configuration_round"],
+                        "kind": "quick_proxy_only", "candidate_id": candidate_id,
+                        "proposal_id": proposal["proposal_id"],
+                        "parameters": proposal["parameters"], "summary": None,
+                        "effective_parameters": row["task"]["parameters"]["flow_parameters"],
+                        "effective_configuration_id": row["effective_configuration_id"],
+                        "predictions": proposal["predictions"],
+                        "model_metadata": proposal.get("model_metadata", {}),
+                        "quick_proxy": proxy, "utility": None,
+                        "decision": "not_promoted_by_calibrated_proxy",
+                        "claim_boundary": "no final QoR was measured for this configuration",
+                    })
+                    state["agent_events"].append({
+                        "phase": "review", "round": proposal["configuration_round"],
+                        "claim": "calibrated quick proxy did not promote this configuration; no final QoR claim",
+                        "candidate_id": candidate_id,
+                        "run_ids": list(row["quick_run_ids"]),
+                        "execution_allowed": False,
+                    })
+                    save()
+                    continue
+                candidate_run_ids = list(row["full_run_ids"])
+                last_full_ids = candidate_run_ids
+                observations = []
+                for run_id in candidate_run_ids:
+                    context = self._learning_context_for_run(
+                        self.runtime_store.get_run(run_id))
+                    observation = exporter.export_run(run_id, context)
+                    projected = dataclasses.replace(
+                        observation,
+                        parameters={item.name: observation.parameters[item.name]
+                                    for item in parameters},
+                    )
+                    self.optimization_store.add_observation(study.study_id, projected)
+                    if (state.get("ablation_policy") or {}).get("use_memory", True):
+                        state["optimization_memory"] = self.optimization_memory.ingest(
+                            observation, objectives)
+                    observations.append(observation)
+                    if (state.get("ablation_policy") or {}).get("use_memory", True):
+                        self.auto_collect_terminal_run(run_id)
+                summary = summarize_replicates(
+                    observations, objectives, state["hard_constraints"])
+                utility = relative_utility(
+                    summary, state["baseline_summary"], objectives)
+                review = stalled_decision(
+                    candidate_utility=utility,
+                    best_utility=float(state["best_utility"]),
+                    minimum_relative_improvement=float(
+                        state["minimum_relative_improvement"]),
+                    stalled_rounds=int(state["stalled_rounds"]),
+                    has_feasible_incumbent=bool(state.get("best_feasible")),
+                )
+                full_evaluated_now = 1 + sum(
+                    item.get("kind") == "bo_candidate" for item in state["history"]
+                )
+                if full_evaluated_now <= int(state["optimizer_minimum_initial"]):
+                    review = {**review, "stalled_rounds": 0,
+                              "stall_counting_active": False,
+                              "stall_counting_reason": (
+                                  "minimum unique full-flow initialization not reached"
+                              )}
+                else:
+                    review = {**review, "stall_counting_active": True}
+                state["history"].append({
+                    "round": proposal["configuration_round"],
+                    "kind": "bo_candidate", "candidate_id": candidate_id,
+                    "proposal_id": proposal["proposal_id"],
+                    "parameters": proposal["parameters"], "summary": summary,
+                    "effective_parameters": row["task"]["parameters"]["flow_parameters"],
+                    "effective_configuration_id": row["effective_configuration_id"],
+                    "predictions": proposal["predictions"],
+                    "model_metadata": proposal.get("model_metadata", {}),
+                    "quick_proxy": proxy, "utility": utility,
+                    "decision": review,
+                })
+                state["stalled_rounds"] = review["stalled_rounds"]
+                if review["promoted"]:
+                    state["best_utility"] = utility
+                    state["best_round"] = proposal["configuration_round"]
+                    state["best_feasible"] = True
+                if proxy["score"] is not None and utility is not None:
+                    state["proxy_calibration_records"].append({
+                        "candidate_id": candidate_id,
+                        "quick_score": proxy["score"], "full_score": utility,
+                        "quick_run_ids": list(row["quick_run_ids"]),
+                        "full_run_ids": candidate_run_ids,
+                    })
+                state["agent_events"].extend((
+                    {"phase": "validate", "round": proposal["configuration_round"],
+                     "claim": "aggregated replicated full-flow Runtime observations",
+                     "run_ids": candidate_run_ids, "eligible": summary["eligible"],
+                     "failure_rate": summary["failure_rate"],
+                     "quick_metrics_are_final": False, "execution_allowed": False},
+                    {"phase": "review", "round": proposal["configuration_round"],
+                     "claim": review["reason"], "promoted": review["promoted"],
+                     "utility": utility, "execution_allowed": False},
+                    {"phase": "memory", "round": proposal["configuration_round"],
+                     "claim": ("stored replicated full-flow outcome with immutable Runtime evidence"
+                               if (state.get("ablation_policy") or {}).get("use_memory", True)
+                               else "cross-study memory write disabled by preregistered ablation"),
+                     "run_ids": candidate_run_ids,
+                     "outcome": "improved" if review["promoted"] else "no_improvement",
+                     "execution_allowed": False},
+                ))
+                state["optimization_trace"] = observed_hypervolume_trace(
+                    state["history"], objectives, state["baseline_summary"])
+                save()
+            self.multifidelity_store.set_state(campaign_id, "completed")
+            state.update({"active_run_ids": [], "active_proposals": [],
+                          "active_multifidelity_campaign_id": None,
+                          "active_quick_proxies": {},
+                          "active_promotion_decision": None})
+            save()
+            return last_full_ids
+
         for _ in range(transitions):
             if state["status"] in {"completed", "diagnosis_required", "failed"}:
                 break
+            if state.get("active_kind") == "candidate_batch":
+                if not state.get("study_id"):
+                    raise RuntimeError("candidate batch has no optimization study")
+                study = self.optimization_store.get(state["study_id"])
+                last_full_ids = execute_active_batch(study)
+                full_evaluated = len({
+                    item["candidate_id"] for item in state["history"]
+                    if item.get("kind") == "bo_candidate"
+                })
+                minimum_initial = int(state["optimizer_minimum_initial"])
+                if full_evaluated <= minimum_initial:
+                    state["stalled_rounds"] = 0
+                if (state["stalled_rounds"] >= 3
+                        and full_evaluated > minimum_initial):
+                    record_stall_diagnosis(study, last_full_ids)
+                if state["round"] >= state["max_rounds"]:
+                    if state.get("best_feasible"):
+                        state.update({"status": "completed", "active_run_ids": [],
+                                      "study_outcome": "feasible_incumbent_found"})
+                    else:
+                        packet = diagnosis_packet(state["history"], objectives)
+                        packet.update({
+                            "reason": "no hard-constraint-feasible baseline or candidate",
+                            "next": "repair_agent_stage_localization",
+                        })
+                        state["agent_events"].append({
+                            "phase": "diagnosis", "round": state["round"],
+                            "claim": "the complete fixed budget ended without a feasible vector",
+                            "next": "repair_agent_stage_localization",
+                            "execution_allowed": False,
+                        })
+                        state.update({
+                            "status": "completed", "diagnosis": packet,
+                            "study_outcome":
+                                "fixed_budget_exhausted_no_feasible_configuration",
+                            "active_run_ids": [],
+                        })
+                    save()
+                    break
+                schedule_next_batch(study)
+                continue
             run_ids = list(state.get("active_run_ids") or [])
             if len(run_ids) > state["repetitions"]:
                 state.update({"status": "failed", "diagnosis": {
@@ -1338,7 +2515,7 @@ class ApiState:
                                     if state["active_kind"] == "baseline"
                                     else f"{pipeline_id}-round-{state['round']}-r{replica}"),
                         "parameters": {**state["base_task"]["parameters"],
-                                       **state["active_parameters"],
+                                       "flow_parameters": state["active_parameters"],
                                        "or_seed": state["replica_or_seeds"][replica]},
                         "labels": {**state["base_task"].get("labels", {}),
                                    "v2_pipeline_id": pipeline_id,
@@ -1368,27 +2545,35 @@ class ApiState:
                     study_id=f"study-{uuid.uuid4().hex[:20]}", design_id=state["design_id"],
                     context_fingerprint=context.fingerprint, parameter_space=parameters,
                     objectives=objectives,
-                    max_runs=min(64, state["repetitions"] * (state["max_rounds"] + 1)),
-                    seed=int(state["optimizer_seed"]), status="active",
+                    max_runs=state["repetitions"] * (state["max_rounds"] + 1),
+                    seed=int(state["optimizer_seed"]),
+                    hard_constraints=tuple(state["hard_constraints"]),
+                    status="active",
                 )
                 state["study_id"] = self.optimization_store.create(study)
                 historical = []
-                try:
-                    candidates = self.tenant_learning_store.list(
-                        owner_id or "system-auto", "openroad-platform")
-                except ValueError:
-                    candidates = []
-                for item in reversed(candidates):
-                    if item.context.fingerprint != context.fingerprint:
-                        continue
-                    if not all(spec.lower <= float(item.parameters.get(spec.name, float("inf"))) <= spec.upper
-                               for spec in parameters):
-                        continue
-                    if not all(obj.metric_name in item.metrics for obj in objectives):
-                        continue
-                    historical.append(item)
-                    if len(historical) >= 24:
-                        break
+                use_memory = bool((state.get("ablation_policy") or {}).get(
+                    "use_memory", True))
+                if use_memory:
+                    try:
+                        candidates = self.tenant_learning_store.list(
+                            owner_id or "system-auto", "openroad-platform")
+                    except ValueError:
+                        candidates = []
+                    for item in reversed(candidates):
+                        if item.context.fingerprint != context.fingerprint:
+                            continue
+                        try:
+                            MixedParameterEncoder(parameters).encode(item.parameters)
+                        except (TypeError, ValueError, KeyError):
+                            continue
+                        if not all(obj.metric_name in item.metrics for obj in objectives):
+                            continue
+                        historical.append(dataclasses.replace(
+                            item, parameters={spec.name: item.parameters[spec.name]
+                                              for spec in parameters}))
+                        if len(historical) >= 512:
+                            break
                 state["memory_prior_observations"] = [
                     item.to_dict() for item in reversed(historical)]
                 state["memory_prior_refs"] = [
@@ -1396,17 +2581,23 @@ class ApiState:
                      "fingerprint": item.fingerprint,
                      "run_id": item.run_id}
                     for item in reversed(historical)]
-                knowledge_bundle = self._evidence_rag_for_owner(owner_id).retrieve(
+                knowledge_bundle = (self._evidence_rag_for_owner(owner_id).retrieve(
                     "validated parameter interaction timing area power QoR",
-                    context, limit=8, action_eligible_only=True)
-                state["validated_knowledge_bundle"] = knowledge_bundle.to_dict()
+                    context, limit=8, action_eligible_only=True) if use_memory else None)
+                state["validated_knowledge_bundle"] = (
+                    knowledge_bundle.to_dict() if knowledge_bundle else None)
                 state["agent_events"].append({
                     "phase": "memory", "round": 0,
-                    "claim": "retrieved context-exact numeric priors and validated semantic rules for BO warm start",
+                    "claim": ("retrieved context-exact numeric priors and validated semantic rules for BO warm start"
+                              if use_memory else
+                              "cross-study memory read disabled by preregistered ablation"),
                     "prior_count": len(historical),
                     "observation_refs": state["memory_prior_refs"],
-                    "knowledge_bundle_fingerprint": knowledge_bundle.bundle_fingerprint,
-                    "validated_rule_count": len(knowledge_bundle.records),
+                    "knowledge_bundle_fingerprint": (
+                        knowledge_bundle.bundle_fingerprint if knowledge_bundle else None),
+                    "validated_rule_count": (
+                        len(knowledge_bundle.records) if knowledge_bundle else 0),
+                    "memory_enabled": use_memory,
                     "execution_allowed": False,
                 })
                 save()
@@ -1414,9 +2605,23 @@ class ApiState:
             observations = []
             for run_id in run_ids:
                 observation = exporter.export_run(run_id, context)
-                self.optimization_store.add_observation(study.study_id, observation)
+                projected = dataclasses.replace(
+                    observation,
+                    parameters={item.name: observation.parameters[item.name]
+                                for item in parameters},
+                )
+                self.optimization_store.add_observation(study.study_id, projected)
+                if (state.get("ablation_policy") or {}).get("use_memory", True):
+                    memory_snapshot = self.optimization_memory.ingest(
+                        observation, objectives)
                 observations.append(observation)
-                self.auto_collect_terminal_run(run_id)
+                if (state.get("ablation_policy") or {}).get("use_memory", True):
+                    self.auto_collect_terminal_run(run_id)
+            if (state.get("ablation_policy") or {}).get("use_memory", True):
+                state["optimization_memory"] = memory_snapshot
+            else:
+                state["optimization_memory"] = {
+                    "disabled_by_ablation": True, "active_artifacts": []}
             summary = summarize_replicates(observations, objectives, state["hard_constraints"])
             state["agent_events"].append({
                 "phase": "validate", "round": state["round"],
@@ -1472,17 +2677,31 @@ class ApiState:
                     state["best_utility"] = utility
                     state["best_round"] = state["round"]
                     state["best_feasible"] = True
-                if state["stalled_rounds"] >= 3:
+                unique_evaluated = len({
+                    json.dumps(item.get("parameters", {}), sort_keys=True)
+                    for item in state["history"] if item.get("kind") != "baseline"
+                })
+                minimum_initial = max(32, 4 * len(parameters))
+                minimum_initial = int(state.get("optimizer_minimum_initial") or minimum_initial)
+                if unique_evaluated <= minimum_initial:
+                    state["stalled_rounds"] = 0
+                if state["stalled_rounds"] >= 3 and unique_evaluated > minimum_initial:
                     packet = diagnosis_packet(state["history"], objectives)
                     evidence_packets = []
-                    for run_id in run_ids[:3]:
-                        try:
-                            evidence_packets.append(self.runtime_edair(
-                                run_id, owner_id=owner_id, include_legacy=include_legacy,
-                                focus="diagnosis")["evidence_packet"])
-                        except (KeyError, ValueError):
-                            continue
+                    if (state.get("ablation_policy") or {}).get(
+                            "use_edair_diagnosis", True):
+                        for run_id in run_ids[:3]:
+                            try:
+                                evidence_packets.append(self.runtime_edair(
+                                    run_id, owner_id=owner_id,
+                                    include_legacy=include_legacy,
+                                    focus="diagnosis")["evidence_packet"])
+                            except (KeyError, ValueError):
+                                continue
                     packet["evidence_packets"] = evidence_packets
+                    packet["edair_diagnosis_enabled"] = bool(
+                        (state.get("ablation_policy") or {}).get(
+                            "use_edair_diagnosis", True))
                     parameter_names = [item.name for item in parameters]
                     if len(parameter_names) >= 2:
                         first, second = parameter_names[:2]
@@ -1538,7 +2757,8 @@ class ApiState:
                     save(); break
             if state["round"] >= state["max_rounds"]:
                 if state.get("best_feasible"):
-                    state.update({"status": "completed", "active_run_ids": []})
+                    state.update({"status": "completed", "active_run_ids": [],
+                                  "study_outcome": "feasible_incumbent_found"})
                 else:
                     packet = diagnosis_packet(state["history"], objectives)
                     packet.update({
@@ -1550,54 +2770,14 @@ class ApiState:
                         "claim": "the search budget ended without a hard-constraint-feasible vector",
                         "next": "repair_agent_stage_localization", "execution_allowed": False,
                     })
-                    state.update({"status": "diagnosis_required", "diagnosis": packet,
-                                  "active_run_ids": []})
+                    state.update({
+                        "status": "completed", "diagnosis": packet,
+                        "study_outcome":
+                            "fixed_budget_exhausted_no_feasible_configuration",
+                        "active_run_ids": [],
+                    })
                 save(); break
-            observations_all = self.optimization_store.observations(study.study_id)
-            memory_priors = [
-                LearningObservation.from_dict(item)
-                for item in state.get("memory_prior_observations", [])]
-            proposal = MultiObjectiveBayesianOptimizer(pool_size=512, exploration=.05).propose(
-                study, observations_all, historical_observations=memory_priors)
-            self.optimization_store.save_proposal(proposal)
-            state["round"] += 1
-            state["active_kind"] = "bo_candidate"
-            state["active_parameters"] = proposal.parameters
-            state["active_proposal_id"] = proposal.proposal_id
-            state["active_run_ids"] = []
-            state["status"] = "round_running"
-            state["agent_events"].extend([
-                {"phase": "hypothesis", "round": state["round"],
-                 "claim": "the BO/GP coupled parameter vector may improve weighted QoR",
-                 "proposal_id": proposal.proposal_id,
-                 "parameters": proposal.parameters,
-                 "execution_allowed": False},
-                {"phase": "implement", "round": state["round"],
-                 "claim": "submitted the allowlisted parameter intervention to Runtime",
-                 "proposal_id": proposal.proposal_id,
-                 "parameters": proposal.parameters,
-                 "evidence_refs": [item.to_dict() for item in proposal.evidence],
-                 "knowledge_bundle_fingerprint": (
-                     state.get("validated_knowledge_bundle") or {}).get(
-                         "bundle_fingerprint"),
-                 "execution_allowed": True,
-                 "authority": "only the declared parameter vector may be submitted to Runtime"},
-            ])
-            # Persist the round identity before its first child is submitted.
-            save()
-            for replica in range(state["repetitions"]):
-                task = TaskSpec.from_dict({**state["base_task"],
-                    "task_id": f"{pipeline_id}-round-{state['round']}-r{replica}",
-                    "parameters": {**state["base_task"]["parameters"], **proposal.parameters,
-                                   "or_seed": state["replica_or_seeds"][replica]},
-                    "labels": {**state["base_task"].get("labels", {}),
-                               "v2_pipeline_id": pipeline_id,
-                               "v2_round": str(state["round"]),
-                               "optimizer_proposal_id": proposal.proposal_id,
-                               "replica_index": str(replica),
-                               "or_seed": str(state["replica_or_seeds"][replica])}})
-                state["active_run_ids"].append(self.runtime.submit(task).run_id)
-                save()
+            schedule_next_batch(study)
         return {**checkpoint, "state": state,
                 "run_to_boundary": {"transitions_budget": transitions,
                                     "stopped_at": state["status"]},
@@ -1831,7 +3011,15 @@ class ApiState:
                             if any(x.get("artifact_id") == netlist["artifact_id"] for x in a.get("artifacts", []))), None)
             path = Path(attempt["workspace"]) / netlist["store_key"] if attempt else None
             if path and path.is_file() and _sha256(path) == netlist["sha256"]:
-                design_ir = build_design_ir(path)
+                # Netlist parsing is an optional projection, not a reason to
+                # discard an otherwise valid QoR/report evidence packet.  A
+                # generated netlist may use a frontend syntax outside the
+                # current DesignIR parser; raw bytes and their registry hash
+                # remain available through ``raw_artifacts`` in that case.
+                try:
+                    design_ir = build_design_ir(path)
+                except (OSError, ValueError):
+                    design_ir = None
         timing = None
         timing_candidates = [
             item for item in artifacts
@@ -2909,11 +4097,56 @@ class ApiState:
                     "spec_id": spec_id, "candidate_id": check["candidate_id"],
                     **({"owner_id": owner_id} if owner_id else {})},
         )
-        run = self.runtime.submit(task, capability="eda.rtl_to_gds")
-        return {"run": self.get_runtime_run(run.run_id, owner_id=owner_id,
+        # L1 is now the only backend-entry path: even this deterministic
+        # verified-RTL promotion creates a typed goal/state and requests the
+        # semantic tools, rather than submitting a bare ORFS task directly.
+        rtl_evidence = EvidencePointer(
+            ref=f"artifact:verified-rtl:{rtl['sha256']}", sha256=rtl["sha256"])
+        platform_name = str(spec["constraints"].get("platform") or "nangate45")
+        profile = orfs_optimization_profile(platform_name)
+        allowed_parameters = ("core_utilization_pct", "place_density", "minimum_die_size_um",
+                              *(str(item["name"]) for item in profile["parameter_space"]))
+        policy_provenance = EvidencePointer(
+            ref=f"artifact:l1-api-policy-{spec_id}",
+            sha256=hashlib.sha256(f"{spec_id}:{check['candidate_id']}:{rtl['sha256']}".encode()).hexdigest())
+        trusted_goal_policy = TrustedGoalPolicy(
+            "l1-api-promotion", "v1", "platform", policy_provenance,
+            "openroad-platform", spec["design_id"], platform_name, platform_name,
+            "orfs-runtime-bound", rtl_evidence, GoalPreference.BALANCED,
+            (QoRConstraint("setup_wns_ns", ">=", 0.0), QoRConstraint("drc_errors", "<=", 0.0)),
+            ("synth", "floorplan", "place", "cts", "route", "finish"),
+            tuple(dict.fromkeys(allowed_parameters)), AgentBudget(1, 4, int(task.timeout_seconds), 1),
+            (ToolName.RUN_STAGE,))
+        draft = GoalDraft(f"draft-{uuid.uuid4().hex}", "Promote verified RTL through the permitted finish stage.", GoalIntent.EXECUTE)
+        goal = GoalFinalizer.finalize(draft, trusted_goal_policy, goal_id=f"goal-{uuid.uuid4().hex}")
+        initial_state = DesignState(
+            state_id=f"state-{uuid.uuid4().hex}", goal_id=goal.goal_id, revision=0,
+            status="new", completed_stage=None, metrics={},
+            remaining_budget=goal.budget, evidence=(rtl_evidence,),
+        )
+        bridge = L1RuntimeBridge(self.runtime, task, ORFSRTLToGDSFactory(),
+                                 cancel_port=self.runtime_store.request_cancel)
+        trace_id = f"l1-trace-{uuid.uuid4().hex}"
+        self.l1_trace.record_draft(trace_id, draft)
+        self.l1_trace.record_goal(trace_id, goal)
+        loop = L1DurableLoop(self.l1_loop_store, bridge, self.l1_trace)
+        plan = loop.plan_validate_execute(trace_id, goal, initial_state, SemanticToolCall(
+            call_id=f"call-{uuid.uuid4().hex}", goal_id=goal.goal_id,
+            state_id=initial_state.state_id, tool=ToolName.RUN_STAGE,
+            arguments={"stage": "finish"},
+            producer="rtl-to-l1-bridge", evidence=(rtl_evidence,),
+        ), TrustedPolicyIdentity("l1-api-promotion", "v1", "platform", policy_provenance),
+            planner_summary="Submit the verified RTL through the permitted finish stage.")
+        run_id = str(plan["run_id"])
+        return {"run": self.get_runtime_run(run_id, owner_id=owner_id,
                                              include_legacy=include_legacy),
                 "source_verification_run_id": verify_run_id,
-                "candidate_id": check["candidate_id"], "execution_started": False}
+                "candidate_id": check["candidate_id"], "execution_started": False,
+                "l1": {"design_goal": goal.to_dict(),
+                       "trace_id": trace_id,
+                       "tool_receipts": [plan["receipt"]],
+                       "state_id": initial_state.state_id,
+                       "authority": "typed semantic tools; Runtime is sole executor"}}
 
     def add_spec_turn(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         owner_id = _optional_string(payload.get("owner_id"))
@@ -3467,6 +4700,12 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         "execution_ready": health["execution_ready"],
                         "runtime_worker_ready": health["runtime_worker_ready"],
                         "runtime_worker_status": health["runtime_worker_status"],
+                        "dse_controller_ready": health["dse_controller_ready"],
+                        "dse_controller_status": health["dse_controller_status"],
+                        "dse_controller_active_pipeline": health["dse_controller_active_pipeline"],
+                        "dse_controller_last_seen": health["dse_controller_last_seen"],
+                        "dse_execution_backend": health["dse_execution_backend"],
+                        "dse_distributed": health["dse_distributed"],
                         "taiwei_3d_ready": health["taiwei_3d_ready"],
                         "server_spec_model_ready": health["server_spec_model_ready"],
                         "server_spec_model": health["server_spec_model"],
@@ -3620,6 +4859,35 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     self._json(state.list_learning_observations({
                         "tenant_id": [session.user_id], "project_id": ["openroad-platform"]
                     }))
+                elif path == "/api/v2/closed-loops":
+                    records = state.pipeline_checkpoints.list(
+                        pipeline_kind="bo-gp-closed-loop-v2",
+                        owner_id=session.user_id, limit=100,
+                    )
+                    if session.legacy_access:
+                        legacy = state.pipeline_checkpoints.list(
+                            pipeline_kind="bo-gp-closed-loop-v2", limit=100,
+                        )
+                        known = {item["pipeline_id"] for item in records}
+                        records.extend(item for item in legacy
+                                       if item.get("owner_id") is None
+                                       and item["pipeline_id"] not in known)
+                        records.sort(key=lambda item: item["updated_at"], reverse=True)
+                    self._json({"closed_loops": records[:100]})
+                elif path == "/api/v2/external-optimizer-loops":
+                    records = state.pipeline_checkpoints.list(
+                        pipeline_kind=EXTERNAL_L2_KIND, owner_id=session.user_id,
+                        limit=100,
+                    )
+                    self._json({"external_optimizer_loops": records})
+                elif path.startswith("/api/v2/external-optimizer-loops/"):
+                    checkpoint = state.pipeline_checkpoints.get(unquote(
+                        path.removeprefix("/api/v2/external-optimizer-loops/")))
+                    if (checkpoint["pipeline_kind"] != EXTERNAL_L2_KIND
+                            or checkpoint.get("owner_id") not in {None, session.user_id}
+                            and not session.legacy_access):
+                        raise KeyError(path)
+                    self._json(checkpoint)
                 elif path.startswith("/api/v2/closed-loops/"):
                     checkpoint = state.pipeline_checkpoints.get(
                         unquote(path.removeprefix("/api/v2/closed-loops/")))
@@ -3700,7 +4968,7 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     configurable through direct research harnesses, never by a
                     browser/client pretending to run the autonomous product.
                     """
-                    allowed = {"design_id", "clock", "platform", "objective_profile"}
+                    allowed = {"spec_id", "candidate_id", "objective_profile"}
                     unexpected = sorted(set(payload) - allowed)
                     if unexpected:
                         raise ValueError(
@@ -3714,15 +4982,6 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         raise ValueError(
                             "the automatic RTL product entry accepts no model, testbench, "
                             "cost, step, revision, or execution controls"
-                        )
-                    return scoped({})
-
-                def autonomous_resume_request(payload: dict[str, Any]) -> dict[str, Any]:
-                    """The service, not the browser, owns the loop execution budget."""
-                    if payload:
-                        raise ValueError(
-                            "the autonomous v2 resume entry accepts no transition, seed, "
-                            "repetition, round, or search controls"
                         )
                     return scoped({})
 
@@ -3771,17 +5030,18 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         unquote(match.group(1)), autonomous_rtl_request(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
-                if path == "/api/v2/closed-loops":
-                    self._json(state.start_bayesian_closed_loop(
+                if path == "/api/v2/external-optimizer-loops":
+                    self._json(state.start_external_optimizer_loop(
                         autonomous_product_request(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
-                match = re.fullmatch(r"/api/v2/closed-loops/([^/]+)/run-to-boundary", path)
+                match = re.fullmatch(r"/api/v2/external-optimizer-loops/([^/]+)/advance", path)
                 if match:
-                    self._json(state.run_bayesian_closed_loop_to_boundary(
-                        unquote(match.group(1)), autonomous_resume_request(self._read_json()),
-                        owner_id=session.user_id,
-                        include_legacy=session.legacy_access))
+                    if self._read_json():
+                        raise ValueError("external optimizer advance accepts no browser execution controls")
+                    self._json(state.advance_external_optimizer_loop(
+                        unquote(match.group(1)), owner_id=session.user_id,
+                        include_legacy=session.legacy_access, execute=False))
                     return
                 if path == "/api/research/protocols":
                     self._json(state.preregister_paper_protocol(scoped(self._read_json())), HTTPStatus.CREATED)

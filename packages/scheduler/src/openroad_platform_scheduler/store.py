@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from openroad_platform_contracts import RunRequest, RunResult, RunStatus
+from openroad_platform_contracts import RunRequest, RunResult, RunStatus, RuntimeStatus
 
 
 TERMINAL = {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED}
@@ -24,6 +24,7 @@ class Job:
     heartbeat_at: str | None = None
     result: dict | None = None
     error: str | None = None
+    runtime_run_id: str | None = None
 
 
 class JobStore:
@@ -86,6 +87,83 @@ class JobStore:
 
     def mark_running(self, job_id: str) -> None:
         self._transition(job_id, {RunStatus.PREPARING}, RunStatus.RUNNING, "started")
+
+    def bind_runtime_run(self, job_id: str, runtime_run_id: str) -> Job:
+        """Record a non-authoritative link to the sole Runtime run.
+
+        The old jobs table is retained only for backward-compatible reads and
+        cancellation intake.  It must never point one job at multiple Runtime
+        runs.
+        """
+        if not runtime_run_id:
+            raise ValueError("runtime_run_id is required")
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT runtime_run_id FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown job: {job_id}")
+            current = row["runtime_run_id"]
+            if current not in {None, runtime_run_id}:
+                raise ValueError("Legacy job is already bound to a different Runtime run")
+            if current is None:
+                now = _now()
+                connection.execute(
+                    "UPDATE jobs SET runtime_run_id = ?, updated_at = ? WHERE id = ?",
+                    (runtime_run_id, now, job_id),
+                )
+                self._event(connection, job_id, "runtime_bound", {"runtime_run_id": runtime_run_id})
+        return self.get(job_id)
+
+    def project_runtime(self, job_id: str, runtime_view: dict) -> Job:
+        """Copy a terminal Runtime fact into the legacy read model.
+
+        ``runtime_view`` is retained as a pointer-rich snapshot for old clients;
+        RuntimeStore remains the source of truth for attempts, artifacts and
+        canonical terminal status.
+        """
+        run = runtime_view.get("run") if isinstance(runtime_view, dict) else None
+        if not isinstance(run, dict):
+            raise ValueError("runtime_view requires a run object")
+        runtime_run_id = run.get("run_id")
+        try:
+            runtime_status = RuntimeStatus(run.get("status"))
+        except ValueError as exc:
+            raise ValueError("runtime_view has an invalid Runtime status") from exc
+        if runtime_status not in {
+            RuntimeStatus.SUCCEEDED, RuntimeStatus.FAILED, RuntimeStatus.CANCELLED,
+            RuntimeStatus.TIMED_OUT, RuntimeStatus.LOST,
+        }:
+            raise ValueError("Only a terminal Runtime run may be projected")
+        legacy_status = {
+            RuntimeStatus.SUCCEEDED: RunStatus.SUCCEEDED,
+            RuntimeStatus.CANCELLED: RunStatus.CANCELLED,
+            RuntimeStatus.FAILED: RunStatus.FAILED,
+            RuntimeStatus.TIMED_OUT: RunStatus.FAILED,
+            RuntimeStatus.LOST: RunStatus.FAILED,
+        }[runtime_status]
+        error = _runtime_projection_error(runtime_view) if legacy_status is RunStatus.FAILED else None
+        now = _now()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT runtime_run_id FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown job: {job_id}")
+            if row["runtime_run_id"] != runtime_run_id:
+                raise ValueError("Runtime projection does not match the job binding")
+            connection.execute(
+                """UPDATE jobs SET status = ?, result_json = ?, error = ?, updated_at = ?
+                   WHERE id = ?""",
+                (legacy_status.value, json.dumps(runtime_view, ensure_ascii=False),
+                 error, now, job_id),
+            )
+            self._event(connection, job_id, "runtime_projected", {
+                "runtime_run_id": runtime_run_id,
+                "runtime_status": runtime_status.value,
+                "legacy_status": legacy_status.value,
+            })
+        return self.get(job_id)
 
     def heartbeat(self, job_id: str) -> None:
         now = _now()
@@ -191,6 +269,7 @@ class JobStore:
                     error TEXT,
                     claimed_by TEXT,
                     heartbeat_at TEXT,
+                    runtime_run_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -205,6 +284,11 @@ class JobStore:
                 );
                 """
             )
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+            }
+            if "runtime_run_id" not in columns:
+                connection.execute("ALTER TABLE jobs ADD COLUMN runtime_run_id TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, isolation_level=None)
@@ -228,6 +312,7 @@ class JobStore:
             request=RunRequest.from_dict(json.loads(row["request_json"])),
             result=json.loads(row["result_json"]) if row["result_json"] else None,
             error=row["error"],
+            runtime_run_id=row["runtime_run_id"],
             claimed_by=row["claimed_by"],
             heartbeat_at=row["heartbeat_at"],
             created_at=row["created_at"],
@@ -237,3 +322,14 @@ class JobStore:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _runtime_projection_error(runtime_view: dict) -> str:
+    run = runtime_view["run"]
+    reason = str(run.get("terminal_reason") or run.get("status") or "runtime_failed")
+    for stage in runtime_view.get("stages", []):
+        for attempt in reversed(stage.get("attempts", [])):
+            failure = attempt.get("failure")
+            if isinstance(failure, dict) and failure.get("message"):
+                return f"{reason}: {failure['message']}"
+    return reason

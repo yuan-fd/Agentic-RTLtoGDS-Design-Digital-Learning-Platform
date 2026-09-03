@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/app.css?v=20260821c">
+  <link rel="stylesheet" href="/assets/app.css?v=20260828d">
 </head>
 <body>
   <header class="site-header">
@@ -211,7 +211,17 @@
 
         <section class="task-panel">
           <header class="task-panel-head"><span>②</span><div><b data-i18n="backend.config.title">Choose constraints and optimization goal</b><small data-i18n="backend.config.subtitle">The Agent owns baseline settings, coupled-parameter search, repetition count, and stopping policy.</small></div></header>
-          <div class="task-panel-body"><div class="backend-config-grid"><label><span data-i18n="backend.clock">Clock port</span><input id="flowClock" value="clk"></label><label><span data-i18n="backend.platform">PDK / platform</span><select id="flowPdk"><option value="nangate45">Nangate45 · OpenROAD</option><option value="sky130hd">Sky130HD · OpenROAD</option><option value="sky130hs">Sky130HS · OpenROAD</option><option value="asap7">ASAP7 · OpenROAD</option><option value="gf180">GF180 · OpenROAD</option></select></label></div><fieldset class="objective-options"><legend data-i18n="backend.objective">Optimization objective</legend><label><input type="radio" name="flowObjective" value="balanced" checked><span data-i18n="backend.objective.balanced">Balanced</span></label><label><input type="radio" name="flowObjective" value="timing"><span data-i18n="backend.objective.timing">Timing first</span></label><label><input type="radio" name="flowObjective" value="area"><span data-i18n="backend.objective.area">Area first</span></label><label><input type="radio" name="flowObjective" value="power"><span data-i18n="backend.objective.power">Power first</span></label></fieldset><p class="field-note"><b>This is not a manual parameter panel.</b> The server runs the default configuration three times as round 0, then BO/GP chooses coupled utilization and placement-density combinations. The specification clock is frozen for every arm so timing cannot be “improved” by relaxing the requirement. Every candidate is measured three times. Three consecutive rounds below the registered improvement threshold trigger stage diagnosis.</p></div>
+          <div class="task-panel-body"><div class="backend-config-grid"><label><span data-i18n="backend.clock">Clock port</span><input id="flowClock" value="clk"></label><label><span data-i18n="backend.platform">PDK / platform</span><select id="flowPdk"><option value="nangate45">Nangate45 · OpenROAD</option><option value="sky130hd">Sky130HD · OpenROAD</option><option value="asap7">ASAP7 · OpenROAD</option></select></label></div><fieldset class="objective-options"><legend data-i18n="backend.objective">Optimization objective</legend><label><input type="radio" name="flowObjective" value="balanced" checked><span data-i18n="backend.objective.balanced">Balanced</span></label><label><input type="radio" name="flowObjective" value="timing"><span data-i18n="backend.objective.timing">Timing first</span></label><label><input type="radio" name="flowObjective" value="area"><span data-i18n="backend.objective.area">Area first</span></label><label><input type="radio" name="flowObjective" value="power"><span data-i18n="backend.objective.power">Power first</span></label></fieldset><p class="field-note"><b>This is not a manual parameter panel.</b> The server owns an 11-dimensional mixed ORFS search space spanning floorplan, placement, CTS, and routing. It first measures the frozen default baseline, then covers at least 44 unique Sobol configurations before ARD-GP/qNEHVI may declare a three-round stall. Repeated OR_SEED runs estimate noise; they do not count as new design-space points. Clock and SDC requirements remain frozen.</p></div>
+        </section>
+
+        <section class="task-panel optimization-dashboard" id="optimizationDashboard">
+          <header class="task-panel-head"><span>④</span><div><b>Industrial DSE evidence dashboard</b><small>Observed OpenROAD evidence only; predicted values and quick-fidelity proxies are labelled separately.</small></div></header>
+          <div class="task-panel-body">
+            <div class="optimization-kpis" id="optimizationKpis"><div><b>—</b><span>Optimizer</span></div><div><b>—</b><span>Unique configurations</span></div><div><b>—</b><span>Full evaluations</span></div><div><b>—</b><span>Best verified utility</span></div></div>
+            <div class="optimization-charts"><article><b>Anytime best-so-far · observed full-flow</b><svg id="optimizationAnytime" viewBox="0 0 640 220" role="img" aria-label="Anytime best utility"></svg></article><article><b>Observed area–timing Pareto projection</b><svg id="optimizationPareto" viewBox="0 0 640 220" role="img" aria-label="Observed Pareto projection"></svg></article><article><b>Quick → full evidence funnel</b><div id="optimizationFunnel" class="optimization-funnel"><span>No campaign selected.</span></div></article></div>
+            <div class="optimization-detail"><article><b>Parameter and stage coverage</b><div id="optimizationParameters" class="data-list"><div class="empty-row">No campaign selected.</div></div></article><article><b>Predicted uncertainty · never measured QoR</b><div id="optimizationPredictions" class="data-list"><div class="empty-row">No fitted surrogate predictions.</div></div></article><article><b>Evidence-gated memory</b><div id="optimizationMemory" class="data-list"><div class="empty-row">No verified memory artifacts.</div></div></article><article><b>Runtime, liveness, and failure evidence</b><div id="optimizationRuntime" class="data-list"><div class="empty-row">No Runtime evidence.</div></div></article></div>
+            <p class="field-note" id="optimizationBoundary">No claim is available until the campaign records Runtime evidence.</p>
+          </div>
         </section>
 
         <section class="task-panel">
@@ -272,6 +282,6 @@
     </section>
   </main>
   <footer><span>OpenROAD Self-Evolving EDA Platform</span><span class="footer-health" title="Platform status"><i id="healthDot"></i><b id="healthText">Connecting</b></span><span>Spec → RTL → GDS · verified evidence</span></footer>
-  <script src="/assets/app.js?v=20260821c"></script>
+  <script src="/assets/app.js?v=20260828d"></script>
 </body>
 </html>

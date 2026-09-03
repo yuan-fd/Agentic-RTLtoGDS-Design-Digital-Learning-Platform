@@ -7,8 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from openroad_platform_contracts import RuntimeStatus, TaskSpec
-from openroad_platform_execution import build_orfs_task
+from openroad_platform_contracts import (
+    RTLToGDSFactory,
+    RTLToGDSRequest,
+    RuntimeStatus,
+    TaskSpec,
+)
 
 from .runtime import WorkflowRuntime
 
@@ -27,6 +31,7 @@ def execute_verified_rtl_to_orfs(
     verification_task: TaskSpec,
     *,
     top: str,
+    rtl_to_gds_factory: RTLToGDSFactory,
     orfs_options: dict[str, Any] | None = None,
 ) -> RTLToORFSResult:
     """Only a Runtime-succeeded RTL verification artifact may enter ORFS."""
@@ -43,14 +48,15 @@ def execute_verified_rtl_to_orfs(
     actual = _sha256(rtl_path)
     if actual != artifact["sha256"]:
         raise RuntimeError("verified RTL artifact changed before ORFS submission")
-    task = build_orfs_task(
-        rtl_path, project_id=verification_task.project_id,
+    task = rtl_to_gds_factory.build(RTLToGDSRequest(
+        rtl_path=str(rtl_path), project_id=verification_task.project_id,
         design_id=verification_task.design_id,
         task_id=f"orfs-after-{verification_task.task_id}", top=top,
         labels={"source_run_id": verify_run.run_id, "source_plugin": "rtl-verify"},
-        **dict(orfs_options or {}),
-    )
-    orfs_run = _drain(runtime, runtime.submit(task, capability="eda.rtl_to_gds").run_id)
+        options=dict(orfs_options or {}),
+    ))
+    orfs_run = _drain(runtime, runtime.submit(
+        task, capability=rtl_to_gds_factory.capability).run_id)
     return RTLToORFSResult(verify_run.run_id, orfs_run.run_id, orfs_run.status, actual,
                            orfs_run.terminal_reason)
 
@@ -60,6 +66,7 @@ def execute_rtl_to_orfs(
     rtl_task: TaskSpec,
     *,
     top: str,
+    rtl_to_gds_factory: RTLToGDSFactory,
     orfs_options: dict[str, Any] | None = None,
 ) -> RTLToORFSResult:
     """Run RTL generation, then submit its hashed RTL as an ORFS child run.
@@ -86,16 +93,14 @@ def execute_rtl_to_orfs(
         raise RuntimeError("registered RTL artifact changed before ORFS submission")
 
     options = dict(orfs_options or {})
-    task = build_orfs_task(
-        rtl_path,
-        project_id=rtl_task.project_id,
-        design_id=rtl_task.design_id,
-        top=top,
+    task = rtl_to_gds_factory.build(RTLToGDSRequest(
+        rtl_path=str(rtl_path), project_id=rtl_task.project_id,
+        design_id=rtl_task.design_id, top=top,
         task_id=f"orfs-after-{rtl_task.task_id}",
         labels={"source_run_id": rtl_run.run_id, "source_plugin": "rtlscout"},
-        **options,
-    )
-    orfs_run = runtime.submit(task, capability="eda.rtl_to_gds")
+        options=options,
+    ))
+    orfs_run = runtime.submit(task, capability=rtl_to_gds_factory.capability)
     orfs_run = _drain(runtime, orfs_run.run_id)
     return RTLToORFSResult(
         rtl_run_id=rtl_run.run_id,

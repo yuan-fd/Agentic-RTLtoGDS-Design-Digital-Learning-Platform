@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "plugin_id": "statetune",
+  "repository": "https://github.com/C-YuLong/stateTune.git",
+  "commit": "66ea6061128afcb389ae36dab51e29bd0847f268",
+  "cache_path": ".external-src/stateTune",
+  "paper": {
+    "title": "StateTune: Transforming LLM-Assisted EDA Flow Tuning into a Stateful, Closed-Loop Process",
+    "venue": "ICCAD 2026",
+    "doi": "10.1145/3831252.3834031",
+    "arxiv": "2608.23601"
+  },
+  "admission_status": "source-audit-only",
+  "license_status": "not_declared_in_checked_revision",
+  "checked_paths": ["LICENSE", "COPYING", "NOTICE"],
+  "reason": "README references LICENSE but commit 66ea6061128afcb389ae36dab51e29bd0847f268 contains no license file. Do not copy, modify, redistribute, or register an executable platform plugin until the authors publish a license or provide permission.",
+  "technical_findings": {
+    "native_openroad_backend": "src/EDATuner/runners/openroad_runner.py",
+    "main_loop": "src/EDATuner/main.py",
+    "persistent_memory": "src/EDATuner/knowledge/",
+    "ehvi_agent": "src/EDATuner/agents/mo_ehvi_agent.py",
+    "external_dependencies": ["RAG-EDA corpus", "OpenAI-compatible API or DashScope", "Cadence/LSF optional for paper flow"]
+  }
+}

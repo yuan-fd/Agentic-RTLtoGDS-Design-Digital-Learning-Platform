@@ -69,9 +69,19 @@ def test_tutorial_shaped_language_to_runtime_trace_smoke(tmp_path):
     model.responses=iter([raw])
     query=L1ModelBoundary.propose_tool(model,goal,state2,hits)
     loop.plan_validate_execute("trace-1",goal,state2,query.call,TrustedPolicyIdentity("policy-1","v1","platform",provenance),planner_summary=query.decision_summary)
-    trace.record_reflection("trace-1",state2,summary="Registered Runtime metrics were observed; stop this bounded tutorial smoke.",decision="stop",evidence=query.citations)
+    basis = tuple(event.event_id for event in trace.store.read("trace-1")
+                  if event.kind.value in {"state_transition", "tool_receipt"})
+    trace.record_reflection("trace-1",state2,summary="Registered Runtime metrics were observed; stop this bounded tutorial smoke.",decision="stop",evidence=query.citations,basis_event_ids=basis)
     events=trace.store.read("trace-1")
     assert state2.status == "observed" and any(event.kind.value == "state_transition" for event in events)
     assert events[-1].kind.value == "reflection_recorded" and events[-1].facts["decision"] == "stop"
+    drafted, finalized = events[0], events[1]
+    transition = next(event for event in events if event.kind.value == "state_transition")
+    assert drafted.facts["request_text"] == "Run a bounded route step then inspect its metrics."
+    assert drafted.facts["clarification_questions"] == [] and drafted.facts["clarification_answers"] == []
+    assert finalized.facts["goal_ir"]["pdk_id"] == "pdk-1"
+    assert transition.facts["state_before"]["status"] == "running"
+    assert transition.facts["state_after"]["status"] == "observed"
+    assert events[-1].facts["basis_event_ids"]
     for pointer in (knowledge, provenance, rtl):
         assert hashlib.sha256((Path(__file__).parents[1] / pointer.ref).read_bytes()).hexdigest() == pointer.sha256

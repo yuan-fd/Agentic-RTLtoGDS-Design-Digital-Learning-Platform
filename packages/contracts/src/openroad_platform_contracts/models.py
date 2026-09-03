@@ -47,6 +47,16 @@ class ArtifactKind(str, Enum):
 @dataclass(frozen=True)
 class RunRequest:
     rtl_path: str
+    # Ordered multi-file/SystemVerilog bundle. ``rtl_path`` remains the
+    # primary source for backward compatibility and top inference.  When this
+    # tuple is non-empty, every file is staged with its path relative to
+    # ``rtl_root``; source order is part of the experiment identity.
+    rtl_files: tuple[str, ...] = ()
+    rtl_root: str | None = None
+    rtl_include_dirs: tuple[str, ...] = ()
+    synth_hdl_frontend: str | None = None
+    design_options: dict[str, Any] = field(default_factory=dict)
+    sdc_path: str | None = None
     top: str | None = None
     clock: str | None = None
     clock_period_ns: float = 10.0
@@ -54,6 +64,9 @@ class RunRequest:
     target_stage: RunStage = RunStage.FINISH
     core_utilization_pct: float = 10.0
     place_density: float = 0.45
+    # Versioned plugin-owned tuning vector. Legacy scalar fields remain as a
+    # compatibility projection; new optimization campaigns use this mapping.
+    flow_parameters: dict[str, Any] = field(default_factory=dict)
     # OpenROAD detailed routing randomizes the order of nets to reroute.  Keep
     # this explicit so replicated paper experiments can use paired seeds
     # instead of pretending that identical deterministic reruns are samples.
@@ -67,6 +80,37 @@ class RunRequest:
         rtl = Path(self.rtl_path).expanduser()
         if require_rtl and not rtl.is_file():
             raise ValueError(f"RTL file does not exist: {rtl}")
+        bundle = tuple(Path(item).expanduser() for item in self.rtl_files)
+        if bundle:
+            root = Path(self.rtl_root).expanduser().resolve() if self.rtl_root else None
+            if root is None or not root.is_dir():
+                raise ValueError("rtl_root must be an existing directory for a multi-file bundle")
+            for source in bundle:
+                resolved = source.resolve()
+                if require_rtl and (not resolved.is_file() or resolved.stat().st_size == 0):
+                    raise ValueError(f"RTL bundle file does not exist or is empty: {resolved}")
+                if not resolved.is_relative_to(root):
+                    raise ValueError(f"RTL bundle file escapes rtl_root: {resolved}")
+                if resolved.suffix.lower() not in {".v", ".sv"}:
+                    raise ValueError(f"RTL bundle source must be .v or .sv: {resolved}")
+            if require_rtl and rtl.resolve() not in {item.resolve() for item in bundle}:
+                raise ValueError("rtl_path must identify one source in rtl_files")
+            for include in self.rtl_include_dirs:
+                directory = Path(include).expanduser().resolve()
+                if not directory.is_dir() or not directory.is_relative_to(root):
+                    raise ValueError(f"RTL include directory is invalid or escapes rtl_root: {directory}")
+        elif self.rtl_root is not None or self.rtl_include_dirs:
+            raise ValueError("rtl_root/include directories require rtl_files")
+        if self.synth_hdl_frontend not in {None, "yosys", "slang"}:
+            raise ValueError("synth_hdl_frontend must be yosys, slang, or null")
+        if not isinstance(self.design_options, dict) or not all(
+            isinstance(name, str) and name for name in self.design_options
+        ):
+            raise ValueError("design_options must be a string-keyed mapping")
+        if self.sdc_path is not None:
+            sdc = Path(self.sdc_path).expanduser()
+            if require_rtl and (not sdc.is_file() or sdc.stat().st_size == 0):
+                raise ValueError(f"SDC file does not exist or is empty: {sdc}")
         if self.top is not None and not re.fullmatch(r"[A-Za-z_]\w*", self.top):
             raise ValueError(f"Invalid top module: {self.top}")
         if self.clock is not None and not re.fullmatch(r"[A-Za-z_]\w*", self.clock):
@@ -77,6 +121,10 @@ class RunRequest:
             raise ValueError("core_utilization_pct must be between 0 and 100")
         if not 0 < self.place_density <= 1:
             raise ValueError("place_density must be between 0 and 1")
+        if not isinstance(self.flow_parameters, dict) or not all(
+            isinstance(name, str) and name for name in self.flow_parameters
+        ):
+            raise ValueError("flow_parameters must be a string-keyed mapping")
         if (not isinstance(self.or_seed, int) or isinstance(self.or_seed, bool)
                 or not 0 <= self.or_seed <= 2_147_483_647):
             raise ValueError("or_seed must be an integer between 0 and 2147483647")
@@ -94,6 +142,8 @@ class RunRequest:
     def from_dict(cls, value: dict[str, Any]) -> RunRequest:
         payload = dict(value)
         payload["target_stage"] = RunStage(payload.get("target_stage", RunStage.FINISH))
+        payload["rtl_files"] = tuple(payload.get("rtl_files") or ())
+        payload["rtl_include_dirs"] = tuple(payload.get("rtl_include_dirs") or ())
         return cls(**payload)
 
 

@@ -49,3 +49,9 @@ def test_policy_and_receipt_events_require_their_respective_evidence() -> None:
 def test_trace_event_rejects_partial_state_hash() -> None:
     with pytest.raises(ValueError, match="supplied together"):
         L1TraceEvent(**{**_event().__dict__, "state_before_sha256": None}).validate()
+
+
+@pytest.mark.parametrize("summary", ["<think>private scratchpad</think>", "Chain of thought: first do x", "api_key=secret"])
+def test_trace_event_rejects_hidden_reasoning_or_secret_like_summary(summary: str) -> None:
+    with pytest.raises(ValueError, match="planner_summary"):
+        L1TraceEvent(**{**_event().__dict__, "planner_summary": summary}).validate()

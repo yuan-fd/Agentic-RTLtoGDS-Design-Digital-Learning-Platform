@@ -58,6 +58,42 @@ P8 状态：`taiwei-pin-3d@1.0.0` 协议接入完成；固定 3D 工具链因 Gi
 - P15 已完成固定构建和 patch 前像检查；两份完整 from-clean 候选可应用，两份 framework delta 失配。
 - 尚未执行 evolved candidate 的真实 full-flow/QoR 对照，不得宣称代码优化效果已验证。
 
+## ORFS-Agent
+
+- 官方仓库：`ABKGroup/ORFS-Agent`，固定 commit
+  `730f1fa11f9c17c0aaac332412af2b2538f42e9b`，BSD-3-Clause。
+- 上游的完整 campaign 假设特定 ORFS revision、三个设计、远程 SSH 主机和
+  Anthropic；不能直接成为本平台的 scheduler。
+- 已接入的第一边界是 `orfs-agent@2025.1` dataset bridge：将完整的、带
+  observation id 和 artifact 引用的 Runtime observations 转成上游
+  `output.json` 行格式，并校验 source lock。它不替代上游算法，更不会悄悄
+  回退到旧 `stateful-l2-portfolio-v1`。
+- 已通过平台托管 `codex-cli:gpt-5.6-terra` 的窄适配调用上游 analyst：模型只
+  选择实测训练子集，上游 `scikit-optimize` GP/EI 产生数值候选。真实 OpenROAD
+  baseline → candidate → repeated evaluation 已作为 smoke 跑通；这证明链路，
+  不构成跨设计 PPA 优势声明。
+
+## Seeded Random Control
+
+- `seeded-random-control@1.0.0` 不是外部研究项目，也不替代 ORFS-Agent；它是
+  论文比较协议所需的内部、非自适应对照插件。
+- 入口：`seeded_random_control_adapter.py`；仅使用独立 Python 3.9 标准库环境，
+  无网络、无 QoR 读取能力、无 ORFS 启动能力。
+- 输入是预检已经收缩后的有限参数域、固定 seed 与已用坐标指纹。它只做无放回
+  抽样；可用坐标不足时明确失败，绝不以重复配置补足预算。
+- 输出候选、输入清单和抽样 trace；实际 OpenROAD 调用、工件哈希和 QoR 真相仍由
+  Runtime 与 protected evaluator 负责。
+
+## StateTune（用户口中的 StateTuner）
+
+- 官方仓库：`C-YuLong/stateTune`，固定 commit
+  `66ea6061128afcb389ae36dab51e29bd0847f268`；论文为 ICCAD 2026，
+  DOI `10.1145/3831252.3834031`。
+- 技术上它提供完整的 typed persistent memory、evidence gating、multi-fidelity
+  qEHVI 和 runtime-aware promotion，可作为 L2 目标实现，而非让平台重写。
+- 该 commit 实际没有 LICENSE/COPYING/NOTICE；目前只作 read-only source audit，
+  没有 Runtime 插件，也不复制或修改其源码。获得许可证/作者许可后才可正式接入。
+
 ## EDACraft Extension Pack
 
 - 官方仓库：`ephonic/EDACraft`；固定 commit `739eee0f3ced8fc3cbb6f01b6cc89414758fd898`。

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "pinned-orfs-toolchain",
+  "orfs_commit": "51ad1231a231ee85234c06db807688d029b85c35",
+  "patches": [
+    {
+      "path": "integrations/orfs/patches/0001-headless-final-report.patch",
+      "sha256": "9adff4b928fb727842fd71be52429303f737484a3d027fcf3083a0b078b4ca58",
+      "purpose": "Skip optional GUI screenshot only when gui::show is unavailable in a batch session",
+      "patched_file": "flow/scripts/final_report.tcl",
+      "patched_file_sha256": "f5fd7ca8992b7803039ff2b264abffa94b6330cdd365f9909766f99d16ba4b06"
+    }
+  ],
+  "orfs_binary_patch_sha256": "9adff4b928fb727842fd71be52429303f737484a3d027fcf3083a0b078b4ca58",
+  "binaries": {
+    "openroad": {
+      "sha256": "bd83d3fd24471f199638eea71e463a0e5592e93f53174b1c5e375c43711c20a8"
+    },
+    "yosys": {
+      "sha256": "4a00aafa0da7ef48620552e308a285efe24571c987e727f3eb69899f24f38574"
+    },
+    "klayout": {
+      "sha256": "faf1988fec29530f320fbfb8763d035400f743e77f66c46523fd01ddb8fd5ddb"
+    }
+  },
+  "formal_experiment_policy": "The ORFS worktree must match this commit and exactly this patch; generated design directories and unrelated developer changes are forbidden."
+}

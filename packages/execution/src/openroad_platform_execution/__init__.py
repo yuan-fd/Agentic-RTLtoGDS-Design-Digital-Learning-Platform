@@ -2,6 +2,11 @@
 
 from .adapter import AdapterExecution, ProcessAdapter
 from .orfs_runner import ORFSRunner
+from .orfs_generated_design import (
+    generated_design_from_platform_plan, generated_design_from_reference_design,
+    install_generated_design_adapter, validate_generated_design_adapter,
+)
+from .orfs_reference_designs import ORFSReferenceDesign, load_orfs_reference_design
 from .orfs_plugin import (
     ORFS_PLUGIN_ID,
     ORFS_PLUGIN_VERSION,
@@ -9,9 +14,34 @@ from .orfs_plugin import (
     orfs_plugin_manifest,
 )
 from .orfs_task_factory import ORFSRTLToGDSFactory
+from .orfs_agent_plugin import (
+    ORFS_AGENT_PLUGIN_ID, ORFS_AGENT_PLUGIN_VERSION, ORFS_AGENT_UPSTREAM_COMMIT,
+    build_orfs_agent_dataset_task, build_orfs_agent_native_task,
+    build_orfs_agent_initial_warmup_recipes,
+    orfs_agent_plugin_manifest,
+)
+from .orfs_agent_reproduction_plugin import (
+    ORFS_AGENT_REPRODUCTION_PLUGIN_ID, ORFS_AGENT_REPRODUCTION_VERSION,
+    ORFS_AGENT_COMMIT as ORFS_AGENT_REPRODUCTION_UPSTREAM_COMMIT,
+    ORFS_PAPER_COMMIT as ORFS_AGENT_REPRODUCTION_ORFS_COMMIT,
+    UPSTREAM_PARAMETERS as ORFS_AGENT_REPRODUCTION_PARAMETERS,
+    build_orfs_agent_reproduction_task, orfs_agent_reproduction_manifest,
+)
+from .seeded_random_control_plugin import (
+    SEEDED_RANDOM_CONTROL_PLUGIN_ID, SEEDED_RANDOM_CONTROL_PLUGIN_VERSION,
+    build_seeded_random_control_task, seeded_random_control_plugin_manifest,
+)
+from .orfs_parameters import (
+    ORFS_PARAMETERS, apply_parameter_calibration, apply_parameter_search_allowlist,
+    effective_configuration_id, official_autotuner_common_parameter_names,
+    official_autotuner_independent_parameter_names,
+    orfs_optimization_profile,
+    orfs_parameter_schema, validate_orfs_parameters,
+)
 from .process_guardian import ProcessGuardian, ProcessOutcome
 from .registry import PluginRegistry
 from .toolchain import ToolchainCatalog, ToolchainConfig, load_toolchain
+from .pinned_toolchain import validate_pinned_orfs_toolchain
 from .rtlscout_plugin import (
     RTLSCOUT_PLUGIN_ID,
     RTLSCOUT_PLUGIN_VERSION,
@@ -74,10 +104,29 @@ from .edacraft_extension import (
 
 __all__ = [
     "AdapterExecution", "ProcessAdapter", "ORFSRunner", "ProcessGuardian",
+    "generated_design_from_platform_plan", "generated_design_from_reference_design",
+    "install_generated_design_adapter",
+    "validate_generated_design_adapter",
+    "ORFSReferenceDesign", "load_orfs_reference_design",
     "ProcessOutcome", "PluginRegistry", "ORFS_PLUGIN_ID", "ORFS_PLUGIN_VERSION",
     "build_orfs_task", "orfs_plugin_manifest", "ToolchainCatalog",
     "ORFSRTLToGDSFactory",
-    "ToolchainConfig", "load_toolchain",
+    "ORFS_AGENT_PLUGIN_ID", "ORFS_AGENT_PLUGIN_VERSION", "ORFS_AGENT_UPSTREAM_COMMIT",
+    "build_orfs_agent_dataset_task", "build_orfs_agent_native_task",
+    "build_orfs_agent_initial_warmup_recipes",
+    "orfs_agent_plugin_manifest",
+    "ORFS_AGENT_REPRODUCTION_PLUGIN_ID", "ORFS_AGENT_REPRODUCTION_VERSION",
+    "ORFS_AGENT_REPRODUCTION_UPSTREAM_COMMIT", "ORFS_AGENT_REPRODUCTION_ORFS_COMMIT",
+    "ORFS_AGENT_REPRODUCTION_PARAMETERS", "build_orfs_agent_reproduction_task",
+    "orfs_agent_reproduction_manifest",
+    "SEEDED_RANDOM_CONTROL_PLUGIN_ID", "SEEDED_RANDOM_CONTROL_PLUGIN_VERSION",
+    "build_seeded_random_control_task", "seeded_random_control_plugin_manifest",
+    "ORFS_PARAMETERS", "apply_parameter_calibration", "apply_parameter_search_allowlist",
+    "effective_configuration_id", "official_autotuner_common_parameter_names",
+    "official_autotuner_independent_parameter_names",
+    "orfs_optimization_profile",
+    "orfs_parameter_schema", "validate_orfs_parameters",
+    "ToolchainConfig", "load_toolchain", "validate_pinned_orfs_toolchain",
     "RTLSCOUT_PLUGIN_ID", "RTLSCOUT_PLUGIN_VERSION", "RTLSCOUT_UPSTREAM_COMMIT",
     "build_rtlscout_task", "build_rtlscout_spec_task", "rtlscout_plugin_manifest",
     "RTL_VERIFY_PLUGIN_ID", "RTL_VERIFY_PLUGIN_VERSION", "build_rtl_verify_task",

@@ -91,6 +91,13 @@ def _effective_parameters(workdir: Path, platform: str, design: str,
                           requested: dict) -> dict:
     effective = dict(requested)
     config = workdir / "designs" / platform / design / "config.mk"
+    parameter_contract = workdir / "parameter_contract.json"
+    contract = {}
+    if parameter_contract.is_file():
+        try:
+            contract = json.loads(parameter_contract.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            contract = {}
     if config.is_file():
         text = config.read_text(errors="replace")
         for env_name, key in (("CORE_UTILIZATION", "core_utilization_pct"),
@@ -101,6 +108,20 @@ def _effective_parameters(workdir: Path, platform: str, design: str,
                     effective[key] = float(match.group(1))
                 except ValueError:
                     effective[key] = match.group(1)
+        definitions = ((contract.get("registry") or {}).get("parameters") or [])
+        for definition in definitions:
+            name, env_name = definition.get("name"), definition.get("env_name")
+            if name not in (contract.get("requested_parameters") or {}) or not env_name:
+                continue
+            match = re.search(rf"^\s*export\s+{re.escape(env_name)}\s*=\s*([^#\s]+)", text, re.M)
+            if not match:
+                continue
+            raw = match.group(1)
+            try:
+                value = float(raw)
+                effective[name] = int(value) if value.is_integer() else value
+            except ValueError:
+                effective[name] = raw
     place_log = workdir / "logs" / platform / design / "base" / "3_3_place_gp.log"
     if place_log.is_file():
         text = place_log.read_text(errors="replace")
@@ -113,13 +134,82 @@ def _effective_parameters(workdir: Path, platform: str, design: str,
     return effective
 
 
+def _parameter_liveness(workdir: Path, effective: dict) -> dict:
+    path = workdir / "parameter_contract.json"
+    if not path.is_file():
+        return {"schema_version": 1, "status": "legacy_unregistered",
+                "parameters": [], "claim_boundary": "no typed parameter contract"}
+    try:
+        contract = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"schema_version": 1, "status": "invalid_contract",
+                "error": str(exc), "parameters": []}
+    definitions = {item["name"]: item for item in
+                   (contract.get("registry") or {}).get("parameters", [])}
+    rule_version = (contract.get("registry") or {}).get("liveness_rule_version") \
+        or "legacy-unversioned"
+    source_evidence = {item.get("name"): item for item in contract.get("source_evidence", [])}
+    stage_numbers = {"floorplan": "2", "place": "3", "cts": "4", "route": "5", "finish": "6"}
+    log_parts = []
+    for log in (workdir / "logs").rglob("*.log") if (workdir / "logs").is_dir() else ():
+        try:
+            log_parts.append(log.read_text(errors="replace")[-2_000_000:])
+        except OSError:
+            pass
+    log_text = "\n".join(log_parts)
+    rows = []
+    for name, requested in (contract.get("requested_parameters") or {}).items():
+        materialized = effective.get(name)
+        source = source_evidence.get(name) or {}
+        stage = (definitions.get(name) or {}).get("stage")
+        prefix = stage_numbers.get(stage)
+        stage_completed = bool(prefix and any(
+            (workdir / "results").glob(f"*/*/base/{prefix}_*.odb")
+        ))
+        value_text = f"{materialized:g}" if isinstance(materialized, (int, float)) else str(materialized)
+        runtime_observed = any(re.search(
+            pattern.replace("{value}", re.escape(value_text)), log_text,
+        ) for pattern in source.get("runtime_patterns", ()))
+        match = materialized == requested
+        if runtime_observed:
+            level = "runtime_value_observed"
+        elif match and source.get("consumer_declared") and stage_completed:
+            level = "consumer_stage_completed"
+        elif match:
+            level = "config_materialized"
+        else:
+            level = "missing"
+        rows.append({
+            "name": name, "env_name": (definitions.get(name) or {}).get("env_name"),
+            "requested": requested, "materialized": materialized,
+            "materialized_match": match,
+            "consumer_declared": bool(source.get("consumer_declared")),
+            "consumer_sha256": source.get("consumer_sha256"),
+            "stage": stage, "stage_completed": stage_completed,
+            "runtime_observed": runtime_observed,
+            "evidence_level": level,
+        })
+    return {
+        "schema_version": 1,
+        "liveness_rule_version": rule_version,
+        "status": "materialized" if rows and all(row["materialized_match"] for row in rows)
+                  else "empty" if not rows else "mismatch",
+        "effective_configuration_id": contract.get("effective_configuration_id"),
+        "parameters": rows,
+        "claim_boundary": "runtime_value_observed is strongest; consumer_stage_completed proves the pinned consumer and stage ran but not the exact internal numeric use",
+    }
+
+
 def write_run_evidence(workdir: str | Path, *, platform: str, design: str,
                        rtl_path: str | Path, requested_parameters: dict,
                        engine: str, strategy: str, status: str,
                        runtime_seconds: float | None = None,
                        stage_records: list[dict] | None = None,
                        execution_command: list[str] | None = None,
-                       orfs_root: str | Path | None = None) -> dict:
+                       orfs_root: str | Path | None = None,
+                       openroad_bin: str | Path | None = None,
+                       yosys_bin: str | Path | None = None,
+                       or_seed: int | None = None) -> dict:
     workdir = Path(workdir).resolve()
     rtl_path = Path(rtl_path).resolve()
     analysis_dir = workdir / "analysis"
@@ -133,6 +223,7 @@ def write_run_evidence(workdir: str | Path, *, platform: str, design: str,
         if stage in metrics.get("stages", {}):
             metrics["stages"][stage]["sources"] = stage_sources
     effective = _effective_parameters(workdir, platform, design, requested_parameters)
+    parameter_liveness = _parameter_liveness(workdir, effective)
 
     config_path = workdir / "designs" / platform / design / "config.mk"
     project_root = Path(__file__).resolve().parent.parent
@@ -151,14 +242,18 @@ def write_run_evidence(workdir: str | Path, *, platform: str, design: str,
         "status": status,
         "runtime_seconds": runtime_seconds,
         "target_stage": expected_stage,
-        "random_seed": {"value": None, "status": "not_exposed"},
+        "random_seed": {
+            "value": or_seed,
+            "status": "controlled" if or_seed is not None else "not_exposed",
+        },
         "inputs": {"rtl": str(rtl_path), "rtl_sha256": _sha256(rtl_path)},
         "requested_parameters": requested_parameters,
         "effective_parameters": effective,
+        "parameter_liveness": parameter_liveness,
         "tools": {
-            "openroad": _version([str(Path.home() / "bin/openroad"), "-version"]),
-            "yosys": _version([str(Path.home() / "bin/yosys"), "-V"]),
-            "orfs_commit": _version(["git", "-C", str(Path.home() / "OpenROAD-flow-scripts"),
+            "openroad": _version([str(openroad_bin or Path.home() / "bin/openroad"), "-version"]),
+            "yosys": _version([str(yosys_bin or Path.home() / "bin/yosys"), "-V"]),
+            "orfs_commit": _version(["git", "-C", str(resolved_orfs_root),
                                       "rev-parse", "HEAD"]),
         },
         "platform_provenance": {
@@ -207,6 +302,7 @@ def write_run_evidence(workdir: str | Path, *, platform: str, design: str,
     }
     outputs = {"run_manifest.json": manifest, "stage_metrics.json": metrics,
                "stage_deltas.json": deltas, "causal_evidence.json": evidence}
+    outputs["parameter_liveness.json"] = parameter_liveness
     for filename, payload in outputs.items():
         _write_json(analysis_dir / filename, payload)
 

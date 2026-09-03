@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "orfs",
-  "plugin_version": "1.0.0",
+  "plugin_version": "1.2.0",
   "adapter_entry": ["python3", "./orfs_adapter.py"],
   "capabilities": ["eda.orfs", "eda.rtl_to_gds"],
   "supported_arch": ["aarch64"],
@@ -24,6 +24,8 @@
     {"kind": "report", "required": false},
     {"kind": "config", "required": false},
     {"kind": "toolchain_snapshot", "required": false},
+    {"kind": "parameter_contract", "required": false},
+    {"kind": "design_input_manifest", "required": false},
     {"kind": "run_result", "required": false},
     {"kind": "other", "required": false}
   ],

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "plugin_id": "seeded-random-control",
+  "plugin_version": "1.0.0",
+  "adapter_entry": ["python3", "./seeded_random_control_adapter.py"],
+  "capabilities": ["optimizer.l2.control.random"],
+  "supported_arch": ["aarch64", "x86_64"],
+  "input_schema": {"type": "object", "required": ["mode", "design", "platform", "objective", "search_parameter_names", "fixed_parameters", "admissible_values", "n_suggestions", "seed"]},
+  "output_schema": {"type": "object", "required": ["status", "artifacts", "provenance"]},
+  "required_tools": ["python3"],
+  "default_timeout_seconds": 1800,
+  "artifact_rules": [
+    {"kind": "optimizer_candidates", "required": true},
+    {"kind": "optimizer_input_manifest", "required": true},
+    {"kind": "optimizer_trace", "required": true},
+    {"kind": "log", "required": false}
+  ],
+  "environment": {}
+}

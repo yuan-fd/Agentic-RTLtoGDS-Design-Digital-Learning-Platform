@@ -52,7 +52,9 @@ class Heartbeat:
 def _oldest_ready_run(state: ApiState):
     ready = {"queued", "retry_wait"}
     runs = [run for run in state.runtime_store.list_runs(limit=500)
-            if run.status.value in ready]
+            if run.status.value in ready
+            and not run.task_spec.labels.get("v2_pipeline_id")
+            and not run.task_spec.labels.get("external_l2_pipeline_id")]
     return runs[-1] if runs else None
 
 

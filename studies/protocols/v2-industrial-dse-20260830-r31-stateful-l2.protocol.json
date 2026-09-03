@@ -1,0 +1,948 @@
+{
+  "ablation_budget": 200,
+  "ablations": [
+    {
+      "ablation_id": "no_gp",
+      "removed": "surrogate/acquisition",
+      "replacement": "scrambled Sobol with equal budget"
+    },
+    {
+      "ablation_id": "no_multifidelity",
+      "removed": "CTS screening",
+      "replacement": "every proposal receives finish evaluation"
+    },
+    {
+      "ablation_id": "no_feasibility",
+      "removed": "failure probability constraint"
+    },
+    {
+      "ablation_id": "no_trust_region",
+      "removed": "stall-localized TuRBO-style route"
+    },
+    {
+      "ablation_id": "no_memory",
+      "removed": "validated numeric priors and routing hints"
+    },
+    {
+      "ablation_id": "no_stage_focus",
+      "removed": "diagnosis-guided local dimensions"
+    },
+    {
+      "ablation_id": "no_edair",
+      "removed": "typed loss-aware EDA evidence packet"
+    },
+    {
+      "ablation_id": "no_safe_initialization",
+      "removed": "feasible-anchor one-factor-at-a-time Sobol cold start",
+      "replacement": "global scrambled Sobol with equal candidate budget"
+    },
+    {
+      "ablation_id": "single_replica_error_control",
+      "interpretation": "variance/claim error only",
+      "removed": "replicated final replay"
+    },
+    {
+      "ablation_id": "no_state_policy",
+      "removed": "L1 evidence-bound strategy/subspace selector; retain the same BO, parameter domain, budget and Runtime evaluator"
+    }
+  ],
+  "budget_checkpoints": [
+    50,
+    100,
+    200,
+    375,
+    600
+  ],
+  "budget_unit": "unique proposed effective configuration",
+  "claim_boundaries": [
+    "No optimizer-superiority claim is made before all paired primary cells finish.",
+    "Official AutoTuner is compared on the common domain; the full-domain portfolio is compared only with full-domain random and Sobol controls.",
+    "A successful run proves execution only; optimization requires repeated common-evaluator statistics.",
+    "The six primary blocks provide moderate power for large effects, not universal EDA generalization.",
+    "r27 static-portfolio results are not pooled with this stateful-L2 study; only r31 cells sharing this digest support a state-policy claim."
+  ],
+  "common_domain_arms": [
+    {
+      "arm_id": "random",
+      "optimizer": "seeded-random-mixed-v1"
+    },
+    {
+      "arm_id": "sobol",
+      "optimizer": "sobol-scrambled-mixed-v1"
+    },
+    {
+      "arm_id": "tpe",
+      "optimizer": "optuna-motpe-mixed-v1"
+    },
+    {
+      "arm_id": "qlognehvi",
+      "optimizer": "botorch-ard-matern-qlognehvi-mixed-v2"
+    },
+    {
+      "arm_id": "official_autotuner_hyperopt",
+      "optimizer": "official-openroad-autotuner-hyperopt"
+    }
+  ],
+  "endpoint_definitions": {
+    "empirical_attainment": "at each frozen checkpoint, fraction of design-PDK by optimizer-seed cells that reached first_baseline_improvement, with Wilson 95% interval; nonattainment remains right-censored at budget",
+    "first_baseline_improvement": "first logical round whose repeated finish evaluation is hard-constraint eligible and whose observed balanced relative utility is strictly greater than zero; positive hypervolume alone is not improvement"
+  },
+  "execution": {
+    "campaign_namespace_policy": "Runner exclusively owns each cell output directory and creates the cell manifest before any other writer. Campaign diagnostics are written under controller-logs, outside the cell namespace; a pre-existing unbound cell remains rejected instead of being silently reused.",
+    "completion_gate": "controller/protocol failure invalidates the cell; only a complete fixed logical budget may enter aggregation",
+    "external_artifact_namespace": "Official AutoTuner experiment names include study mode, protocol digest, design-PDK, optimizer seed, OR_SEED and logical budget; interrupted cells resume only that immutable Ray experiment and append controller attempts",
+    "external_environment_policy": "Official AutoTuner binds FLOW_HOME, DESIGN_HOME, PLATFORM_HOME, UTILS_DIR, SCRIPTS_DIR and TEST_DIR to the validated pinned ORFS worktree; inherited developer-shell paths cannot redirect execution",
+    "final_replay": "all reported incumbents/Pareto points are replayed at finish with the same three paired OR_SEED values",
+    "frozen_controller_binding_policy": "In paper mode, Campaign and Runner independently recompute the controller source content digest and reject execution unless it equals the controller digest stored in this frozen protocol. A campaign-local manifest hash is additional evidence, never a replacement for the protocol binding.",
+    "full_fidelity": "finish, three paired OR_SEED replicas",
+    "l1_semantic_tool_policy": "L1 submits only typed, allowlisted semantic calls: create_experiment, set_flow_params, run_stage, timing/congestion/DRC/power queries, comparison, policy proposal, stop and escalation. No generic shell command, script path, environment variable, credential, unregistered stage or unregistered parameter is accepted. run_stage acknowledgement means queued/accepted only; QoR becomes visible solely after the protected Runtime records a completed evaluation.",
+    "minimum_full_per_batch": 4,
+    "promotion_fraction": 0.3,
+    "proxy_activation_gate": {
+      "fallback": "promote without trusting proxy ranking",
+      "minimum_pairs": 12,
+      "minimum_spearman": 0.6
+    },
+    "quick_fidelity": "CTS proxy, one OR_SEED",
+    "source_freeze": "campaign-wide digest over runner plus all local Python evaluator, contract, execution and scheduler sources",
+    "state_storage_policy": "live SQLite WAL databases reside only on a node-local filesystem; every controller boundary publishes a content-verified SQLite backup to one of two alternating durable shared-filesystem mirror slots; resume validates the cell binding and every database hash before restore"
+  },
+  "external_validation_blocks": [
+    {
+      "design": "gcd",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "gcd",
+      "platform": "sky130hd",
+      "role": "external"
+    },
+    {
+      "design": "riscv32i",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "riscv32i",
+      "platform": "sky130hd",
+      "role": "external"
+    },
+    {
+      "design": "uart",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "cva6",
+      "platform": "asap7",
+      "role": "external"
+    }
+  ],
+  "freeze_policy": "append-only; any change creates a new study_id and digest",
+  "full_domain_arm": {
+    "arm_id": "stateful_l2_portfolio",
+    "optimizer": "stateful-l2-portfolio-v1",
+    "search_domain": "calibrated_full"
+  },
+  "full_domain_arms": [
+    {
+      "arm_id": "random_full",
+      "optimizer": "seeded-random-mixed-v1",
+      "search_domain": "calibrated_full"
+    },
+    {
+      "arm_id": "sobol_full",
+      "optimizer": "sobol-scrambled-mixed-v1",
+      "search_domain": "calibrated_full"
+    },
+    {
+      "arm_id": "stateful_l2_portfolio",
+      "optimizer": "stateful-l2-portfolio-v1",
+      "search_domain": "calibrated_full"
+    }
+  ],
+  "hard_constraints": [
+    {
+      "metric": "setup_wns_ns",
+      "operator": ">=",
+      "threshold": 0.0
+    },
+    {
+      "metric": "drc_errors",
+      "operator": "<=",
+      "threshold": 0.0
+    },
+    {
+      "rule": "NaN, missing final metrics, timeout and tool failure are infeasible"
+    }
+  ],
+  "metric_contract": {
+    "asap7_rule": "public period/slack values are ns; official SDC ps literals remain byte-identical",
+    "canonical_units": {
+      "area_um2": "um^2",
+      "drc_errors": "count",
+      "hold_wns_ns": "ns",
+      "power_W": "W",
+      "runtime_seconds": "s",
+      "setup_tns_ns": "ns",
+      "setup_wns_ns": "ns"
+    },
+    "common_evaluator_schema": 3,
+    "runtime_evidence_policy": "every formal finish evaluation records finite positive wall time; native Runtime uses summed stage duration, upstream AutoTuner uses Ray time_total_s, and paired replay uses controller monotonic time",
+    "time_unit_rule": "read run__flow__platform__time_units from ORFS JSON and reject missing, conflicting, or unsupported unit evidence"
+  },
+  "objectives": [
+    {
+      "direction": "max",
+      "metric": "setup_wns_ns",
+      "weight": 0.4
+    },
+    {
+      "direction": "min",
+      "metric": "area_um2",
+      "weight": 0.35
+    },
+    {
+      "direction": "min",
+      "metric": "power_W",
+      "weight": 0.25
+    }
+  ],
+  "optimization_policy": {
+    "acquisition": "constrained qLogNEHVI over a deduplicated mixed candidate pool",
+    "batch_size": 8,
+    "constraint_surrogate": "one signed GP residual per hard constraint, including configuration-caused failures as positive residuals; qLogNEHVI treats every residual <= 0 as feasible",
+    "edair_context_policy": "L1 state policy consumes provenance-linked EDAIR when available. It passes at most eight ranked handles (EDAIR before run, study and artifact handles) to the policy context, while Runtime retains every raw artifact and its hash. If an optional netlist projection cannot be parsed, the run report, QoR, artifact index and loss manifest remain available; the controller must label that view missing rather than inventing an object graph. The no_edair ablation blocks all runtime EDAIR reads by the state policy as well as the older portfolio.",
+    "external_baseline_warm_start": "Official AutoTuner receives the same frozen baseline as one explicit points_to_evaluate observation; the upstream controller runs budget+1 samples, while the baseline is labeled uncharged and only the remaining budget candidates enter optimizer endpoints",
+    "feasibility_model": "configuration-caused ORFS quick/full failures and final hard-constraint violations; infrastructure failures are retained but excluded from GP fitting",
+    "infrastructure_failure_policy": "lost, cancelled, worker, runtime, adapter, protocol and transient-I/O failures remain in the immutable budget ledger and deduplication set, but are excluded from surrogate fitting, feasibility labels and portfolio failure-rate routing",
+    "initialization": "before surrogate fitting, expand from a hard-constraint-feasible observed anchor with one-factor-at-a-time scrambled Sobol points; defer high-order combinations, retain every failure in budget, and fall back to global Sobol when no feasible anchor exists",
+    "objective_noise": "replica-derived mean variance with a positive floor",
+    "qlognehvi_candidate_pool": 4096,
+    "replicated_incumbent_policy": "incumbent utility, stagnation routing and trust-region centers use only configurations with all required finish-fidelity replicas present and hard-constraint-feasible; infeasible replicas remain individual labels for the probabilistic feasibility model",
+    "safe_anchor_replication": "an anchor is eligible only after all required finish-fidelity OR_SEED replicas are observed and every replica satisfies every hard constraint; quick-fidelity, infrastructure-failure and single lucky-seed evidence cannot establish safety",
+    "stall_route": "after initialization, three non-improving full configurations switch the portfolio route without ending the fixed budget",
+    "stateful_l2_policy": "L1 may select only feasibility_recovery, global_exploration, interaction_screening, local_trust_region, cost_aware_promotion or replicated_confirmation with evidence references and an allowlisted parameter subset; it cannot emit numeric candidates. The L2 controller projects observed configurations into that legal conditional subspace and BO/GP generates the numerical vector. When no admissible L1 policy exists, the deterministic evidence-bound fallback is labelled as such.",
+    "surrogate": "independent ARD Matern-5/2 SingleTaskGP per objective",
+    "surrogate_minimum_unique_configurations": "max(32, 4 * search_dimensions)",
+    "tpe_batch_domain_policy": "TPE proposals pass through the same relational typed-domain projection as Random, Sobol and qLogNEHVI; parallel proposals use Optuna constant_liar=True and remain RUNNING rather than fabricating value-less pruned observations",
+    "tpe_constraint_handling": "the Optuna multi-objective TPE control imports frozen history through the ask/tell lifecycle and supplies signed hard-constraint residuals through TPESampler constraints_func; infrastructure failures are excluded"
+  },
+  "optimizer_seeds": [
+    1103,
+    2207,
+    3301
+  ],
+  "paired_or_seeds": [
+    101,
+    211,
+    307
+  ],
+  "primary_blocks": [
+    {
+      "design": "aes",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "jpeg",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "ibex",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "aes",
+      "platform": "sky130hd",
+      "role": "primary"
+    },
+    {
+      "design": "jpeg",
+      "platform": "sky130hd",
+      "role": "primary"
+    },
+    {
+      "design": "ibex",
+      "platform": "sky130hd",
+      "role": "primary"
+    }
+  ],
+  "primary_endpoints": [
+    "observed feasible hypervolume at every budget checkpoint",
+    "anytime feasible-hypervolume area under the evaluation curve",
+    "evaluations to first feasible baseline-improving point"
+  ],
+  "protocol_digest": "18231c568882a37dd127355202b8c5d19625ac2847240f4e302f3406bae81b58",
+  "reproducibility": {
+    "aggregation_binding_policy": "native and Official evidence-aggregation artifacts carry both study_id and protocol_digest, and the paired statistics layer rejects any mismatch before normalization, endpoint construction or hypothesis testing",
+    "calibration_report_fingerprint": "8b089438d61b37456a813df230196aea6b9b2dda154f05ddaf67bc5390196ed5",
+    "external_domain_binding_policy": "Official fairness evidence binds the common domain ID, exact sorted platform-parameter names, inclusive value mappings, generated config digest and semantic manifest fingerprint; aggregation recomputes all bindings instead of trusting a self-declared config hash",
+    "orfs_commit": "51ad1231a231ee85234c06db807688d029b85c35",
+    "python_environment_policy": "campaign and every cell bind a canonical fingerprint of the actual controller Python plus numpy, scipy, torch, gpytorch, botorch, optuna, ray and hyperopt versions; Official cells additionally fingerprint the external AutoTuner virtual environment",
+    "source_snapshot": {
+      "controller": {
+        "digest": "1dbc2660b00cd3d4fb7b3f878881c2f9435bf4ec5efcfdda16fa5ae0e1b6805d",
+        "file_count": 145,
+        "files": [
+          {
+            "path": "apps/api/app.py",
+            "sha256": "bbaa8592eb1d99a0c8e502bbc23affc5d192c94cee964d878e27175cfa554c0b"
+          },
+          {
+            "path": "apps/api/services/__init__.py",
+            "sha256": "0f9d38bf59d372a445b9369d88622dfab9eec61d518cc665f65e2e69e926a8d3"
+          },
+          {
+            "path": "apps/api/services/auth_service.py",
+            "sha256": "b6d96769dd1749a8f7dd6e78e1df56350576c5056c24ffe091ebd0a4e7818854"
+          },
+          {
+            "path": "apps/api/services/design_service.py",
+            "sha256": "935b6234d0176351c34a635f35ceec5870aa8cad6f3ac2249b99f87664c101d0"
+          },
+          {
+            "path": "apps/api/services/platform_service.py",
+            "sha256": "12984c35fff867c6b90f3dfa88af3c692efc0879d5f9f36667c3297e35ce9e53"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/__init__.py",
+            "sha256": "32f746846c24f5fbba0bf4a120996b43b46b349ca07d4499a8f75721e9d6b015"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/agent_trace.py",
+            "sha256": "d428bd5a0214b00d52bede41c0529f528037faeba5fcf035c23b8cf3ac514b6c"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/calibration.py",
+            "sha256": "550e28ba8652b274daa72dc1ab651fc3e1cbc613e4162d28e8a1bb4ebd80b4b3"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/causal_evidence.py",
+            "sha256": "f6e91271d989dcfa1c4f52fbf744d7106e57e9f83568e436d654854877e341c8"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/causal_learning.py",
+            "sha256": "8265774b677461c42006fc116a8937e381c99dcecab7ef8a89d9a2e4195458cf"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/circuitops_ir.py",
+            "sha256": "c0f12cba846dae37478b756cdec18b9f90086618afca126fd624f772f775f093"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/closed_loop.py",
+            "sha256": "eaacc65cfbd44418037a4a7c679c5bda65cb49dda56b0aa0ace30ca754d4e6b3"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/common_evaluator.py",
+            "sha256": "3defb9d1205234e5352b567c9f783113ba2e8d6e7f5645a6b339bf25d37b6cc9"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/compare.py",
+            "sha256": "d42c839ee55be9e116539b9522021d57bed525b4f1a9d2745ee557210044563b"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/design_ir.py",
+            "sha256": "55d651f3c95bc6529f3bb2039f06dfe891b52e15bbe86d8ac25494d26593edc0"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/design_suite.py",
+            "sha256": "ce7d34ccf1641c5e10176d97364b2511d75c0d945bea5956847a2c6a3fc83eba"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/diagnosis.py",
+            "sha256": "4a44779325f9f2fa309369e903c5f39cc45d62aa28fcf3de42d0905c4d64c40b"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/edair.py",
+            "sha256": "b20c4475ff7e58ff6529b98c768e35ddceff42bac6455de9523220c5291188ee"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/environment_snapshot.py",
+            "sha256": "7da4a1c70a9064b6e3a772b4b65e05a84c7e3c0d59db1f8bc936cb56eb36b2e3"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/evidence_rag.py",
+            "sha256": "caaa029cc138d119b3fdae4a8f92e54eb642dbc66ffa9b2cf5f6c0117f816763"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/evolve_agent.py",
+            "sha256": "7288e19e810ab8278ce6ce330977daef68cfe0cb7872bbad63bbbe76728aac21"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/experiment_compare.py",
+            "sha256": "678492e7fddb2f938de2afd1f9318ecbe0e57e4b88b3723a75e0e0e60623510f"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/feedback_loop.py",
+            "sha256": "cc0485b7f41fc086cc692a20aab66043a376bd36e399a6bce176ef44465f3daf"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/graybox.py",
+            "sha256": "fd9857040ffe6d064c834e09fe879c641774fbfd74b770769388d9012a284b81"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/graybox_models.py",
+            "sha256": "ad372434a759ab993e36d0b41ae9dbbc4221ea1598433d09929c256144902f25"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/hypothesis_ledger.py",
+            "sha256": "a447c5083de5d2b09093325caa3f71289f737b1f159e2884fab0a9360cc17185"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/industrial_dse_protocol.py",
+            "sha256": "98c0cbe85eaba26d481392f42e9cf50ed2b964dea7c8c7f0141f7a687970f1e6"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/iterative_agent.py",
+            "sha256": "87ce6e80f9009caf719b2be7434924f85b5efa6ccb0095309e4541fc848dce60"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/knowledge_base.py",
+            "sha256": "23748a2a43301e8fddc15f8e6eb96821d966429cb03455c20760092c5aa31477"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/learning_collector.py",
+            "sha256": "87ff37c4874b4f6a3c1793021d43b4a5f5c2f16d9a06caaffbf53c79674bb2dc"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/learning_data.py",
+            "sha256": "105fdd38fcbb670716dc28e2e15751086247dbee741e8311ace814949519aad2"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/lessons.py",
+            "sha256": "93fba6aac90d71ab4a28e71605e871332038faa77844d5d7a720a038de0318c4"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/llm_reporter.py",
+            "sha256": "45e243d93fe04d73a57d300a31f310a6eaf361465a9d343c860c5c8377c179ad"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/native_orfs_evidence.py",
+            "sha256": "23c6984b57a46ec3fce126b01590b61164e9cb9865348933edf1bef1401e313e"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/netlist/__init__.py",
+            "sha256": "9eb1587448ef5cb08fbc1b0bf2ac0ebcd71662047ef5b02be0d0baaffdcfd3d6"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/netlist/analyzer.py",
+            "sha256": "10e0347510d923e8e953b3eb0bb4fe64ec0687ab25e140acf6c97872c345a38a"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/netlist/model.py",
+            "sha256": "a6381f7154fcd875a1892a882c203d14c068945bbce75558ff18b555943cfe7e"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/netlist/parser.py",
+            "sha256": "16efb4db13ceb3da2199780f81f9ebcc410d589b3199ee685b4a11079e5602ba"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/netlist/summary.py",
+            "sha256": "edd9f7f6f406dcc575cfa32e34792efe6002eef0c290babac07d05f1900da3b7"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/official_autotuner.py",
+            "sha256": "474fb6f72da594e64b349a5e13bef0fbe5201c1ec4cf9be15a036c650e19aa52"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/offline_policy.py",
+            "sha256": "8f2d1756977888513be8e98d5cc1397322e35cdb6541b24db82c33338f588996"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/open_knowledge.py",
+            "sha256": "9cc3099b0819cb829091a570560a1ada711943201bc259a35043c48926bf5104"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/optimization.py",
+            "sha256": "4a99f7352a9991fcb838da5926ea5cb856bdf9341d3b4bf411cbe6b8e6e6f836"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/optimization_memory.py",
+            "sha256": "fecad590fc8c2c1d92d76ab1d7a9714c9321864bf4bb2047bfa98d4d1cf764b0"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/optimizer_plugins.py",
+            "sha256": "10a4f1992db56c814c751fcaa3f96e37f80e0adcbe75da49076faeaf1a19606f"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/paper_harness.py",
+            "sha256": "b86b2b3e5ee0d06febddcf29d7e4dfa90e7da53d9bc1d6c68104b67b69e93608"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/paper_statistics.py",
+            "sha256": "2f0ae71a0f44aaa899436d255ca7f10cf27591f5abf93e642306fc75d5187906"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/parameter_calibration.py",
+            "sha256": "678dc9815818e0ccabea6971e05499ab2b3b6ab63ec07e1593968c55b5f923be"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/parsers/__init__.py",
+            "sha256": "c0e129c9cb86ef3129b38d8ac9641e46420503553c390382d57b64512c0589eb"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/parsers/cell_coords.py",
+            "sha256": "a28711619f91ac2df116c1467d4b0104346eb53e31f22f085dde05794afa9ffa"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/parsers/opensta_timing.py",
+            "sha256": "113b531517c16c9fbbed0d115bd6bcc5dc7f28d08fe3ea4efe3b46bc8485c5d0"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/parsers/stage_json.py",
+            "sha256": "64d89c70935e5f140e582312b55baa051a2d24b21c559a67052a4ffea44db517"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/pipeline.py",
+            "sha256": "55742b556ff8fd75bc1ff32ba1abf737b327a92dad02f1717ccca8cd8ffce0dc"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/recommendations.py",
+            "sha256": "de9d60e23d75cf08679820f3d693fd48737c867ed5a7719bd140a6f7357ce9fd"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/replication.py",
+            "sha256": "13cad5c0451d514e0120d2cca9634f1078aef7319bd7554b80f6e29f18561877"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/reporter.py",
+            "sha256": "547b2e8c9610fada7dc2fe1f1c4f61d8346fd36af5819f6f6f118190258a9881"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/research_methods.py",
+            "sha256": "bf569bf9304e5fbf695fd4e6e904fb8c329cd22180bd19021e98849ed6ae4579"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/run_evidence.py",
+            "sha256": "3029dc96ea39e8c4bc44ff59f7b0a8489f93d7eb1e9efd8faab69068c8df3caa"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/runtime_ir.py",
+            "sha256": "a60c00a4df2c23d1441c230a53b41620b618733ac5868b708340d0dbc13d88e5"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/skills.py",
+            "sha256": "e72098f2686f5eef112e496c45adcb3bbb88a9c25dee49a7220703c3d89e04b5"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/state_tuning.py",
+            "sha256": "8227d990365cf8da3a541841019d339477c01446986a5bea7d172f2af0d4346e"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/v2_research.py",
+            "sha256": "728b79f9747199a76d940c0e16faa30451ab1a5cf314c39672373d92b2a573d9"
+          },
+          {
+            "path": "packages/analysis/src/openroad_platform_analysis/verification_evidence.py",
+            "sha256": "940c1f0ba18d938192e4a3ce46ac6b8c9804df3c96076b6818eff6c46a15836a"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/__init__.py",
+            "sha256": "c640f42a64fd990e4adf1609d38fd777307a0d637be235e0acb462b159a44220"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/agent_control.py",
+            "sha256": "fe0cd3e509f424ee45dcbabfbfcd72b5c042e5cbebee64902f26c06019f4c571"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/experiment_graph.py",
+            "sha256": "cbc92ffa3fd0e783d5896372186ab8e1b2135943bc1abec8235c7ccfec60fded"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/learning.py",
+            "sha256": "76b7a8d8a21a521987a59dade96f02d8b3b64bcee0f140b5bbd587558cc95cf1"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/models.py",
+            "sha256": "4f3bda8ba9869d2c932c5b72b5bfed7a81db269ffbc60f95ade1ad4af92cd559"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/platform.py",
+            "sha256": "972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f"
+          },
+          {
+            "path": "packages/contracts/src/openroad_platform_contracts/rtl_frontend.py",
+            "sha256": "e62891b91b76997d0b0e0bd3e972c252ae176986dadedb83190498e8a15a9334"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/__init__.py",
+            "sha256": "f022b38962476e0250ebe3e79e405b05e8282d00d2011dece031669c0073de5d"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/adapter.py",
+            "sha256": "d821910e9b04dbb956a6da00d584bfaec44f8cc4247df310db55b217faa4ad69"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/agenticpd_adapter.py",
+            "sha256": "86c3d395a516d48cbcc7234879467ddf89dd57658261a3b740eb0924d57958fd"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/agenticpd_plugin.py",
+            "sha256": "b842d98b735ed6e923e43295f0b39dfb2a0cd05d7fc5fdaf003d3a6dfc358fe6"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/cli.py",
+            "sha256": "4e9eb351f54db8419024c32301f32347e44580a0fb6302cc6927904e627c83d2"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/coding_agent.py",
+            "sha256": "63df12b9bfcba7fcceede4b426dc569e2a67b98d8fe755c78c3db46af50e22bc"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/craft_flow.py",
+            "sha256": "50f41d21f499ec681a95c01318ce530da698199543afe77f9104c5d82a2f8304"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/dplevolve_adapter.py",
+            "sha256": "89485cc6cc54b4a0a958c7af2a2fa545a2a75a5109b00cb00e110732df56ac40"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/dplevolve_plugin.py",
+            "sha256": "81763b8068bf62dc585ec9bc1a853f8397afaa4d703acfc62e78d2da17d958ef"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/edacraft_adapter.py",
+            "sha256": "5fcaf60c236de2d36e8c0ab68f6af26d6646fa609409029ee654968fb2178de3"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/edacraft_extension.py",
+            "sha256": "361ed5196e44d4de8444f6400415244b7d3d0c0a2478a00b1d353cd0807b3074"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/implcraft_adapter.py",
+            "sha256": "c81e3603bda2c18583f08a928a6edaba7a21243801eb828004cb495faf280f47"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/implcraft_plugin.py",
+            "sha256": "862761c0dd014cee67086e2295561771eb44f6dfc1ffb4edf31ffeb9de8ade5a"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_adapter.py",
+            "sha256": "37743088600440a9dbc7b9034bd353131eeb1a1e0860cf6eb772ac8270fabd71"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_config.py",
+            "sha256": "96234b8f13751f6cfc97e00e4a1009d73eadaf38c0d2fa3010886a610b5ff3f4"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_design_options.py",
+            "sha256": "5b2b5dcbb7dd9d8560ac4bacb6854bb513f6b57a4ac582f0c8822dd99d7229fe"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_generated_design.py",
+            "sha256": "add4bb1405815c85227c1b4fa891bff87ede95cca9627029d55fbeabd1c7c392"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_parameters.py",
+            "sha256": "d9cbc1fb4ec87c8ee2b9884434c1d3506cc31f8e32fff121d48d5842fb5224c0"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_plugin.py",
+            "sha256": "44dd04cfbc5b0fa728361b37ce909c14b61f293e17da50e5d47fd40621770347"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_reference_designs.py",
+            "sha256": "fbdfd82fe9f649845df7ab213b9981bc024e25cc436ee413bdb72f10713bf9be"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/orfs_runner.py",
+            "sha256": "7c76db83c70744ce67f4bc2142966e561ee7c631988abf9203099866137da250"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/pinned_toolchain.py",
+            "sha256": "c416821937d22045c426d041f75d410994ff7d6375dbfb45c68f02494df4983a"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/process_guardian.py",
+            "sha256": "a51a1f09a57f6fbe80f2a79331c07940f588fa88bd0764375ee7554c71d3e058"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/protected_whitebox.py",
+            "sha256": "47dbfa974c2742295a54af0e37af7bb0dca1fea2ca94d451a2c8a44e5c055b31"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/registry.py",
+            "sha256": "3bf5deff8bc7d9699161da0b5f975bf04827ab958b40bdac6557b517b1dd75de"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_formal_adapter.py",
+            "sha256": "afe782b19a4a218448ccda474cc9c7319521f8e6f9f946474a9f894442e65929"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_formal_plugin.py",
+            "sha256": "1002e30c155df4b85a51a717473828afa61c7cd4e4f20960ae181454c55fa831"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_mutation_adapter.py",
+            "sha256": "0cde4c3151b77c8ef1724508bea13ed14dc516f81d55489923b440a32a2c7e60"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_mutation_plugin.py",
+            "sha256": "a624b3c25f5bc50ae28d3c9459e4965c90ed8ea2999ee3f79393dda6f0169650"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_sim_adapter.py",
+            "sha256": "18c446b848a0824bc740c26c416a87f79258ab05a69e9347e9fca41bd43cfa06"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_sim_plugin.py",
+            "sha256": "3039924cc1cf9a7c9db93a0f001e4e484360bccb96431ecefcab98c4a111a77c"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_verify_adapter.py",
+            "sha256": "c4045f7a9228fe0df0fca7fc4e496fa547f6dbf9854c968e950a44263317b213"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtl_verify_plugin.py",
+            "sha256": "177970db5c92f75ae46448f3f7c5b799c450ae18a2f1797a45b2d4aa951d6a8b"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtlscout_adapter.py",
+            "sha256": "a482a9980351082ed1880f0c109bfc5b8062ac32d5a2977ef687cbc6615a58cd"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/rtlscout_plugin.py",
+            "sha256": "8979461a32500f57b20bd3cdfd2ed6726f6914639bb6598ed2d2c62475dc108f"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/taiwei_adapter.py",
+            "sha256": "1cf6b71e149cfda6b0b3b55aa62359428eca4cdb9f7e3c7f744472ef907f9207"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/taiwei_plugin.py",
+            "sha256": "03b1b74ab1aa0e8137fa53302b227c01626da78d5a0ce5d436483570b3c4ff63"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/taiwei_postprocess.py",
+            "sha256": "727e86b112c1c4ad6406c0f9754e539345477d0181016d9404f68352cba38058"
+          },
+          {
+            "path": "packages/execution/src/openroad_platform_execution/toolchain.py",
+            "sha256": "11709c7a204fa89d923e5d72c4814e26d44b228f387056939c80c713d4b92d52"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/__init__.py",
+            "sha256": "660b4fde3eb83292d602f7a21eb0fdd33229fc343b830a7ce1f24c24cc075272"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/campaign.py",
+            "sha256": "24e0dc2c68d3349446947e6cd27a8e673d3b523a478eb593a3b5b43285dd2d95"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/cli.py",
+            "sha256": "7b37b4e94ace54f0424a7c31ea508b72dc5b8079b5ad111dc7c1acd53ae59c90"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/composition.py",
+            "sha256": "1950747b576ec606ebb8e2a04a33ba8f0788b2928124d9d9abdc06ca2d292a91"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/design_goal_compiler.py",
+            "sha256": "b0bfffa5926ce13450827f53a3284d32d3fc29a31edf5c7a448b8c1f2baa40f2"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/evolution_campaign.py",
+            "sha256": "66301923d37db0c7cf00f862591a66ad92ff3fd27bbe5cd745985dd493d9f999"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/execution_backends.py",
+            "sha256": "fe5fbcb348a347044172a1c5d7b8be40acbd6fecde3fac3e95b98500e505dc34"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/experiment_graph.py",
+            "sha256": "bda5005288700c2c24bd3a844b1e25ddbce9474d94ffb440d94a964055e2eeef"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/four_gate.py",
+            "sha256": "7ef8eebed4167b66cef70a61217ef4237e67c9a6427969a19e8d3a48bc7e38a2"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/l1_orfs_service.py",
+            "sha256": "14d8b17ea2ffe79eb385fc754240b30796dd8366aff32e6fd9c988aa62b0d4e7"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/legacy_projection.py",
+            "sha256": "a9f648ef5b59d0a4479cfca74984b282ab38d3a965ffe48acdabacf5239fa0e8"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/local_state.py",
+            "sha256": "fe277d717b2a5775a3ff959ab6e031674c516fc5e4aa999bb0679fab6adeff2c"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/multifidelity.py",
+            "sha256": "3f466933d0a1b1f51314264be4ed1ac4df4f40c0819f8468021aa75a929da886"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/neighbor_grid.py",
+            "sha256": "663e99aa85651b322c193a22924171038fd1b5ccb88de5ca04cdbada3ab028a4"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/nl_control.py",
+            "sha256": "83bfb5a8ecb3f01f1dba5296f781bdc8b5f3398715319979bfa0f1443dc7e8a8"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/objective_profiles.py",
+            "sha256": "15150e8e76c40bac2cf3e3f8c65f947d31cebfa888f782887e7f16cafc01f25b"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/optimization_bridge.py",
+            "sha256": "5265f1aa46530dff1f1d08dee2748b38a9b0180eb067ee4209003f8bb619fc0e"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/patch_registry.py",
+            "sha256": "a59d91e4ad0675034bdf03b37a0994eeef8aa67f886334724d59495bb1de4048"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/pipeline_checkpoint.py",
+            "sha256": "fb724ddb7705aec4a59967627b96c470077c31db3085f4b04af088c95b3473f0"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/rtl_frontend_store.py",
+            "sha256": "2675f458d68ae5c86afded633bae2fc1969ad217415e8a88b472ec030da90738"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/runtime.py",
+            "sha256": "cd3c0e2e7af6f604047772d38b40e2d6b8fd27483f383729088b79d9cb0230f6"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/runtime_store.py",
+            "sha256": "123bfe6696369257331075e282513edad1f0f5f159cbdc004e9e3e25347c48ea"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/semantic_tools.py",
+            "sha256": "67c5e7a017be784f01804b267498565754f9e13bd1873813013f5a39b63c04c9"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/spec_conversation.py",
+            "sha256": "111a492eafa494cbba0216835e649b1813ee01c3fb4886a83f811dad4dc1266d"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/store.py",
+            "sha256": "83f2e77fd15ccbc2bc6470dd65ee5bc6a518d185bf3ed5de5c0e75a454d9208a"
+          },
+          {
+            "path": "packages/scheduler/src/openroad_platform_scheduler/worker.py",
+            "sha256": "65d1c48b5d7c407b94ad86564cada070569fb368a03a2b7c7ab11e5b60675c56"
+          },
+          {
+            "path": "scripts/aggregate_industrial_dse_campaign.py",
+            "sha256": "4cc750e28a4212a4e2e207a769e44a8f9418012e317cff4943c51e309705b547"
+          },
+          {
+            "path": "scripts/aggregate_official_autotuner_campaign.py",
+            "sha256": "a2264fe64b04d957cb94123b55538cd9bd03d1fb56aee065ff288ec3c6829291"
+          },
+          {
+            "path": "scripts/analyze_industrial_dse_ablations.py",
+            "sha256": "ed54de346dfbfb3a58522ca04d1ed30b7a9d0987752a09e16a9ea7c2766c7d4e"
+          },
+          {
+            "path": "scripts/analyze_industrial_dse_study.py",
+            "sha256": "32d54673ddd0ec32058d3092c644030b90480e9fa81f852f1bdbb4a9f59f90ec"
+          },
+          {
+            "path": "scripts/calibrate_orfs_parameters.py",
+            "sha256": "71a426e2d690fbbcae86137e5fb8b51d6bb4b3a9e03c69b62536cdc284e2b08a"
+          },
+          {
+            "path": "scripts/prepare_pinned_orfs_toolchain.py",
+            "sha256": "a492d143f3338565cbe618f2cc056940e65791f7505ad55881834eac1828b375"
+          },
+          {
+            "path": "scripts/run_industrial_dse_campaign.py",
+            "sha256": "59ad7c2f47d2b2c79c81e4008409263cb2aee6890552bf446082859a4b340e89"
+          },
+          {
+            "path": "scripts/run_industrial_dse_experiment.py",
+            "sha256": "fee06b453774fbd59605fce5cd14ad312b582e3fb58d80243db72d634d6e4fcf"
+          },
+          {
+            "path": "scripts/run_official_autotuner_baseline.py",
+            "sha256": "c53fb45d2281c5ec1657f9eaad6752cbd3bd7732c1c3fbe1f38e3735f2d940e6"
+          },
+          {
+            "path": "scripts/run_official_autotuner_campaign.py",
+            "sha256": "b45a2760579738d3b94ef09b9a2c3444dd01feecbad01a5460225a6074c2c4f6"
+          }
+        ]
+      },
+      "freeze_script_sha256": "1921139ff3067dd5014746d629c5d626deb51cb9c05262e147b7c35a5f022f68"
+    },
+    "toolchain_fingerprint": "06c10df65f4f4a964c1efdbe9f5d33cf5e3a614359a64a039b521926070bd2ea",
+    "unresolved_parameters_excluded": [
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "asap7"
+      },
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "nangate45"
+      },
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "sky130hd"
+      }
+    ]
+  },
+  "schema_version": 32,
+  "search_domains": {
+    "clock_sdc_policy": "frozen per design-PDK block and excluded from every search arm",
+    "common": "intersection of controlled-liveness calibration and pinned official AutoTuner variables.yaml tunable=1, restricted to an independent Cartesian domain representable by every compared optimizer",
+    "common_domain_id": "official_autotuner_independent_v2",
+    "common_parameter_names": [
+      "core_utilization_pct",
+      "place_density_lb_addon",
+      "global_placement_padding",
+      "cts_cluster_size",
+      "cts_cluster_diameter"
+    ],
+    "external_optimizer_design_adapter": "content-addressed execution namespace copies the exact reference RTL, include files, SDC, HDL frontend, design options and baseline flow parameters; reports retain the logical design and source fingerprint",
+    "fixed_nonsearch_policy": "server baseline values; never omitted or optimizer-selected",
+    "full": "all controlled-liveness-eligible platform parameters",
+    "placement_density_policy": "generated ORFS configurations emit exactly one active placement-density policy: PLACE_DENSITY_LB_ADDON when that calibrated parameter is present, otherwise direct PLACE_DENSITY; inactive contradictory assignments are forbidden and adapter identity binds exclusive-placement-density-v1",
+    "quantized_bound_parity": "platform numeric bounds are inclusive; pinned AutoTuner randint/arange upper bounds are exclusive, so its generated configuration encodes one additional quantization step and the enumerated value sets must match",
+    "relational_parameter_policy": "a dependent variable that upstream Hyperopt cannot condition is removed from every common-domain arm and fixed at its calibrated baseline; its independent target may remain tunable only when the fixed value is legal across the target's full range"
+  },
+  "secondary_endpoints": [
+    "area, WNS, TNS, power, DRC, wall time and failure rate",
+    "median, IQR, paired bootstrap 95% CI and empirical attainment"
+  ],
+  "statistics": {
+    "ablation_co_primary_ids": [
+      "no_gp",
+      "no_memory",
+      "no_edair"
+    ],
+    "ablation_family_policy": "Holm familywise control applies to exactly three co-primary mechanism claims aligned with parameter exploration, evolution memory and EDAIR; remaining ablations are secondary paired effect estimates without confirmatory rejection labels, and no_multifidelity is interpreted with runtime and compute cost rather than QoR alone",
+    "ablation_inference_unit": "mechanism ablations use the same six design-PDK blocks as primary inference after median aggregation across the three optimizer seeds; the 18 seed cells are descriptive and are never treated as independent",
+    "aggregation_rule": "never pool EDA replicas or optimizer seeds as independent primary samples; report all 18 seed cells descriptively, aggregate their three seeds within each design-PDK block for inference",
+    "baseline_parity_policy": "before normalization or inference, every optimizer cell for a given design-PDK must have an identical content fingerprint over replicated baseline objective summaries, hard constraints, replica counts and eligibility; run IDs, runtime and scheduling timestamps are excluded",
+    "effect_sizes": [
+      "paired median difference",
+      "paired win-tie-loss",
+      "paired bootstrap CI",
+      "unpaired descriptive Cliff delta"
+    ],
+    "exact_small_sample_policy": "with six design-PDK blocks, enumerate all 2^6 paired sign flips and report the exact tail fraction without a Monte Carlo plus-one correction; the analysis unit label is the block after median-over-seeds aggregation",
+    "familywise_control": "Holm correction over exactly the two co-primary strong-control tests; pairwise arm contrasts form a separately labelled secondary family",
+    "primary_test": "two co-primary one-sided paired sign-flip tests across six design-PDK blocks on median-over-seeds anytime-HV AUC: qLogNEHVI versus the per-cell best of equal-budget Random, Sobol, constrained TPE and Official Hyperopt in the common domain; Portfolio versus the per-cell best of equal-budget Random and Sobol in the calibrated full domain",
+    "reporting_rule": "report every seed, failure, exclusion, timeout and checkpoint",
+    "strong_control_policy": "within each optimizer-seed cell the composite baseline is the maximum observed anytime-HV AUC among its equal-budget, equal-domain control arms; this gives controls more aggregate compute and is conservative for the candidate, while retaining every component arm in the report",
+    "unit": "design-PDK block after median aggregation across optimizer seeds"
+  },
+  "stopping": {
+    "algorithmic": "fixed maximum budget; checkpoints do not stop a losing arm",
+    "engineering": "only explicit timeout, disk guard, cancellation or toolchain invalidation",
+    "nonattainment_completion": "a cell that exhausts the complete fixed logical budget without a feasible configuration is a valid completed nonattainment outcome, not an incomplete or excluded controller failure; its diagnosis is retained",
+    "stall_routing": "three non-improving full configurations change optimizer route, not study budget"
+  },
+  "study_id": "v2-industrial-dse-20260830-r31-stateful-l2",
+  "title": "Stateful L1-guided constrained multi-objective OpenROAD exploration"
+}

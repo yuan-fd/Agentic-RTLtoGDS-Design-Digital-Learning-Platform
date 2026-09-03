@@ -4,8 +4,8 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -23,6 +23,12 @@ from openroad_platform_contracts import (
 )
 
 from .orfs_config import infer_clock, infer_top, write_design_files
+from .orfs_parameters import (
+    effective_configuration_id,
+    orfs_parameter_schema,
+    parameter_source_evidence,
+    validate_orfs_parameters,
+)
 from .process_guardian import ProcessGuardian
 from .toolchain import ToolchainConfig
 
@@ -69,7 +75,10 @@ class ORFSRunner:
         request.validate()
         self._validate_runtime()
         rtl_path = Path(request.rtl_path).expanduser().resolve()
-        rtl = rtl_path.read_text(encoding="utf-8", errors="replace")
+        rtl_paths = tuple(Path(item).expanduser().resolve() for item in request.rtl_files)
+        source_paths = rtl_paths or (rtl_path,)
+        rtl = "\n".join(path.read_text(encoding="utf-8", errors="replace")
+                        for path in source_paths)
         design = request.top or infer_top(rtl, rtl_path.stem)
         if not re.fullmatch(r"[A-Za-z_]\w*", design):
             raise ValueError(f"Invalid inferred top module: {design}")
@@ -78,11 +87,14 @@ class ORFSRunner:
         if workdir.exists() and any(workdir.iterdir()):
             raise FileExistsError(f"Run workspace is not empty: {workdir}")
         workdir.mkdir(parents=True, exist_ok=True)
-        # Never invoke make in the operator-owned ORFS tree. Materialize a
-        # per-Attempt flow copy before process creation.
+        # Never invoke make in the operator-owned ORFS tree.  Materialize a
+        # per-Attempt flow copy before any executable step so all possible
+        # Makefile/script writes are contained by Runtime's workspace.
         staged_flow = workdir / "orfs-flow"
         shutil.copytree(self.flow_home, staged_flow, symlinks=True)
-
+        canonical_parameters = validate_orfs_parameters(
+            request.flow_parameters, platform=request.platform,
+        )
         config_path = write_design_files(
             workdir=workdir,
             rtl_path=rtl_path,
@@ -94,7 +106,37 @@ class ORFSRunner:
             place_density=request.place_density,
             or_seed=request.or_seed,
             minimum_die_size_um=request.minimum_die_size_um,
+            flow_parameters=request.flow_parameters,
+            rtl_files=rtl_paths,
+            rtl_root=(Path(request.rtl_root).expanduser().resolve()
+                      if request.rtl_root else None),
+            rtl_include_dirs=tuple(Path(item).expanduser().resolve()
+                                   for item in request.rtl_include_dirs),
+            synth_hdl_frontend=request.synth_hdl_frontend,
+            design_options=request.design_options,
+            sdc_path=(Path(request.sdc_path).expanduser().resolve()
+                      if request.sdc_path else None),
         )
+        staged_root = workdir / "designs" / "src" / design
+        staged_sources = []
+        if rtl_paths:
+            source_root = Path(request.rtl_root).expanduser().resolve()
+            staged_sources = [staged_root / path.relative_to(source_root)
+                              for path in rtl_paths]
+        else:
+            staged_sources = [staged_root / f"{design}{rtl_path.suffix.lower() or '.v'}"]
+        self._write_json(workdir / "design_input_manifest.json", {
+            "schema_version": 1,
+            "kind": "ordered-rtl-bundle",
+            "top": design,
+            "source_order": [str(path.relative_to(staged_root)) for path in staged_sources],
+            "sources": [self._file_record(path) for path in staged_sources],
+            "include_dirs": [str((staged_root / Path(item).resolve().relative_to(
+                Path(request.rtl_root).expanduser().resolve())).relative_to(staged_root))
+                for item in request.rtl_include_dirs] if request.rtl_root else [],
+            "synth_hdl_frontend": request.synth_hdl_frontend,
+            "design_options": request.design_options,
+        })
         stages = tuple(stage for stage in RunStage
                        if list(RunStage).index(stage) <= list(RunStage).index(request.target_stage))
         plan = ExecutionPlan(
@@ -114,8 +156,8 @@ class ORFSRunner:
             "clock": plan.clock,
             "workdir": plan.workdir,
             "flow_home": plan.flow_home,
-            "config_path": plan.config_path,
             "source_flow_home": str(self.flow_home),
+            "config_path": plan.config_path,
             "stages": [stage.value for stage in plan.stages],
             "request": request.to_dict(),
             "tools": self.tool_versions(),
@@ -123,6 +165,20 @@ class ORFSRunner:
         self._write_json(
             workdir / "toolchain_snapshot.json", self.toolchain_snapshot(plan)
         )
+        self._write_json(workdir / "parameter_contract.json", {
+            "schema_version": 1,
+            "registry": orfs_parameter_schema(),
+            "requested_parameters": canonical_parameters,
+            "effective_configuration_id": effective_configuration_id(
+                canonical_parameters, platform=request.platform,
+            ),
+            "platform": request.platform,
+            "generated_config": str(config_path),
+            "source_evidence": parameter_source_evidence(
+                self.flow_home, canonical_parameters,
+            ),
+            "claim_boundary": "requested and materialized; runtime liveness requires log/artifact evidence",
+        })
         return plan
 
     def run(
@@ -254,6 +310,8 @@ class ORFSRunner:
                 "platform_config": self._file_record(platform_config),
                 "generated_config": self._file_record(generated_config),
                 "rtl": self._file_record(rtl),
+                "rtl_bundle": [self._file_record(Path(item).expanduser().resolve())
+                               for item in plan.request.rtl_files],
             },
             "request": {
                 "platform": plan.request.platform,
@@ -263,6 +321,14 @@ class ORFSRunner:
                 "clock_period_ns": plan.request.clock_period_ns,
                 "core_utilization_pct": plan.request.core_utilization_pct,
                 "place_density": plan.request.place_density,
+                "flow_parameters": plan.request.flow_parameters,
+                "rtl_root": plan.request.rtl_root,
+                "rtl_include_dirs": plan.request.rtl_include_dirs,
+                "synth_hdl_frontend": plan.request.synth_hdl_frontend,
+                "design_options": plan.request.design_options,
+                "sdc": self._file_record(
+                    Path(plan.request.sdc_path).expanduser().resolve()
+                    if plan.request.sdc_path else None),
                 "or_seed": plan.request.or_seed,
                 "minimum_die_size_um": plan.request.minimum_die_size_um,
                 "stage_timeout_seconds": plan.request.stage_timeout_seconds,
@@ -371,9 +437,10 @@ class ORFSRunner:
         workdir = Path(plan.workdir)
         candidates = [
             workdir / "plan.json",
+            workdir / "design_input_manifest.json",
             workdir / "toolchain_snapshot.json",
+            workdir / "parameter_contract.json",
             workdir / "logs/flow.log",
-            workdir / "analysis/report.json",
             workdir / "analysis/flow_error.log",
             Path(plan.config_path),
             Path(plan.config_path).with_name("constraint.sdc"),
@@ -389,6 +456,12 @@ class ORFSRunner:
         candidates.extend(reports / name for name in (
             "6_finish.rpt", "5_route_drc.rpt", "synth_check.txt", "synth_stat.txt",
         ))
+        # These machine-readable ORFS reports are the source of the bounded
+        # Runtime metric projection below.  They are artifacts, not hidden
+        # workspace inputs: Runtime registers and hashes them before metrics
+        # may cite them.
+        logs = workdir / "logs" / plan.request.platform / plan.design / "base"
+        candidates.extend(logs / name for name in ("6_report.json", "5_2_route.json"))
         suffix_kinds = {
             ".v": ArtifactKind.NETLIST,
             ".odb": ArtifactKind.ODB,

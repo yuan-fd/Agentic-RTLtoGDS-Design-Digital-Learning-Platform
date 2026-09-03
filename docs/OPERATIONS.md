@@ -46,7 +46,7 @@ curl -fsS -X POST http://127.0.0.1:8000/api/spec/sessions \
   -H 'Content-Type: application/json' \
   -d '{"message":"..."}'
 
-curl -fsS -X POST http://127.0.0.1:8000/api/v2/closed-loops \
+curl -fsS -X POST http://127.0.0.1:8000/api/v2/external-optimizer-loops \
   -H 'Content-Type: application/json' \
   -d '{"design_id":"...","objective_profile":"balanced"}'
 ```
@@ -54,12 +54,13 @@ curl -fsS -X POST http://127.0.0.1:8000/api/v2/closed-loops \
 使用返回的 `pipeline_id` 运行或恢复持久闭环：
 
 ```bash
-curl -fsS -X POST http://127.0.0.1:8000/api/v2/closed-loops/<pipeline_id>/run-to-boundary \
+curl -fsS -X POST http://127.0.0.1:8000/api/v2/external-optimizer-loops/<pipeline_id>/advance \
   -H 'Content-Type: application/json' -d '{}'
 ```
 
-该接口会自动执行重复 baseline、BO/GP 多参数组合实验、重复测量和停滞检测；
-遇到 `diagnosis_required` 就停止并返回完整历史，不会自动修改 RTL 或调用未批准的修复工具。
+该接口只记录下一项受控工作；控制器会自动执行重复 baseline、ORFS-Agent GP/EI
+候选、重复测量和停滞检测。遇到 `diagnosis_required` 就停止并返回完整历史，
+不会自动修改 RTL 或调用未批准的修复工具。
 
 Spec session 的 `/turn` 用于补齐规格，`/materialize-spec` 冻结 SpecIR；随后唯一的
 `/api/rtl/specs/<id>/run-to-baseline` 自动完成独立 Testbench、RTLScout、lint、仿真、

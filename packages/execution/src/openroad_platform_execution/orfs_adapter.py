@@ -111,30 +111,75 @@ def main() -> int:
         return 1
 
 
-def _stage_rtl(task: TaskSpec, workspace: Path) -> Path:
-    reference = task.inputs.get("rtl")
-    if not isinstance(reference, dict):
-        raise ValueError("Task inputs.rtl must be an artifact reference")
+def _checked_copy(reference: dict, destination: Path, *, label: str) -> Path:
     source = Path(str(reference.get("path", ""))).expanduser().resolve()
     expected_size = reference.get("size_bytes")
     expected_sha = reference.get("sha256")
     if not source.is_file() or source.stat().st_size == 0:
-        raise FileNotFoundError(f"RTL source is missing or empty: {source}")
+        raise FileNotFoundError(f"{label} source is missing or empty: {source}")
     if source.stat().st_size != expected_size or _sha256(source) != expected_sha:
-        raise ValueError("RTL source size/SHA-256 does not match TaskSpec")
-    destination = workspace / "inputs" / "design.v"
+        raise ValueError(f"{label} source size/SHA-256 does not match TaskSpec")
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
     if destination.stat().st_size != expected_size or _sha256(destination) != expected_sha:
-        raise ValueError("Staged RTL size/SHA-256 does not match TaskSpec")
+        raise ValueError(f"Staged {label} size/SHA-256 does not match TaskSpec")
     return destination
 
 
-def _legacy_request(task: TaskSpec, staged_rtl: Path) -> RunRequest:
+def _stage_rtl(task: TaskSpec, workspace: Path) -> dict:
+    reference = task.inputs.get("rtl")
+    if not isinstance(reference, dict):
+        raise ValueError("Task inputs.rtl must be an artifact reference")
+    bundle = task.inputs.get("rtl_bundle")
+    if bundle is None:
+        destination = _checked_copy(reference, workspace / "inputs/design.v", label="RTL")
+        sdc = (_checked_copy(task.inputs["sdc"], workspace / "inputs/constraint.sdc",
+                             label="SDC") if isinstance(task.inputs.get("sdc"), dict) else None)
+        return {"primary": destination, "files": (), "root": None,
+                "include_dirs": (), "synth_hdl_frontend": None, "sdc": sdc}
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("files"), list):
+        raise ValueError("Task inputs.rtl_bundle must contain an ordered files list")
+    root = workspace / "inputs/rtl"
+    files = []
+    primary = None
+    for item in bundle["files"]:
+        relative = Path(str(item.get("relative_path", "")))
+        if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("RTL bundle relative_path is unsafe")
+        staged = _checked_copy(item, root / relative, label="RTL bundle")
+        files.append(staged)
+        if item.get("sha256") == reference.get("sha256") and item.get("path") == reference.get("path"):
+            primary = staged
+    if primary is None:
+        raise ValueError("Primary RTL reference is not present in rtl_bundle")
+    include_dirs = []
+    for directory in bundle.get("include_dirs") or ():
+        relative_dir = Path(str(directory.get("relative_path", "")))
+        if not relative_dir.parts or relative_dir.is_absolute() or ".." in relative_dir.parts:
+            raise ValueError("RTL include relative_path is unsafe")
+        include_dirs.append(root / relative_dir)
+        for header in directory.get("headers") or ():
+            relative = Path(str(header.get("relative_path", "")))
+            if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("RTL header relative_path is unsafe")
+            _checked_copy(header, root / relative, label="RTL header")
+    sdc = (_checked_copy(task.inputs["sdc"], workspace / "inputs/constraint.sdc",
+                         label="SDC") if isinstance(task.inputs.get("sdc"), dict) else None)
+    return {"primary": primary, "files": tuple(files), "root": root,
+            "include_dirs": tuple(include_dirs),
+            "synth_hdl_frontend": bundle.get("synth_hdl_frontend"), "sdc": sdc}
+
+
+def _legacy_request(task: TaskSpec, staged_rtl: dict) -> RunRequest:
     parameters = task.parameters
     target = RunStage(str(parameters.get("target_stage", "finish")))
     return RunRequest(
-        rtl_path=str(staged_rtl),
+        rtl_path=str(staged_rtl["primary"]),
+        rtl_files=tuple(str(item) for item in staged_rtl["files"]),
+        rtl_root=str(staged_rtl["root"]) if staged_rtl["root"] else None,
+        rtl_include_dirs=tuple(str(item) for item in staged_rtl["include_dirs"]),
+        synth_hdl_frontend=staged_rtl["synth_hdl_frontend"],
+        sdc_path=str(staged_rtl["sdc"]) if staged_rtl["sdc"] else None,
         top=_optional_string(task.inputs.get("top"), "top"),
         clock=_optional_string(task.inputs.get("clock"), "clock"),
         clock_period_ns=float(parameters.get("clock_period_ns", 10.0)),
@@ -148,8 +193,16 @@ def _legacy_request(task: TaskSpec, staged_rtl: Path) -> RunRequest:
             if parameters.get("minimum_die_size_um") is not None else None
         ),
         stage_timeout_seconds=int(parameters.get("stage_timeout_seconds", 3600)),
+        flow_parameters=dict(parameters.get("flow_parameters") or {}),
+        design_options=dict(parameters.get("design_options") or {}),
         run_id="implementation",
-        labels={"task_id": task.task_id, "design_id": task.design_id},
+        labels={
+            "task_id": task.task_id, "design_id": task.design_id,
+            **{key: task.labels[key] for key in (
+                "reference_design", "design_bundle_sha256", "orfs_commit",
+                "optimizer_proposal_id", "fidelity", "replica_index",
+            ) if key in task.labels},
+        },
     )
 
 
@@ -222,6 +275,10 @@ def _plugin_result(result, *, plan_workdir: Path, workspace: Path, input_referen
 def _artifact_kind(path: Path, fallback: str) -> str:
     if path.name == "toolchain_snapshot.json":
         return "toolchain_snapshot"
+    if path.name == "parameter_contract.json":
+        return "parameter_contract"
+    if path.name == "design_input_manifest.json":
+        return "design_input_manifest"
     if path.name == "config.mk":
         return "config"
     if path.name == "run_result.json":

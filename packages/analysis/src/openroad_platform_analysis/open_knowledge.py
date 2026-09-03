@@ -255,8 +255,31 @@ class PublicKnowledgeRegistry:
     def add_source(self, item: KnowledgeSource) -> None:
         item.validate()
         payload = item.to_dict()
-        self._insert_four("public_sources_v1", "source_id", item.source_id,
-                          payload, item.content_sha256, _digest(payload))
+        try:
+            self._insert_four("public_sources_v1", "source_id", item.source_id,
+                              payload, item.content_sha256, _digest(payload))
+        except ValueError:
+            # Schema v1 databases created before typed bibliographic fields
+            # existed omit those optional keys.  Treat that representation as
+            # the same immutable source only when applying the dataclass
+            # defaults produces exactly the current payload.  Any substantive
+            # metadata change still requires a new, versioned source_id.
+            with self._connect() as connection:
+                row = connection.execute(
+                    "SELECT payload_json FROM public_sources_v1 WHERE source_id = ?",
+                    (item.source_id,),
+                ).fetchone()
+            if row is None:
+                raise
+            legacy = json.loads(row[0])
+            try:
+                normalized = KnowledgeSource(**{
+                    **legacy, "authors": tuple(legacy.get("authors", ())),
+                }).to_dict()
+            except (TypeError, ValueError):
+                raise
+            if normalized != payload:
+                raise
 
     def add_claim(self, item: DocumentClaim) -> None:
         item.validate()

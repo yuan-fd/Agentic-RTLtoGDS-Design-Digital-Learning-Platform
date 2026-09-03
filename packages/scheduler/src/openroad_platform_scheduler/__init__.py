@@ -27,6 +27,19 @@ from .objective_profiles import objective_profile, profile_grid, profile_hard_co
 from .patch_registry import PatchRegistry
 from .four_gate import FourGateController
 from .pipeline_checkpoint import PipelineCheckpointStore
+from .multifidelity import (
+    FidelityPolicy, MultiFidelityScheduler, MultiFidelityStore,
+    promotion_decision, proxy_calibration,
+)
+from .execution_backends import (
+    ExecutionBackendRegistry, LocalThreadExecutionBackend,
+    ParallelExecutionBackend, RayExecutionBackend,
+    default_execution_backend_registry,
+)
+from .semantic_tools import SemanticToolPolicy, SemanticToolRegistry, ToolDefinition
+from .l1_orfs_service import L1ORFSToolService
+from .design_goal_compiler import compile_design_goal, infer_goal_preference
+from .external_l2_service import EXTERNAL_L2_KIND, ExternalOptimizerLoopService
 
 __all__ = [
     "Job", "JobStore", "Worker", "RuntimeAttempt", "RuntimeRun",
@@ -46,4 +59,17 @@ __all__ = [
     "PatchRegistry",
     "FourGateController",
     "PipelineCheckpointStore",
+    "FidelityPolicy", "MultiFidelityScheduler", "MultiFidelityStore",
+    "promotion_decision", "proxy_calibration",
+    "ExecutionBackendRegistry", "ParallelExecutionBackend",
+    "LocalThreadExecutionBackend", "RayExecutionBackend",
+    "default_execution_backend_registry",
+    "SemanticToolPolicy", "SemanticToolRegistry", "ToolDefinition",
+    "L1ORFSToolService",
+    "compile_design_goal", "infer_goal_preference",
+    "EXTERNAL_L2_KIND", "ExternalOptimizerLoopService",
 ]
+from .local_state import (
+    LocalStateMirror, StateSnapshot, filesystem_type, require_local_sqlite_root,
+    resolve_mirrored_database,
+)

@@ -23,11 +23,12 @@ for source_root in (
 ):
     sys.path.insert(0, str(source_root))
 
-from openroad_platform_contracts import RuntimeStatus  # noqa: E402
+from openroad_platform_analysis import ORFSProtectedEvaluator  # noqa: E402
+from openroad_platform_contracts import RTLToGDSRequest, RuntimeStatus  # noqa: E402
 from openroad_platform_execution import (  # noqa: E402
+    ORFSRTLToGDSFactory,
     PluginRegistry,
     ToolchainConfig,
-    build_orfs_task,
     orfs_plugin_manifest,
 )
 from openroad_platform_scheduler import RuntimeStore, WorkflowRuntime  # noqa: E402
@@ -82,23 +83,21 @@ def main() -> int:
         workspace_root=output / "attempts",
         worker_id="p2-real-acceptance",
         lease_seconds=60,
+        protected_evaluator=ORFSProtectedEvaluator(),
     )
-    task = build_orfs_task(
-        args.rtl,
-        task_id="p2-real-nangate45-mux",
-        project_id="openroad-platform",
-        design_id="p2-mux-2to1",
-        top="mux_2to1",
-        platform_name="nangate45",
-        target_stage="finish",
-        clock_period_ns=10.0,
-        core_utilization_pct=10.0,
-        place_density=0.45,
-        stage_timeout_seconds=args.stage_timeout,
-        timeout_seconds=args.timeout,
+    factory = ORFSRTLToGDSFactory()
+    task = factory.build(RTLToGDSRequest(
+        rtl_path=str(args.rtl), task_id="p2-real-nangate45-mux",
+        project_id="openroad-platform", design_id="p2-mux-2to1", top="mux_2to1",
         labels={"phase": "P2", "acceptance": "real-nangate45"},
-    )
-    run = runtime.submit(task, capability="eda.rtl_to_gds")
+        options={
+            "platform_name": "nangate45", "target_stage": "finish",
+            "clock_period_ns": 10.0, "core_utilization_pct": 10.0,
+            "place_density": 0.45, "stage_timeout_seconds": args.stage_timeout,
+            "timeout_seconds": args.timeout,
+        },
+    ))
+    run = runtime.submit(task, capability=factory.capability)
     print(f"[p2] run_id={run.run_id} workspace={output}", flush=True)
     started = time.monotonic()
     completed = runtime.execute_once(
@@ -110,12 +109,14 @@ def main() -> int:
     attempt = view["stages"][0]["attempts"][0]
     evidence = verify_attempt(attempt)
     run_result = json.loads(evidence["run_result_path"].read_text(encoding="utf-8"))
+    evaluation = verify_runtime_evaluation(attempt)
     runtime_snapshot = archive_runtime_db(runtime_db, output / "runtime.snapshot.db")
     shared_unchanged = before == after
     accepted = (
         completed.status is RuntimeStatus.SUCCEEDED
         and run_result["milestones"]["implementation_valid"] is True
         and run_result["milestones"]["gds_complete"] is True
+        and evaluation["feasible"] is True
         and shared_unchanged
     )
     summary = {
@@ -127,6 +128,13 @@ def main() -> int:
         "events": view["events"],
         "artifact_verification": evidence["records"],
         "milestones": run_result["milestones"],
+        "common_evaluator": {
+            "schema_version": evaluation["schema_version"],
+            "evaluation_id": evaluation["evaluation_id"],
+            "feasible": evaluation["feasible"],
+            "gate": evaluation["gate"],
+            "path": evaluation["path"],
+        },
         "shared_toolchain_unchanged": shared_unchanged,
         "shared_toolchain_before": before,
         "shared_toolchain_after": after,
@@ -142,6 +150,27 @@ def main() -> int:
         flush=True,
     )
     return 0 if accepted else 2
+
+
+def verify_runtime_evaluation(attempt: dict) -> dict:
+    """Read the Runtime-registered canonical evaluation; never re-evaluate here."""
+    artifact = next(
+        (item for item in attempt["artifacts"]
+         if item["store_key"].endswith("analysis/common_evaluation.json")),
+        None,
+    )
+    if artifact is None:
+        raise RuntimeError("Runtime did not register common_evaluation.json")
+    path = (Path(attempt["workspace"]) / artifact["store_key"]).resolve()
+    if sha256(path) != artifact["sha256"]:
+        raise RuntimeError("Runtime common evaluation hash mismatch")
+    evaluation = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(evaluation, dict):
+        raise RuntimeError("Runtime common evaluation is not a JSON object")
+    for key in ("schema_version", "evaluation_id", "feasible", "gate"):
+        if key not in evaluation:
+            raise RuntimeError(f"Runtime common evaluation missing {key}")
+    return {**evaluation, "path": str(path)}
 
 
 def verify_attempt(attempt: dict) -> dict:

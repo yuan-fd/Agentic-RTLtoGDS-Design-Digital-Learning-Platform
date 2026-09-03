@@ -31,6 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
     worker.add_argument("--once", action="store_true")
     worker.add_argument("--poll-seconds", type=float, default=1.0)
     worker.add_argument("--work-root", type=Path, default=Path("var/runs"))
+    worker.add_argument("--runtime-db", type=Path, default=None,
+                        help="Runtime authority database (default: next to --db)")
     worker.add_argument("--orfs-root", type=Path,
                         default=Path(os.environ.get("ORFS_ROOT", Path.home() / "OpenROAD-flow-scripts")))
     worker.add_argument("--openroad-bin", type=Path, default=None)
@@ -62,12 +64,30 @@ def main(argv: list[str] | None = None) -> int:
         print(job.id)
         return 0
     if args.command == "worker":
+        # This command is a compatibility composition root for the pre-Runtime
+        # queue.  The Worker itself has no concrete ORFS dependency: it drives
+        # WorkflowRuntime through a capability factory and projects facts back
+        # to JobStore only for old clients.
+        from openroad_platform_execution import (
+            ORFSRTLToGDSFactory, PluginRegistry, ToolchainConfig,
+            orfs_plugin_manifest,
+        )
+        from .runtime import WorkflowRuntime
+        from .runtime_store import RuntimeStore
+
+        toolchain = ToolchainConfig.from_environment(
+            name="legacy-cli", orfs_root=args.orfs_root,
+            openroad_bin=args.openroad_bin, yosys_bin=args.yosys_bin,
+        )
+        runtime_db = args.runtime_db or args.db.with_name(args.db.stem + ".runtime.db")
+        runtime = WorkflowRuntime(
+            RuntimeStore(runtime_db), PluginRegistry([orfs_plugin_manifest(toolchain)]),
+            workspace_root=args.work_root / "runtime",
+        )
         worker = Worker(
             store,
-            orfs_root=args.orfs_root,
-            work_root=args.work_root,
-            openroad_bin=args.openroad_bin,
-            yosys_bin=args.yosys_bin,
+            runtime=runtime,
+            rtl_to_gds_factory=ORFSRTLToGDSFactory(),
         )
         if args.once:
             return 0 if worker.run_once() else 3

@@ -17,6 +17,8 @@ DEMO_ORFS_ROOT="${ORFS_ROOT:-$PLATFORM_ROOT/../OpenROAD-flow-scripts}"
 DEMO_OPENROAD_BIN="${OPENROAD_BIN:-$PLATFORM_ROOT/../bin/openroad}"
 DEMO_YOSYS_BIN="${YOSYS_BIN:-$PLATFORM_ROOT/../bin/yosys}"
 DEMO_DB="$PLATFORM_ROOT/var/platform.db"
+export OPENROAD_PLATFORM_PARAMETER_CALIBRATION="${OPENROAD_PLATFORM_PARAMETER_CALIBRATION:-$PLATFORM_ROOT/var/calibration/orfs-parameters-v2/parameter_calibration_report.json}"
+export OPENROAD_PLATFORM_REQUIRE_PARAMETER_CALIBRATION="${OPENROAD_PLATFORM_REQUIRE_PARAMETER_CALIBRATION:-1}"
 
 for required_path in "$DEMO_ORFS_ROOT" "$DEMO_OPENROAD_BIN" "$DEMO_YOSYS_BIN"; do
   if [[ ! -e "$required_path" ]]; then
@@ -24,16 +26,28 @@ for required_path in "$DEMO_ORFS_ROOT" "$DEMO_OPENROAD_BIN" "$DEMO_YOSYS_BIN"; d
     exit 1
   fi
 done
+if [[ "$OPENROAD_PLATFORM_REQUIRE_PARAMETER_CALIBRATION" == "1" && ! -f "$OPENROAD_PLATFORM_PARAMETER_CALIBRATION" ]]; then
+  echo "Industrial DSE parameter calibration is missing: $OPENROAD_PLATFORM_PARAMETER_CALIBRATION" >&2
+  echo "Run scripts/calibrate_orfs_parameters.py before starting the product service." >&2
+  exit 1
+fi
 
 cd "$PLATFORM_ROOT"
 python3 scripts/run_runtime_worker.py --db "$DEMO_DB" \
   --orfs-root "$DEMO_ORFS_ROOT" &
 WORKER_PID=$!
+python3 scripts/run_dse_controller_worker.py --db "$DEMO_DB" \
+  --orfs-root "$DEMO_ORFS_ROOT" &
+DSE_WORKER_PID=$!
 
 cleanup() {
   if kill -0 "$WORKER_PID" 2>/dev/null; then
     kill "$WORKER_PID"
     wait "$WORKER_PID" 2>/dev/null || true
+  fi
+  if kill -0 "$DSE_WORKER_PID" 2>/dev/null; then
+    kill "$DSE_WORKER_PID"
+    wait "$DSE_WORKER_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM

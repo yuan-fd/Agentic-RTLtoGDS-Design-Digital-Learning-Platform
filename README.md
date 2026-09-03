@@ -2,7 +2,7 @@
 
 > **English** · [中文](README.zh-CN.md)
 
-An open platform for chip-design automation: 2D / 3D physical design with an AI self-evolution loop.
+An evidence-first, plugin-based control plane for reproducible chip-design experiments.
 
 ---
 
@@ -10,11 +10,11 @@ An open platform for chip-design automation: 2D / 3D physical design with an AI 
 
 Turning chip design from a manual flow into an **automated + self-learning** open platform:
 
-- **Automated flow**: input RTL, automatically complete 2D / 3D physical design (synthesis → floorplan → placement → routing → GDS), with full traceable evidence.
-- **Evidence-backed learning**: every terminal repeated run is retained; the autonomous BO/GP loop uses context-matched evidence, verifies the next parameter combination, and stores both improvement and failure outcomes.
-- **Open extension**: plugin architecture — a new EDA tool only needs an adapter following the interface; plugins never interfere with each other.
+- **Typed interaction**: natural language becomes a reviewed SpecIR/DesignGoal and typed tool calls, never arbitrary shell text.
+- **Product path**: platform-managed RTLScout produces independently verified RTL; the admitted ORFS-Agent plugin is the sole 2D design-space-exploration product path.
+- **Open extension**: plugins execute through bounded adapters, Runtime and protected evaluation; 3D and specialty tools remain independent capabilities.
 
-**In one sentence: RTL goes in, GDS comes out, experience is kept, and the platform gets smarter.**
+**In one sentence: approved intent enters, independently verified evidence returns, and the platform never substitutes itself for an upstream research algorithm.**
 
 ---
 
@@ -22,45 +22,36 @@ Turning chip design from a manual flow into an **automated + self-learning** ope
 
 ![Platform architecture](docs/images/architecture.png)
 
-*Overall: web workspace → the single autonomous BO/GP entry → durable checkpoint → workflow runtime → repeated OpenROAD measurements → hard safety/quality gates → stall diagnosis → evidence learning.*
+*Overall: typed interaction → approved capability → durable Runtime → raw artifacts → protected QoR and provenance.*
 
 ![Design workflow](docs/images/workflow.png)
 
-*Natural-language SpecIR → independent Verification Agent → RTLScout → 2D ORFS baseline → repeated BO/GP experiments → three-stall diagnosis → automatically gated evidence learning. Existing RTL import and TaiWei 3D remain explicit side inputs, not alternative optimization modes.*
+*Natural-language SpecIR → platform-managed RTLScout → independent verification → verified RTL → DesignGoal/typed policy → admitted ORFS-Agent → immutable TaskSpec → Runtime → raw artifacts → protected QoR.  TaiWei 3D is a separate plugin workflow; research comparators are not product modes.*
 
-### Agent architecture (self-evolution)
+### Product architecture
 
 ```mermaid
 graph TD
     U[User · design intent] -->|natural-language spec| FE[Frontend · spec-to-rtl agent]
-    FE -->|independently verified RTL| B0[automatic repeated baseline]
-    B0 --> BD[autonomous BO/GP loop · WorkflowRuntime]
-    BD -->|run + evidence| OBS[(replicated observations · verified)]
-    OBS -->|observations| BO[BO/GP optimizer<br/>MultiObjectiveBayesianOptimizer]
-    BO -->|coupled parameter proposal| DEC{hard constraints<br/>budget · allowlist · PPA}
-    DEC -->|admitted| BD
-    DEC -->|3 stalled rounds| DIA[stage diagnosis packet]
-    OBS -->|positive and negative outcomes| MEM[(context-scoped evidence memory)]
-    MEM -->|numeric warm start + validated rules| BO
-    KB[(RAG knowledge base<br/>papers · docs · benchmarks)] -->|prior + rationale| FE
-    KB -->|prior + rationale| BO
+    FE -->|verified RTL| L1[DesignGoal + typed policy]
+    L1 -->|approved capability| L2[admitted ORFS-Agent plugin]
+    L2 -->|immutable TaskSpec| RT[Workflow Runtime]
+    RT -->|raw artifacts| EV[Protected evaluator]
+    EV --> OBS[(canonical QoR + provenance)]
+    OBS -->|evidence only| L1[L1 trace and typed policy]
 ```
 
-### v2 Agent loop (one product path)
+### Product execution boundary
 
 ```mermaid
 graph LR
-    subgraph Optimizer[Autonomous BO/GP Agent · each round]
-        A1[1 map + observe<br/>replicated EDA evidence] --> A2[2 hypothesize<br/>coupled parameter vector]
-        A2 --> A3[3 hard gate<br/>allowlist · budget · constraints]
-        A3 --> A4[4 execute<br/>via Workflow Runtime]
-        A4 --> A5[5 verify + review + remember]
-        A5 --> A1
+    subgraph Product[Approved product path]
+        A1[SpecIR / DesignGoal] --> A2[Typed policy gate]
+        A2 --> A3[Admitted plugin capability]
+        A3 --> A4[Workflow Runtime]
+        A4 --> A5[Raw artifacts + protected QoR]
     end
-    CP[(Durable checkpoint<br/>round · replicas · decisions)] <--> Optimizer
-    Optimizer --> TR[(Evidence trace<br/>auditable)]
-    TR --> D[Diagnosis boundary<br/>three consecutive stalls]
-    D -->|stage evidence + falsifiable hypothesis| MEM[(Evidence memory)]
+    A5 --> TR[(Durable evidence trace)]
 ```
 
 ---
@@ -70,16 +61,14 @@ graph LR
 | Feature | Status | Notes |
 | --- | --- | --- |
 | 2D physical design (ORFS 6-stage) | ✅ Working | Nangate45 RTL→GDS verified end-to-end |
-| 3D physical design (TaiWei) | ✅ Working | 3 platforms × any design; 3 real variants verified |
-| Web workspace | ✅ Available | Overview / Frontend / Backend / Projects / Self-Evolution / Tutorial |
+| 3D physical design (TaiWei) | Independent plugin | Separately admitted capability; not part of the 2D product state machine |
+| Web workspace | Legacy UI | Frozen from product growth; it remains a transitional historical/developer surface pending P3 isolation |
 | Natural-language RTL generation | ✅ Available | Server Codex parses SpecIR; a separate verification agent freezes a testbench/oracle before RTLScout candidate search |
 | Frontend LLM entry | ✅ Available | Three entry buttons (upload / LLM spec / examples), agent run trace dashboard |
-| Agent architecture | ✅ Working | Persistent SpecIR/RTL and BO/GP checkpoints, independent verification gates, Runtime evidence, and three-stall diagnosis boundary |
-| Self-evolution | ✅ Working | Repeated observed evidence; coupled BO/GP; three-stall diagnosis; positive/negative context-scoped memory |
-| Causal evidence learning | ✅ Working | Hypothesis ledger, controlled 2×2 interaction tests, holdout validation, and rule revocation after contradictory evidence |
-| Agent trace dashboard | ✅ Working | Every LLM/agent operation traced; step durations & metric comparison |
-| Plugin ecosystem | ✅ Ready | TaiWei / RTLScout / AgenticPD / EDACraft / ImplCraft / DPLEvolve |
-| Autonomous BO/GP implementation loop | ✅ Implemented | One product entry; repeated baseline/candidate runs, coupled-parameter proposals, hard constraints, and three-stall diagnosis |
+| Product control plane | ✅ Working | SpecIR/RTL evidence, Runtime attempt control, artifact provenance and protected evaluation; L1 durable trace is planned |
+| L2 design-space exploration | Admitted plugin | ORFS-Agent is the sole product optimizer; local BO/GP remains research-only |
+| Agent trace dashboard | Planned L1 | Durable Goal → ToolCall → Runtime → Evidence trace workspace |
+| Plugin ecosystem | Governed admission | Every plugin requires a pinned source, license conclusion and bounded smoke |
 | No-auth internal mode | ✅ Available | `OPENROAD_PLATFORM_NO_AUTH=1` skips registration |
 | Platform model | ✅ Server managed | Fixed internal Codex model; browser accepts no Provider or API key |
 
@@ -115,10 +104,12 @@ openroad-platform/
 
 ## Development Model
 
-- **Parallel plugin development**: each plugin is an independent `xxx_plugin.py` +
-  `xxx_adapter.py` pair with zero cross-dependencies. A new plugin needs ① its own
-  file pair, ② an export in `execution/__init__.py`, ③ a manifest mount in `app.py`.
-  Developers of different plugins never conflict.
+- **Plugin development**: each plugin is an independently reviewed manifest,
+  source/environment lock and bounded adapter.  Admission occurs through the
+  Plugin Registry and capability contract; adding a plugin must not require an
+  API route branch, an `execution/__init__.py` export, or a change to the
+  protected evaluator.  Developers of different plugins do not share private
+  dependencies.
 - **Branch flow**: feature branch → commit → full test suite → merge to main.
 - **Testing**: `python3 -m pytest -q` (currently 233 passed).
 
@@ -134,12 +125,12 @@ REST API (every web feature is callable via API):
 | --- | --- |
 | `/api/auth/*` | Login / register (skippable in no-auth mode) |
 | `/api/spec/sessions` → `/api/rtl/specs/<id>/run-to-baseline` | Sole natural-language SpecIR → independently verified RTLScout path |
-| `/api/designs/*` | Registered design evidence and explicit existing-RTL import |
+| `/api/designs/*` | Registered design evidence; direct RTL intake remains a reachable legacy route that can still bypass verified-RTL provenance into L2 pending P2 isolation, and is not a supported product path |
 | `/api/runtime/runs/*` | Internal child-run progress, cancel, evidence, and artifacts |
-| `/api/v2/closed-loops` | The only 2D product start endpoint: repeated baseline → autonomous BO/GP |
-| `/api/v2/closed-loops/<id>/run-to-boundary` | Resume until budget completion or the fixed three-stall diagnosis boundary |
+| `/api/v2/external-optimizer-loops` | The only 2D product start endpoint: repeated baseline → pinned ORFS-Agent GP/EI → repeated QoR evaluation |
+| `/api/v2/external-optimizer-loops/<id>/advance` | Records a safe controller transition; the worker, never the browser, executes tools |
 | `/api/agent/traces` | Agent run traces (every LLM/agent operation, auditable) |
-| `/api/extensions/taiwei/run` | 3D task submit (platform / parameters) |
+| `/api/extensions/taiwei/run` | Independent 3D plugin task submit |
 | `/api/extensions/edacraft/*` | Specialist tools (TCAD / SPICE / ...) |
 | `/api/platform/results` | Projects and results |
 | `/api/learning/observations` | Read-only evidence learned automatically by the closed loop |
@@ -173,7 +164,7 @@ ssh -N -L 8000:127.0.0.1:8000 <user>@<server>
 ```bash
 git clone https://github.com/CODA-Team/ChipEvolve.git
 cd ChipEvolve
-python3 -m pip install -e '.[test,visualization]'
+python3 -m pip install -e '.[test,visualization,optimization,distributed]'
 ./scripts/run_demo.sh
 ```
 
@@ -183,24 +174,34 @@ python3 -m pip install -e '.[test,visualization]'
 export PLATFORM_STATE=/tmp/openroad-platform-$UID
 mkdir -p "$PLATFORM_STATE"
 
-# Terminal 1: worker
+# Terminal 1: generic plugin worker (non-DSE jobs)
 python3 scripts/run_runtime_worker.py \
   --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
   --runtime-db "$PLATFORM_STATE/runtime.db"
 
-# Terminal 2: web
+# Terminal 2: durable DSE controller (owns v2 quick/full Runtime jobs)
+python3 scripts/run_dse_controller_worker.py \
+  --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
+  --runtime-db "$PLATFORM_STATE/runtime.db"
+
+# Terminal 3: web
 python3 apps/api/app.py --host 127.0.0.1 --port 8000 \
   --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
   --runtime-db "$PLATFORM_STATE/runtime.db"
 ```
 
-### 5-minute walkthrough
+### Transitional development note
 
-1. Open the web UI → import an RTL design (or use a built-in example);
-2. Backend page → pick design → **Start RTL-to-GDS** (2D);
-3. Backend page → TaiWei 3D panel → pick platform/parameters → **Generate 3D**;
-4. Projects page → inspect layout, metrics, artifacts;
-5. Projects page → **Collect verified run** → knowledge collected → see suggestions in Self-Evolution.
+The existing Web workspace is legacy presentation, not the product workflow
+guide.  Until P3 and the new L1 trace workspace are complete, use the approved
+API path: create a natural-language SpecIR session, complete independent
+verification and RTLScout, then start the admitted ORFS-Agent L2 loop from the
+verified RTL evidence.  TaiWei 3D and specialist extensions are independent
+plugin workflows.  Direct RTL import remains temporarily reachable for legacy
+fixtures/provenance and will be isolated in P2; it is not an alternative
+product RTL-creation route.  Until P2 lands, that legacy import can still
+reach the L2 endpoint, so it must not be treated as proof that product RTL
+provenance is already enforced.
 
 ---
 

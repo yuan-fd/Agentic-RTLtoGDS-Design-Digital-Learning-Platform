@@ -1,0 +1,332 @@
+{
+  "ablation_budget": 200,
+  "ablations": [
+    {
+      "ablation_id": "no_gp",
+      "removed": "surrogate/acquisition",
+      "replacement": "scrambled Sobol with equal budget"
+    },
+    {
+      "ablation_id": "no_multifidelity",
+      "removed": "CTS screening",
+      "replacement": "every proposal receives finish evaluation"
+    },
+    {
+      "ablation_id": "no_feasibility",
+      "removed": "failure probability constraint"
+    },
+    {
+      "ablation_id": "no_trust_region",
+      "removed": "stall-localized TuRBO-style route"
+    },
+    {
+      "ablation_id": "no_memory",
+      "removed": "validated numeric priors and routing hints"
+    },
+    {
+      "ablation_id": "no_stage_focus",
+      "removed": "diagnosis-guided local dimensions"
+    },
+    {
+      "ablation_id": "no_edair",
+      "removed": "typed loss-aware EDA evidence packet"
+    },
+    {
+      "ablation_id": "no_safe_initialization",
+      "removed": "feasible-anchor one-factor-at-a-time Sobol cold start",
+      "replacement": "global scrambled Sobol with equal candidate budget"
+    },
+    {
+      "ablation_id": "single_replica_error_control",
+      "interpretation": "variance/claim error only",
+      "removed": "replicated final replay"
+    }
+  ],
+  "budget_checkpoints": [
+    50,
+    100,
+    200,
+    375,
+    600
+  ],
+  "budget_unit": "unique proposed effective configuration",
+  "claim_boundaries": [
+    "No optimizer-superiority claim is made before all paired primary cells finish.",
+    "Official AutoTuner is compared on the common domain; the full-domain portfolio is compared only with full-domain random and Sobol controls.",
+    "A successful run proves execution only; optimization requires repeated common-evaluator statistics.",
+    "The six primary blocks provide moderate power for large effects, not universal EDA generalization."
+  ],
+  "common_domain_arms": [
+    {
+      "arm_id": "random",
+      "optimizer": "seeded-random-mixed-v1"
+    },
+    {
+      "arm_id": "sobol",
+      "optimizer": "sobol-scrambled-mixed-v1"
+    },
+    {
+      "arm_id": "tpe",
+      "optimizer": "optuna-motpe-mixed-v1"
+    },
+    {
+      "arm_id": "qlognehvi",
+      "optimizer": "botorch-ard-matern-qlognehvi-mixed-v2"
+    },
+    {
+      "arm_id": "official_autotuner_hyperopt",
+      "optimizer": "official-openroad-autotuner-hyperopt"
+    }
+  ],
+  "endpoint_definitions": {
+    "empirical_attainment": "at each frozen checkpoint, fraction of design-PDK by optimizer-seed cells that reached first_baseline_improvement, with Wilson 95% interval; nonattainment remains right-censored at budget",
+    "first_baseline_improvement": "first logical round whose repeated finish evaluation is hard-constraint eligible and whose observed balanced relative utility is strictly greater than zero; positive hypervolume alone is not improvement"
+  },
+  "execution": {
+    "completion_gate": "controller/protocol failure invalidates the cell; only a complete fixed logical budget may enter aggregation",
+    "external_artifact_namespace": "Official AutoTuner experiment names include study mode, protocol digest, design-PDK, optimizer seed, OR_SEED and logical budget; interrupted cells resume only that immutable Ray experiment and append controller attempts",
+    "final_replay": "all reported incumbents/Pareto points are replayed at finish with the same three paired OR_SEED values",
+    "full_fidelity": "finish, three paired OR_SEED replicas",
+    "minimum_full_per_batch": 4,
+    "promotion_fraction": 0.3,
+    "proxy_activation_gate": {
+      "fallback": "promote without trusting proxy ranking",
+      "minimum_pairs": 12,
+      "minimum_spearman": 0.6
+    },
+    "quick_fidelity": "CTS proxy, one OR_SEED",
+    "source_freeze": "campaign-wide digest over runner plus all local Python evaluator, contract, execution and scheduler sources"
+  },
+  "external_validation_blocks": [
+    {
+      "design": "gcd",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "gcd",
+      "platform": "sky130hd",
+      "role": "external"
+    },
+    {
+      "design": "riscv32i",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "riscv32i",
+      "platform": "sky130hd",
+      "role": "external"
+    },
+    {
+      "design": "uart",
+      "platform": "asap7",
+      "role": "external"
+    },
+    {
+      "design": "cva6",
+      "platform": "asap7",
+      "role": "external"
+    }
+  ],
+  "freeze_policy": "append-only; any change creates a new study_id and digest",
+  "full_domain_arm": {
+    "arm_id": "industrial_portfolio",
+    "optimizer": "industrial-dse-portfolio-v1",
+    "search_domain": "calibrated_full"
+  },
+  "full_domain_arms": [
+    {
+      "arm_id": "random_full",
+      "optimizer": "seeded-random-mixed-v1",
+      "search_domain": "calibrated_full"
+    },
+    {
+      "arm_id": "sobol_full",
+      "optimizer": "sobol-scrambled-mixed-v1",
+      "search_domain": "calibrated_full"
+    },
+    {
+      "arm_id": "industrial_portfolio",
+      "optimizer": "industrial-dse-portfolio-v1",
+      "search_domain": "calibrated_full"
+    }
+  ],
+  "hard_constraints": [
+    {
+      "metric": "setup_wns_ns",
+      "operator": ">=",
+      "threshold": 0.0
+    },
+    {
+      "metric": "drc_errors",
+      "operator": "<=",
+      "threshold": 0.0
+    },
+    {
+      "rule": "NaN, missing final metrics, timeout and tool failure are infeasible"
+    }
+  ],
+  "metric_contract": {
+    "asap7_rule": "public period/slack values are ns; official SDC ps literals remain byte-identical",
+    "canonical_units": {
+      "area_um2": "um^2",
+      "drc_errors": "count",
+      "hold_wns_ns": "ns",
+      "power_W": "W",
+      "runtime_seconds": "s",
+      "setup_tns_ns": "ns",
+      "setup_wns_ns": "ns"
+    },
+    "common_evaluator_schema": 3,
+    "runtime_evidence_policy": "every formal finish evaluation records finite positive wall time; native Runtime uses summed stage duration, upstream AutoTuner uses Ray time_total_s, and paired replay uses controller monotonic time",
+    "time_unit_rule": "read run__flow__platform__time_units from ORFS JSON and reject missing, conflicting, or unsupported unit evidence"
+  },
+  "objectives": [
+    {
+      "direction": "max",
+      "metric": "setup_wns_ns",
+      "weight": 0.4
+    },
+    {
+      "direction": "min",
+      "metric": "area_um2",
+      "weight": 0.35
+    },
+    {
+      "direction": "min",
+      "metric": "power_W",
+      "weight": 0.25
+    }
+  ],
+  "optimization_policy": {
+    "acquisition": "constrained qLogNEHVI over a deduplicated mixed candidate pool",
+    "batch_size": 8,
+    "external_baseline_warm_start": "Official AutoTuner receives the same frozen baseline as one explicit points_to_evaluate observation; the upstream controller runs budget+1 samples, while the baseline is labeled uncharged and only the remaining budget candidates enter optimizer endpoints",
+    "feasibility_model": "configuration-caused ORFS quick/full failures and final hard-constraint violations; infrastructure failures are retained but excluded from GP fitting",
+    "infrastructure_failure_policy": "lost, cancelled, worker, runtime, adapter, protocol and transient-I/O failures remain in the immutable budget ledger and deduplication set, but are excluded from surrogate fitting, feasibility labels and portfolio failure-rate routing",
+    "initialization": "before surrogate fitting, expand from a hard-constraint-feasible observed anchor with one-factor-at-a-time scrambled Sobol points; defer high-order combinations, retain every failure in budget, and fall back to global Sobol when no feasible anchor exists",
+    "objective_noise": "replica-derived mean variance with a positive floor",
+    "qlognehvi_candidate_pool": 4096,
+    "replicated_incumbent_policy": "incumbent utility, stagnation routing and trust-region centers use only configurations with all required finish-fidelity replicas present and hard-constraint-feasible; infeasible replicas remain individual labels for the probabilistic feasibility model",
+    "safe_anchor_replication": "an anchor is eligible only after all required finish-fidelity OR_SEED replicas are observed and every replica satisfies every hard constraint; quick-fidelity, infrastructure-failure and single lucky-seed evidence cannot establish safety",
+    "stall_route": "after initialization, three non-improving full configurations switch the portfolio route without ending the fixed budget",
+    "surrogate": "independent ARD Matern-5/2 SingleTaskGP per objective",
+    "surrogate_minimum_unique_configurations": "max(32, 4 * search_dimensions)",
+    "tpe_constraint_handling": "the Optuna multi-objective TPE control imports frozen history through the ask/tell lifecycle and supplies signed hard-constraint residuals through TPESampler constraints_func; infrastructure failures are excluded"
+  },
+  "optimizer_seeds": [
+    1103,
+    2207,
+    3301
+  ],
+  "paired_or_seeds": [
+    101,
+    211,
+    307
+  ],
+  "primary_blocks": [
+    {
+      "design": "aes",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "jpeg",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "ibex",
+      "platform": "asap7",
+      "role": "primary"
+    },
+    {
+      "design": "aes",
+      "platform": "sky130hd",
+      "role": "primary"
+    },
+    {
+      "design": "jpeg",
+      "platform": "sky130hd",
+      "role": "primary"
+    },
+    {
+      "design": "ibex",
+      "platform": "sky130hd",
+      "role": "primary"
+    }
+  ],
+  "primary_endpoints": [
+    "observed feasible hypervolume at every budget checkpoint",
+    "anytime feasible-hypervolume area under the evaluation curve",
+    "evaluations to first feasible baseline-improving point"
+  ],
+  "protocol_digest": "211b78d22cdf285729b13cabd3d18f6b840028e7132c2491ab7459519c4c7e9b",
+  "reproducibility": {
+    "calibration_report_fingerprint": "8b089438d61b37456a813df230196aea6b9b2dda154f05ddaf67bc5390196ed5",
+    "orfs_commit": "51ad1231a231ee85234c06db807688d029b85c35",
+    "python_environment_policy": "campaign and every cell bind a canonical fingerprint of the actual controller Python plus numpy, scipy, torch, gpytorch, botorch, optuna, ray and hyperopt versions; Official cells additionally fingerprint the external AutoTuner virtual environment",
+    "source_snapshot": {
+      "asap7/aes": "e2a8620fd5b18db7c28fcc2e25bc23366e56f5bf3c769ba47a591c19eb11ae79",
+      "asap7/ibex": "db406591445610b09109aac9815de6ef1527d16023a2181740129730cd1ca8cf",
+      "asap7/jpeg": "9d76054ed38992f80c99db8127908a00a6242995241a4f98bab6869ddc6d9090",
+      "sky130hd/aes": "ccdb34159d88edc4fadd7bd9eda1b379b46f78150cf6faeef354943bee876a3b",
+      "sky130hd/ibex": "9c4ca8d1b2d359715f956ae2eee4e3705b77c2d88b66fbcf8a33d69c5ca5b6bc",
+      "sky130hd/jpeg": "f0b9e495399e0c903e56dde44445529dd2c8890ea62c7befa342c581c84256ef"
+    },
+    "toolchain_fingerprint": "04e1f55f239d7573a555f96ed92855f31b3f594870c973bc89e1207b1cc50696",
+    "unresolved_parameters_excluded": [
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "asap7"
+      },
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "nangate45"
+      },
+      {
+        "classification": "unresolved",
+        "parameter": "routing_layer_adjustment",
+        "platform": "sky130hd"
+      }
+    ]
+  },
+  "schema_version": 19,
+  "search_domains": {
+    "clock_sdc_policy": "frozen per design-PDK block and excluded from every search arm",
+    "common": "intersection of controlled-liveness calibration and pinned official AutoTuner variables.yaml tunable=1, restricted to an independent Cartesian domain representable by every compared optimizer",
+    "common_domain_id": "official_autotuner_independent_v2",
+    "external_optimizer_design_adapter": "content-addressed execution namespace copies the exact reference RTL, include files, SDC, HDL frontend, design options and baseline flow parameters; reports retain the logical design and source fingerprint",
+    "fixed_nonsearch_policy": "server baseline values; never omitted or optimizer-selected",
+    "full": "all controlled-liveness-eligible platform parameters",
+    "quantized_bound_parity": "platform numeric bounds are inclusive; pinned AutoTuner randint/arange upper bounds are exclusive, so its generated configuration encodes one additional quantization step and the enumerated value sets must match",
+    "relational_parameter_policy": "a dependent variable that upstream Hyperopt cannot condition is removed from every common-domain arm and fixed at its calibrated baseline; its independent target may remain tunable only when the fixed value is legal across the target's full range"
+  },
+  "secondary_endpoints": [
+    "area, WNS, TNS, power, DRC, wall time and failure rate",
+    "median, IQR, paired bootstrap 95% CI and empirical attainment"
+  ],
+  "statistics": {
+    "aggregation_rule": "never pool EDA replicas or optimizer seeds as independent primary samples; report all 18 seed cells descriptively, aggregate their three seeds within each design-PDK block for inference",
+    "effect_sizes": [
+      "paired median difference",
+      "Cliff delta",
+      "bootstrap CI"
+    ],
+    "familywise_control": "Holm correction over preregistered primary arm contrasts",
+    "primary_test": "paired sign-flip permutation across six design-PDK blocks on the preregistered median-over-seeds anytime-HV AUC difference",
+    "reporting_rule": "report every seed, failure, exclusion, timeout and checkpoint",
+    "unit": "design-PDK block after median aggregation across optimizer seeds"
+  },
+  "stopping": {
+    "algorithmic": "fixed maximum budget; checkpoints do not stop a losing arm",
+    "engineering": "only explicit timeout, disk guard, cancellation or toolchain invalidation",
+    "nonattainment_completion": "a cell that exhausts the complete fixed logical budget without a feasible configuration is a valid completed nonattainment outcome, not an incomplete or excluded controller failure; its diagnosis is retained",
+    "stall_routing": "three non-improving full configurations change optimizer route, not study budget"
+  },
+  "study_id": "v2-industrial-dse-20260829-r18",
+  "title": "Calibrated multi-objective design-space exploration in OpenROAD"
+}

@@ -25,6 +25,7 @@ for source_root in (
 from openroad_platform_contracts import RuntimeStatus  # noqa: E402
 from openroad_platform_execution import (  # noqa: E402
     PluginRegistry,
+    ORFSRTLToGDSFactory,
     ToolchainConfig,
     build_rtlscout_task,
     orfs_plugin_manifest,
@@ -92,7 +93,7 @@ def main() -> int:
     )
     started = time.monotonic()
     result = execute_rtl_to_orfs(
-        runtime, task, top="adder",
+        runtime, task, top="adder", rtl_to_gds_factory=ORFSRTLToGDSFactory(),
         orfs_options={
             "platform_name": "nangate45", "target_stage": "finish",
             "clock_period_ns": 10.0, "core_utilization_pct": 10.0,

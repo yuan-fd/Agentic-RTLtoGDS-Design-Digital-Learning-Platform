@@ -9,14 +9,16 @@ import platform
 import sys
 import uuid
 from pathlib import Path
+from typing import Mapping, Sequence
 
 from openroad_platform_contracts import PluginManifest, RunRequest, RunStage, TaskSpec
 
 from .toolchain import ToolchainConfig
+from .orfs_parameters import validate_orfs_parameters
 
 
 ORFS_PLUGIN_ID = "orfs"
-ORFS_PLUGIN_VERSION = "1.0.0"
+ORFS_PLUGIN_VERSION = "1.2.0"
 
 
 def _require_executable_admission() -> None:
@@ -50,14 +52,32 @@ def build_orfs_task(
     max_attempts: int = 1,
     task_id: str | None = None,
     labels: dict[str, str] | None = None,
+    flow_parameters: dict[str, object] | None = None,
+    rtl_files: Sequence[str | Path] | None = None,
+    rtl_root: str | Path | None = None,
+    rtl_include_dirs: Sequence[str | Path] = (),
+    synth_hdl_frontend: str | None = None,
+    design_options: dict[str, object] | None = None,
+    sdc_path: str | Path | None = None,
 ) -> TaskSpec:
     """Create a TaskSpec with an immutable local RTL artifact reference."""
 
     source = Path(rtl_path).expanduser().resolve()
     if not source.is_file() or source.stat().st_size == 0:
         raise FileNotFoundError(f"RTL input is missing or empty: {source}")
+    tuning = validate_orfs_parameters(flow_parameters or {}, platform=platform_name)
+    bundle_paths = tuple(Path(item).expanduser().resolve() for item in (rtl_files or ()))
+    bundle_root = Path(rtl_root).expanduser().resolve() if rtl_root is not None else None
+    include_paths = tuple(Path(item).expanduser().resolve() for item in rtl_include_dirs)
+    sdc = Path(sdc_path).expanduser().resolve() if sdc_path is not None else None
     legacy = RunRequest(
         rtl_path=str(source), top=top, clock=clock,
+        rtl_files=tuple(str(item) for item in bundle_paths),
+        rtl_root=str(bundle_root) if bundle_root is not None else None,
+        rtl_include_dirs=tuple(str(item) for item in include_paths),
+        synth_hdl_frontend=synth_hdl_frontend,
+        design_options=dict(design_options or {}),
+        sdc_path=str(sdc) if sdc is not None else None,
         clock_period_ns=clock_period_ns, platform=platform_name,
         target_stage=RunStage(target_stage),
         core_utilization_pct=core_utilization_pct,
@@ -65,25 +85,51 @@ def build_orfs_task(
         or_seed=or_seed,
         minimum_die_size_um=minimum_die_size_um,
         stage_timeout_seconds=stage_timeout_seconds,
+        flow_parameters=tuning,
     )
     legacy.validate()
-    expected = ["odb", "config", "toolchain_snapshot", "run_result"]
+    expected = ["odb", "config", "toolchain_snapshot", "parameter_contract",
+                "design_input_manifest", "run_result", "log"]
     if target_stage == "finish":
         expected.extend(("def", "netlist", "gds"))
+    inputs = {
+        "rtl": {
+            "path": str(source),
+            "size_bytes": source.stat().st_size,
+            "sha256": _sha256(source),
+        },
+        "top": top,
+        "clock": clock,
+    }
+    if bundle_paths:
+        assert bundle_root is not None
+        inputs["rtl_bundle"] = {
+            "files": [{
+                "path": str(path), "relative_path": str(path.relative_to(bundle_root)),
+                "size_bytes": path.stat().st_size, "sha256": _sha256(path),
+            } for path in bundle_paths],
+            "include_dirs": [{
+                "path": str(directory),
+                "relative_path": str(directory.relative_to(bundle_root)),
+                "headers": [{
+                    "path": str(header),
+                    "relative_path": str(header.relative_to(bundle_root)),
+                    "size_bytes": header.stat().st_size, "sha256": _sha256(header),
+                } for header in sorted(directory.rglob("*"))
+                 if header.is_file() and header.suffix.lower() in {".v", ".sv", ".vh", ".svh"}],
+            } for directory in include_paths],
+            "synth_hdl_frontend": synth_hdl_frontend,
+        }
+    if sdc is not None:
+        inputs["sdc"] = {
+            "path": str(sdc), "size_bytes": sdc.stat().st_size, "sha256": _sha256(sdc),
+        }
     task = TaskSpec(
         task_id=task_id or f"orfs-{uuid.uuid4().hex}",
         project_id=project_id,
         design_id=design_id,
         plugin_id=ORFS_PLUGIN_ID,
-        inputs={
-            "rtl": {
-                "path": str(source),
-                "size_bytes": source.stat().st_size,
-                "sha256": _sha256(source),
-            },
-            "top": top,
-            "clock": clock,
-        },
+        inputs=inputs,
         parameters={
             "platform": legacy.platform,
             "target_stage": legacy.target_stage.value,
@@ -93,6 +139,8 @@ def build_orfs_task(
             "or_seed": legacy.or_seed,
             "minimum_die_size_um": legacy.minimum_die_size_um,
             "stage_timeout_seconds": legacy.stage_timeout_seconds,
+            "flow_parameters": tuning,
+            "design_options": legacy.design_options,
         },
         resources={"toolchain_profile": "default"},
         timeout_seconds=timeout_seconds,
@@ -127,6 +175,12 @@ def orfs_plugin_manifest(
         "YOSYS_BIN": str(toolchain.yosys_bin),
         "OPENROAD_PLATFORM_TOOLCHAIN_PROFILE": toolchain.name,
     })
+    # Operator-owned resource policy is captured in the immutable plugin
+    # manifest so local and Ray workers receive the same limit. It is never
+    # accepted from a browser or TaskSpec payload.
+    if "OPENROAD_PLATFORM_ORFS_CORES" in os.environ:
+        environment["OPENROAD_PLATFORM_ORFS_CORES"] = os.environ[
+            "OPENROAD_PLATFORM_ORFS_CORES"]
     if toolchain.klayout_bin is not None:
         environment["KLAYOUT_BIN"] = str(toolchain.klayout_bin)
     manifest = PluginManifest(
@@ -145,6 +199,8 @@ def orfs_plugin_manifest(
                 },
                 "top": {"type": ["string", "null"]},
                 "clock": {"type": ["string", "null"]},
+                "rtl_bundle": {"type": "object"},
+                "sdc": {"type": "object"},
             },
         },
         output_schema={"type": "object", "required": ["status", "artifacts"]},
@@ -154,8 +210,8 @@ def orfs_plugin_manifest(
             {"kind": kind, "required": kind == "log"}
             for kind in (
                 "odb", "def", "netlist", "gds", "log", "report", "config",
-                "toolchain_snapshot", "run_result", "other",
-                "layout_view",
+                "toolchain_snapshot", "parameter_contract", "run_result", "other",
+                "layout_view", "design_input_manifest",
             )
         ),
         environment=environment,

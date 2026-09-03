@@ -9,9 +9,15 @@ Main endpoints:
 - `GET /api/health`, `/api/projects`, `/api/designs`
 - `GET /api/designs/<id>` and its `source` and `schematic.svg` resources
 - `POST /api/spec/sessions` for the platform-managed natural-language SpecIR entry
-- `POST /api/designs/import` for an existing RTL design
-- `POST /api/v2/closed-loops` for the only 2D product start path
-- `POST /api/v2/closed-loops/<id>/run-to-boundary` to run/resume repeated baseline and BO/GP exploration
+- `POST /api/designs/import` is a currently reachable legacy intake; pending
+  P2 it can still reach the L2 endpoint without verified-RTL provenance, so it
+  is not a supported product RTL-creation path
+- `POST /api/v2/external-optimizer-loops` starts the rebuilt L2 path: repeated
+  baseline → pinned ORFS-Agent → repeated Runtime evaluation
+- `POST /api/v2/external-optimizer-loops/<id>/advance` records the next safe
+  transition; only the controller worker may execute the queued tool work
+- `/api/v2/closed-loops` remains a legacy/reproduction API while historical
+  checkpoints are migrated; it is not the new L2 architecture
 - `GET /api/runtime/runs` and run detail/cancel routes for child-run monitoring
 
 Runtime and autonomous-loop live SQLite state defaults to
@@ -34,3 +40,13 @@ requests enter through SpecIR and the automatic independent-verifier + RTLScout
 state machine; there is no second direct-LLM RTL generation endpoint. Generated
 source and all derived evidence are copied into this platform's own
 `var/designs` directory.
+
+The admitted ORFS-Agent plugin is the sole L2 product optimizer.  Local BO/GP
+implementations and official-tool comparators are research-only paths; TaiWei
+and specialty integrations are independent extension capabilities rather than
+alternatives in the 2D product workflow.
+
+The approved target chain is `SpecIR -> platform-managed RTLScout -> independent
+verification -> verified RTL -> DesignGoal / typed policy -> admitted ORFS-Agent
+-> immutable TaskSpec -> Runtime -> raw artifacts -> protected QoR`.  P2 will
+enforce the verified-RTL provenance edge currently bypassed by legacy import.

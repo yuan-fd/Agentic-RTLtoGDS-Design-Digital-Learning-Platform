@@ -1,0 +1,18 @@
+diff --git a/flow/scripts/final_report.tcl b/flow/scripts/final_report.tcl
+index d81acc986..00a55fc80 100644
+--- a/flow/scripts/final_report.tcl
++++ b/flow/scripts/final_report.tcl
+@@ -66,7 +66,11 @@ report_metrics 6 "finish"
+ 
+ source_step_tcl POST FINAL_REPORT
+ 
+-# Save a final image if openroad is compiled with the gui
+-if { [ord::openroad_gui_compiled] } {
++# The pinned OpenROAD binary is GUI-capable, but batch -exit sessions do not
++# register gui::* commands.  Gate the optional screenshot on command presence
++# so signoff reporting remains identical while headless runs do not abort.
++if { [ord::openroad_gui_compiled] && [llength [info commands gui::show]] > 0 } {
+   gui::show "source $::env(SCRIPTS_DIR)/save_images.tcl" false
++} else {
++  puts "GUI image export skipped: gui::show is not available in this session."
+ }

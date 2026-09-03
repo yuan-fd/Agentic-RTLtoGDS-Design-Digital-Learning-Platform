@@ -17,6 +17,30 @@
       }
     },
     {
+      "plugin_id": "orfs-agent",
+      "repository": "https://github.com/ABKGroup/ORFS-Agent.git",
+      "branch_at_audit": "main",
+      "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
+      "cache_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
+      "license": "BSD-3-Clause",
+      "entrypoints": [
+        "maindriver.sh",
+        "AutoTuner-integration/ORFS-with-AutoTuner/orfs_agent.py",
+        "AutoTuner-integration/ORFS-with-AutoTuner/analyst_agent_workbench.py"
+      ],
+      "execution_class": "admitted thin Runtime plugin after pinned-source, native GP/EI, and bounded Runtime/protected-evaluator smoke; no performance superiority claim"
+    },
+    {
+      "plugin_id": "statetune",
+      "repository": "https://github.com/C-YuLong/stateTune.git",
+      "branch_at_audit": "main",
+      "commit": "66ea6061128afcb389ae36dab51e29bd0847f268",
+      "cache_path": ".external-src/stateTune",
+      "license": null,
+      "license_status": "not_declared_in_checked_revision",
+      "execution_class": "source-audit-only; no Runtime plugin until license or permission is obtained"
+    },
+    {
       "plugin_id": "agenticpd",
       "repository": "https://github.com/Cheatnut/AgenticPD.git",
       "branch_at_audit": "main",

@@ -8,8 +8,12 @@ import uuid
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from openroad_platform_contracts import RepairAction, TaskSpec
-from openroad_platform_execution import build_orfs_task
+from openroad_platform_contracts import (
+    RTLToGDSFactory,
+    RTLToGDSRequest,
+    RepairAction,
+    TaskSpec,
+)
 
 
 UNSAFE_TEXT = re.compile(r"[;&|`$<>]|\b(?:rm|curl|wget|bash|sh|sudo)\b", re.I)
@@ -18,6 +22,9 @@ NUMBER = r"(\d+(?:\.\d+)?)"
 
 class NaturalLanguageTaskCompiler:
     """Compile a deliberately small language into validated platform tasks."""
+
+    def __init__(self, rtl_to_gds_factory: RTLToGDSFactory):
+        self.rtl_to_gds_factory = rtl_to_gds_factory
 
     def compile(
         self, text: str, *, project_id: str, design_id: str,
@@ -54,11 +61,13 @@ class NaturalLanguageTaskCompiler:
                              minimum=0.01, maximum=1000.0)
         utilization = self._float(intent, rf"{NUMBER}\s*%", default=10.0,
                                   minimum=1.0, maximum=99.0)
-        task = build_orfs_task(
-            rtl_path, project_id=project_id, design_id=design_id, top=top,
-            platform_name="nangate45", target_stage=stage,
-            clock_period_ns=period, core_utilization_pct=utilization,
-        )
+        task = self.rtl_to_gds_factory.build(RTLToGDSRequest(
+            rtl_path=str(rtl_path), project_id=project_id, design_id=design_id,
+            top=top, options={
+                "platform_name": "nangate45", "target_stage": stage,
+                "clock_period_ns": period, "core_utilization_pct": utilization,
+            },
+        ))
         task.validate()
         return task
 

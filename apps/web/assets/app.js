@@ -10,7 +10,7 @@ const state = {
   requestedExtension: null, rtlscoutPoll: null, runtimePoll: null, healthPoll: null,
   health: null, auth: null, workspaceLoaded: false, locale: "en",
   specSession: null, developerView: false,
-  backendMode: "2d", activeClosedLoop: null,
+  backendMode: "2d", activeClosedLoop: null, closedLoopPoll: null,
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
 const ZH = {
@@ -262,6 +262,7 @@ async function loadAuthenticatedWorkspace() {
   await Promise.all([loadRtlscoutStatus(), loadExamples()]);
   await loadDesigns();
   await loadRuns();
+  await restoreActiveClosedLoop();
   state.workspaceLoaded = true;
   // Stage 3.4: prefill the Spec (LLM) agent dashboard with the most recent spec-to-rtl agent trace.
   loadRecentAgentTraces("#agentTraceSpec", "spec-to-rtl");
@@ -361,15 +362,28 @@ async function loadHealth() {
 }
 
 function renderWorkerHealth(health) {
-  const ready = health.ok && health.runtime_worker_ready;
+  const runtimeReady = Boolean(health.ok && health.runtime_worker_ready);
+  const controllerReady = Boolean(health.ok && health.dse_controller_ready);
+  const ready = runtimeReady && controllerReady;
   $("#healthDot").className = ready ? "ok" : "bad";
-  $("#healthText").textContent = ready ? ui("System ready", "系统就绪") : ui("Service offline", "服务离线");
+  $("#healthText").textContent = ready ? ui("System ready", "系统就绪")
+    : !runtimeReady ? ui("Execution worker offline", "执行 Worker 离线")
+      : ui("DSE controller offline", "DSE 控制器离线");
   const indicator = $("#workerIndicator");
   if (indicator) {
     indicator.classList.toggle("ready", ready);
     $("#workerState").textContent = ready
-      ? (health.runtime_worker_status === "running" ? ui("Execution in progress", "正在执行任务") : ui("Execution service ready", "执行服务就绪"))
-      : ui("Execution service offline", "执行服务离线");
+      ? (health.dse_controller_status === "running"
+          ? ui(`DSE running · ${health.dse_execution_backend || "local"}`, `DSE 正在运行 · ${health.dse_execution_backend || "local"}`)
+          : ui(`Workers ready · ${health.dse_execution_backend || "local"}`, `执行服务就绪 · ${health.dse_execution_backend || "local"}`))
+      : !runtimeReady ? ui("Execution worker offline", "执行 Worker 离线")
+        : ui("Durable DSE controller offline", "持久 DSE 控制器离线");
+    if (ready && health.parameter_calibration_required && !health.parameter_calibration_ready) {
+      indicator.classList.remove("ready");
+      $("#workerState").textContent = ui(
+        "DSE blocked: parameter calibration missing",
+        "DSE 已阻止：缺少参数活性校准");
+    }
   }
 }
 
@@ -1055,33 +1069,223 @@ function paintDensityHeatmap(matrix) {
   }));
 }
 
+function optimizationSvgEmpty(selector, text) {
+  const svg = $(selector);
+  if (svg) svg.innerHTML = `<text x="320" y="112" text-anchor="middle" class="optimization-label">${esc(text)}</text>`;
+}
+
+function normalizeExternalOptimizerLoop(loop) {
+  // The external ORFS-Agent path stores raw repeated Runtime observations.
+  // Convert only already-measured rows into the dashboard's common display
+  // shape; no predicted or quick-stage value is promoted to final QoR here.
+  const median = values => {
+    const ordered = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!ordered.length) return null;
+    const m = Math.floor(ordered.length / 2);
+    return ordered.length % 2 ? ordered[m] : (ordered[m - 1] + ordered[m]) / 2;
+  };
+  const summary = observations => {
+    const usable = (observations || []).filter(item => item?.feasible && item.status === "succeeded");
+    const names = ["area_um2", "setup_wns_ns", "power_W", "drc_errors"];
+    return {
+      replicas: (observations || []).length, successes: usable.length,
+      failure_rate: (observations || []).length ? 1 - usable.length / observations.length : 1,
+      eligible: usable.length === (observations || []).length && usable.length > 0,
+      metrics: Object.fromEntries(names.map(name => [name, {median: median(usable.map(item => Number(item.metrics?.[name])))}])),
+      run_ids: (observations || []).map(item => item.run_id),
+    };
+  };
+  const baseline = summary(loop.baseline_observations || []);
+  const history = [{kind: "baseline", round: 0, summary: baseline}];
+  (loop.history || []).forEach(round => (round.results || []).forEach(result => {
+    if (!result.eligible || !Number.isFinite(Number(result.objective_median))) return;
+    history.push({
+      kind: "bo_candidate", round: round.round,
+      candidate_id: result.candidate?.candidate_id || "external-candidate",
+      parameters: result.effective_parameters || {}, summary: summary(result.terminal_observations || result.observations),
+      // The external optimiser minimizes a published scalar objective.  Its
+      // sign is inverted only for the common dashboard's higher-is-better
+      // utility chart; the raw objective remains in the checkpoint.
+      utility: -Number(result.objective_median),
+      model_metadata: {portfolio_route: loop.optimizer_plugin},
+    });
+  }));
+  return {
+    ...loop, history, optimizer_backend: loop.optimizer_plugin,
+    best_utility: Number.isFinite(Number(loop.best_objective)) ? -Number(loop.best_objective) : null,
+    parameter_space: Object.keys(loop.baseline_parameters || {}).map(name => ({name, stage: "ORFS allowlist"})),
+    optimization_trace: {pareto: []}, proxy_calibration_records: [],
+    execution_backend_events: [], optimization_memory: {artifacts: []},
+  };
+}
+
+function renderOptimizationDashboard(loop) {
+  if (!loop) {
+    optimizationSvgEmpty("#optimizationAnytime", ui("No observed full-flow result.", "暂无 full-flow 实测结果。"));
+    optimizationSvgEmpty("#optimizationPareto", ui("No observed Pareto points.", "暂无实测 Pareto 点。"));
+    return;
+  }
+  if (loop.optimizer_plugin === "orfs-agent@2025.1") loop = normalizeExternalOptimizerLoop(loop);
+  const history = Array.isArray(loop.history) ? loop.history : [];
+  const logical = history.filter(item => item.kind !== "baseline");
+  const full = history.filter(item => item.kind === "bo_candidate" && item.summary);
+  const quickOnly = history.filter(item => item.kind === "quick_proxy_only");
+  const routes = full.map(item => item.model_metadata?.portfolio_route).filter(Boolean);
+  const currentRoute = routes.at(-1) || loop.optimizer_backend || "—";
+  const best = Number(loop.best_utility);
+  $("#optimizationKpis").innerHTML = [
+    [currentRoute.replaceAll("_", " "), ui("Optimizer route", "优化器路由")],
+    [String(logical.length), ui("Unique logical configurations", "不同逻辑配置")],
+    [String(full.length), ui("Replicated full evaluations", "完成复测的 full 配置")],
+    [Number.isFinite(best) ? `${(best * 100).toFixed(2)}%` : "—", ui("Best verified utility", "最佳实测效用")],
+  ].map(([value, label]) => `<div><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join("");
+
+  const observed = full.filter(item => Number.isFinite(Number(item.utility)));
+  if (!observed.length) optimizationSvgEmpty("#optimizationAnytime", ui("Waiting for replicated full-flow QoR.", "等待 full-flow 重复测量。"));
+  else {
+    let running = -Infinity;
+    const values = observed.map(item => (running = Math.max(running, Number(item.utility))));
+    const low = Math.min(0, ...values), high = Math.max(0, ...values);
+    const span = Math.max(high - low, .01);
+    const points = values.map((value, index) => ({
+      x: 48 + index * 560 / Math.max(values.length - 1, 1),
+      y: 184 - (value - low) / span * 145,
+    }));
+    const line = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+    const area = `48,184 ${line} ${points.at(-1).x.toFixed(1)},184`;
+    $("#optimizationAnytime").innerHTML = `
+      <line x1="48" y1="24" x2="48" y2="184" class="optimization-axis"/><line x1="48" y1="184" x2="608" y2="184" class="optimization-axis"/>
+      ${[0,1,2,3].map(i => `<line x1="48" y1="${39+i*48}" x2="608" y2="${39+i*48}" class="optimization-grid"/>`).join("")}
+      <polygon points="${area}" class="optimization-area"/><polyline points="${line}" class="optimization-line"/>
+      ${points.map((point, i) => `<circle cx="${point.x}" cy="${point.y}" r="4" class="optimization-point"><title>configuration ${observed[i].round}: ${(values[i]*100).toFixed(3)}%</title></circle>`).join("")}
+      <text x="48" y="205" class="optimization-label">${esc(ui("full-flow configuration", "full-flow 配置"))}</text><text x="8" y="26" class="optimization-label">${(high*100).toFixed(1)}%</text><text x="8" y="184" class="optimization-label">${(low*100).toFixed(1)}%</text>`;
+  }
+
+  const paretoRows = full.map(item => ({
+    item, area: Number(item.summary?.metrics?.area_um2?.median),
+    timing: Number(item.summary?.metrics?.setup_wns_ns?.median),
+  })).filter(row => Number.isFinite(row.area) && Number.isFinite(row.timing));
+  if (!paretoRows.length) optimizationSvgEmpty("#optimizationPareto", ui("Area and timing are not both available.", "面积和时序尚未同时可用。"));
+  else {
+    const areas = paretoRows.map(row => row.area), timings = paretoRows.map(row => row.timing);
+    const areaLow = Math.min(...areas), areaSpan = Math.max(Math.max(...areas) - areaLow, 1e-9);
+    const timingLow = Math.min(...timings), timingSpan = Math.max(Math.max(...timings) - timingLow, 1e-9);
+    const paretoIds = new Set((loop.optimization_trace?.pareto || []).map(item => item.candidate_id));
+    $("#optimizationPareto").innerHTML = `
+      <line x1="48" y1="24" x2="48" y2="184" class="optimization-axis"/><line x1="48" y1="184" x2="608" y2="184" class="optimization-axis"/>
+      ${paretoRows.map(row => { const x=48+(row.area-areaLow)/areaSpan*560; const y=184-(row.timing-timingLow)/timingSpan*145; const active=paretoIds.has(row.item.candidate_id); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${active?6:4}" class="optimization-point${active?" pareto":""}"><title>${esc(row.item.candidate_id)} · area ${row.area.toFixed(3)} · WNS ${row.timing.toFixed(4)}</title></circle>`; }).join("")}
+      <text x="48" y="205" class="optimization-label">${esc(ui("area → larger", "面积 → 更大"))}</text><text x="8" y="26" class="optimization-label">${esc(ui("WNS ↑", "WNS ↑"))}</text>`;
+  }
+
+  const quickCount = logical.length, fullCount = full.length;
+  const maximum = Math.max(quickCount, 1);
+  $("#optimizationFunnel").innerHTML = [
+    ["quick", ui("Quick probes", "Quick 探针"), quickCount],
+    ["full", ui("Full replays", "Full 复测"), fullCount],
+    ["pruned", ui("Proxy-only", "仅代理筛选"), quickOnly.length],
+  ].map(([kind, label, count]) => `<div class="funnel-row ${kind}"><b>${esc(label)}</b><i><i style="width:${Math.max(2, count/maximum*100).toFixed(1)}%"></i></i><span>${count}</span></div>`).join("") + `<span>${esc(ui(`${(loop.proxy_calibration_records||[]).length} paired quick/full points; intermediate metrics are never final QoR.`, `${(loop.proxy_calibration_records||[]).length} 个 quick/full 配对点；中间指标永不作为最终 QoR。`))}</span>`;
+
+  const specs = Array.isArray(loop.parameter_space) ? loop.parameter_space : [];
+  $("#optimizationParameters").innerHTML = specs.length ? specs.map(spec => {
+    const values = logical.map(item => item.parameters?.[spec.name]).filter(value => value !== undefined);
+    const unique = new Set(values.map(value => JSON.stringify(value))).size;
+    const range = values.length && values.every(value => typeof value === "number") ? `${Math.min(...values)}…${Math.max(...values)}` : `${unique} values`;
+    return `<div class="optimization-row"><b>${esc(spec.name)}</b><small>${esc(spec.stage || "unscoped")} · ${esc(range)}</small><span class="optimization-badge">${unique} unique</span></div>`;
+  }).join("") : `<div class="empty-row">No typed parameter contract.</div>`;
+
+  const predictions = logical.flatMap(item => (item.predictions || []).map(prediction => ({...prediction, round:item.round, route:item.model_metadata?.portfolio_route})));
+  $("#optimizationPredictions").innerHTML = predictions.length ? predictions.slice(-16).map(item => `<div class="optimization-row"><b>${esc(item.metric_name)} · #${esc(item.round)}</b><small>${Number(item.mean).toPrecision(5)} ± ${Number(item.stddev).toPrecision(3)} · ${esc(item.model_id)}</small><span class="optimization-badge candidate">predicted</span></div>`).join("") : `<div class="empty-row">${esc(ui("No fitted-surrogate predictions yet; Sobol/TPE proposals do not invent uncertainty.", "尚无拟合代理模型预测；Sobol/TPE 不伪造不确定性。"))}</div>`;
+
+  const memory = loop.optimization_memory?.artifacts || [];
+  $("#optimizationMemory").innerHTML = memory.length ? memory.map(item => `<div class="optimization-row"><b>${esc(item.kind.replaceAll("_", " "))}</b><small>support ${item.support_count} · contradictions ${item.contradiction_count}<br>${esc(item.payload?.scope || "exact context")}</small><span class="optimization-badge ${esc(item.status)}">${esc(item.status)}</span></div>`).join("") : `<div class="empty-row">No evidence-gated memory artifacts.</div>`;
+
+  const executions = loop.execution_backend_events || [];
+  const failures = full.reduce((sum, item) => sum + Number(item.summary?.failure_rate || 0), 0);
+  $("#optimizationRuntime").innerHTML = `
+    <div class="optimization-row"><b>${esc(loop.execution_backend_id || "unknown")}</b><small>${executions.length} fidelity dispatches · ${esc(executions.at(-1)?.distributed ? "Ray distributed evidence" : "local process/thread evidence")}</small><span class="optimization-badge ${executions.at(-1)?.distributed?"active":"candidate"}">${executions.at(-1)?.distributed?"distributed":"local"}</span></div>
+    <div class="optimization-row"><b>Requested → effective</b><small>${logical.filter(item => item.effective_configuration_id).length}/${logical.length} typed configurations have a stable effective ID. Exact consumer liveness remains a per-run artifact.</small><span class="optimization-badge">contract</span></div>
+    <div class="optimization-row"><b>Full-flow failures</b><small>Aggregate replica failure fraction: ${failures.toFixed(3)}. Failed attempts remain in evidence and feasibility modelling.</small><span class="optimization-badge ${failures?"failed":"active"}">${failures?"inspect":"clean"}</span></div>`;
+  const terminal = ["completed", "diagnosis_required", "failed"].includes(loop.status);
+  const boundary = $("#optimizationBoundary");
+  boundary.className = `field-note optimization-boundary ${terminal && loop.status !== "failed" ? "good" : "warn"}`;
+  boundary.textContent = ui(
+    `Status: ${loop.status}. Final claims use ${full.length} replicated full-flow configurations; ${quickOnly.length} quick-only points and ${predictions.length} model predictions are excluded from measured QoR.`,
+    `状态：${loop.status}。最终结论只使用 ${full.length} 个经过重复 full-flow 的配置；${quickOnly.length} 个仅 quick 点和 ${predictions.length} 个模型预测均不计入实测 QoR。`
+  );
+}
+
+function stopClosedLoopPolling() {
+  if (state.closedLoopPoll) clearTimeout(state.closedLoopPoll);
+  state.closedLoopPoll = null;
+}
+
+async function pollClosedLoop(pipelineId) {
+  stopClosedLoopPolling();
+  try {
+    const checkpoint = await api(`/api/v2/external-optimizer-loops/${encodeURIComponent(pipelineId)}`);
+    const loop = checkpoint.state || {};
+    renderOptimizationDashboard(loop);
+    const terminal = ["completed", "diagnosis_required", "failed"].includes(loop.status);
+    const best = Number(loop.best_objective);
+    message("#flowMessage", terminal
+      ? ui(`Campaign stopped at ${loop.status}; ${loop.candidate_count || 0} candidate configurations were repeatedly measured. Best published-optimizer objective: ${Number.isFinite(best) ? best.toFixed(4) : "—"}.`, `实验停于 ${loop.status}；${loop.candidate_count || 0} 个候选配置已完成重复测量。最优上游优化器目标值：${Number.isFinite(best) ? best.toFixed(4) : "—"}。`)
+      : ui(`Campaign ${loop.status || "queued"}: ${loop.candidate_count || 0}/${loop.max_candidates || "?"} candidate configurations. You may leave this page; the durable controller continues.`, `实验 ${loop.status || "排队中"}：${loop.candidate_count || 0}/${loop.max_candidates || "?"} 个候选配置。可以离开页面，持久控制器会继续运行。`));
+    $("#submitFlow").disabled = !terminal;
+    if (!terminal) state.closedLoopPoll = setTimeout(() => pollClosedLoop(pipelineId), 5000);
+    else await loadRuns(null);
+  } catch (error) {
+    message("#flowMessage", error.message, true);
+    state.closedLoopPoll = setTimeout(() => pollClosedLoop(pipelineId), 10000);
+  }
+}
+
+async function restoreActiveClosedLoop() {
+  try {
+    const records = (await api("/api/v2/external-optimizer-loops")).external_optimizer_loops || [];
+    const terminal = new Set(["completed", "diagnosis_required", "failed"]);
+    const active = records.find(item => !terminal.has(item.state?.status));
+    if (!active) return;
+    const designId = active.state?.design_id;
+    if (designId && state.designs.some(item => item.id === designId)
+        && state.selectedDesign?.id !== designId) {
+      await selectDesign(designId);
+    }
+    state.activeClosedLoop = active.pipeline_id;
+    renderOptimizationDashboard(active.state || {});
+    $("#submitFlow").disabled = true;
+    message("#flowMessage", ui(
+      "Recovered an active durable campaign after page reload; execution never depended on this browser tab.",
+      "页面重载后已恢复正在运行的持久实验；执行从不依赖当前浏览器标签页。"));
+    await pollClosedLoop(active.pipeline_id);
+  } catch (error) {
+    message("#flowMessage", `${ui("Could not restore the active campaign", "无法恢复正在运行的实验")}: ${error.message}`, true);
+  }
+}
+
 async function submitFlow() {
   const id = $("#backendDesign").value;
   if (!id) return message("#flowMessage", ui("Select a registered design first.", "请先选择已登记设计。"), true);
   const button = $("#submitFlow");
   button.disabled = true;
   const objective = $('input[name="flowObjective"]:checked')?.value || "balanced";
-  message("#flowMessage", ui("Starting the autonomous loop: three baseline measurements, followed by repeated BO/GP experiments…", "正在启动自主闭环：先重复测量三次 baseline，再自动开展 BO/GP 多参数实验……"));
+  message("#flowMessage", ui("Starting the autonomous loop: three baseline measurements, then pinned ORFS-Agent GP/EI candidate experiments…", "正在启动自主闭环：先重复测量三次 baseline，再由固定版本 ORFS-Agent 的 GP/EI 产生候选实验……"));
   try {
     const base = {
       design_id: id, clock: $("#flowClock").value.trim() || null,
       platform: $("#flowPdk").value,
       objective_profile: objective,
     };
-    const created = await post("/api/v2/closed-loops", base);
+    const created = await post("/api/v2/external-optimizer-loops", base);
     state.activeClosedLoop = created.pipeline_id;
-    const result = await post(`/api/v2/closed-loops/${encodeURIComponent(created.pipeline_id)}/run-to-boundary`, {});
-    const loop = result.state || {};
-    const best = Number(loop.best_utility || 0) * 100;
-    const statusText = loop.status === "diagnosis_required"
-      ? ui("Three consecutive rounds did not improve enough; parameter search stopped and a stage-diagnosis evidence packet was produced.", "连续三轮改善不足；参数搜索已停止，并生成了阶段诊断证据包。")
-      : ui(`The autonomous loop stopped at “${loop.status || "recorded"}” after ${loop.round || 0} BO/GP rounds. Best verified relative utility: ${best.toFixed(2)}%.`, `自主闭环在 ${loop.round || 0} 轮 BO/GP 后停于“${loop.status || "已记录"}”；最佳实测相对效用为 ${best.toFixed(2)}%。`);
-    message("#flowMessage", statusText);
-    await loadRuns((loop.active_run_ids || [])[0] || null);
+    renderOptimizationDashboard(created.state || {});
+    message("#flowMessage", ui(
+      "Campaign accepted. The durable controller is running it in the background; this page now polls evidence without holding an HTTP request open.",
+      "实验已受理。持久控制器在后台运行；页面只轮询证据，不会长时间占住 HTTP 请求。"));
+    await pollClosedLoop(created.pipeline_id);
   } catch (error) {
     message("#flowMessage", error.message, true);
   } finally {
-    button.disabled = false;
+    if (!state.activeClosedLoop) button.disabled = false;
   }
 }
 

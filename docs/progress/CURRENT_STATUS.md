@@ -1,12 +1,13 @@
 # Current status
 
-updated_at: 2026-08-25
+updated_at: 2026-08-30
 phase: v2 engineering acceptance and report freeze
 
 ## Product boundary
 
-- The v2 2D product exposes one execution path: `POST /api/v2/closed-loops`
-  followed by server-owned `run-to-boundary` execution.
+- The v2 2D product exposes one execution path:
+  `POST /api/v2/external-optimizer-loops`.  Its controller owns baseline,
+  pinned external optimiser execution, candidate replay and checkpointing.
 - Baseline is round 0 inside that loop. Sequential scan, grid/manual tuning,
   standalone baseline, recommendation approval, and manual campaign modes are
   not product routes. Seed, repetition count, search bounds, transition count,
@@ -23,7 +24,7 @@ phase: v2 engineering acceptance and report freeze
 
 `natural language -> SpecIR -> independent Verification Agent -> frozen
 testbench -> RTLScout candidate iteration -> lint/simulation/mutation -> ORFS
-baseline -> repeated coupled-parameter BO/GP -> three-stall diagnosis ->
+baseline -> repeated ORFS-Agent GP/EI candidate evaluation -> three-stall diagnosis ->
 evidence/hypothesis/holdout memory`
 
 Workflow Runtime is the sole process and artifact authority. Models propose

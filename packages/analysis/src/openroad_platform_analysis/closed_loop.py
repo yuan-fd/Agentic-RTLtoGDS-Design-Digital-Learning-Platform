@@ -106,11 +106,137 @@ def relative_utility(summary: Mapping[str, Any], reference: Mapping[str, Any],
     for objective in objectives:
         current = float(summary["metrics"][objective.metric_name]["median"])
         baseline = float(reference["metrics"][objective.metric_name]["median"])
-        scale = max(abs(baseline), 1e-12)
+        scale = float(objective.normalization_scale or max(abs(baseline), 1e-12))
         improvement = ((baseline - current) / scale if objective.direction == "min"
                        else (current - baseline) / scale)
         utility += float(objective.weight) / total_weight * improvement
     return float(utility)
+
+
+def intermediate_proxy_score(observations: Iterable[LearningObservation],
+                             reference: Mapping[str, Any],
+                             objectives: Sequence[ObjectiveSpec]) -> dict[str, Any]:
+    """Score intermediate evidence without ever presenting it as final QoR."""
+    items = tuple(observations)
+    coverage = {}
+    proxy_medians = {}
+    metric_sources = {}
+    for objective in objectives:
+        proxy_name = f"proxy_{objective.metric_name}"
+        values = [float(item.metrics[proxy_name]) for item in items
+                  if item.status == "succeeded" and proxy_name in item.metrics]
+        # Compatibility for synthetic/unit adapters that predate the explicit
+        # proxy namespace. Production ORFS quick runs always carry proxy_*.
+        source = proxy_name
+        if not values:
+            values = [float(item.metrics[objective.metric_name]) for item in items
+                      if item.status == "succeeded" and objective.metric_name in item.metrics]
+            source = objective.metric_name
+        coverage[objective.metric_name] = len(values)
+        metric_sources[objective.metric_name] = source
+        if values:
+            proxy_medians[objective.metric_name] = float(statistics.median(values))
+    complete = bool(items) and all(coverage.get(item.metric_name) == len(items)
+                                   for item in objectives)
+    score = None
+    if complete and reference.get("complete_objectives"):
+        total_weight = sum(float(item.weight) for item in objectives)
+        value = 0.0
+        for objective in objectives:
+            current = proxy_medians[objective.metric_name]
+            baseline = float(reference["metrics"][objective.metric_name]["median"])
+            scale = float(objective.normalization_scale or max(abs(baseline), 1e-12))
+            improvement = ((baseline - current) / scale if objective.direction == "min"
+                           else (current - baseline) / scale)
+            value += float(objective.weight) / total_weight * improvement
+        score = float(value)
+    return {
+        "score": score,
+        "objective_coverage": coverage,
+        "metric_sources": metric_sources,
+        "proxy_medians": proxy_medians,
+        "replicas": len(items), "run_ids": [item.run_id for item in items],
+        "eligible_for_calibration": score is not None,
+        "quick_metrics_are_final": False,
+        "claim_boundary": (
+            "intermediate-stage ranking proxy only; requires paired full-flow "
+            "Spearman calibration and can never replace final QoR"
+        ),
+    }
+
+
+def _nondominated(points: Sequence[Sequence[float]]) -> list[tuple[float, ...]]:
+    unique = sorted({tuple(float(value) for value in point) for point in points})
+    return [point for point in unique if not any(
+        other != point
+        and all(right >= left for left, right in zip(point, other))
+        and any(right > left for left, right in zip(point, other))
+        for other in unique
+    )]
+
+
+def _maximization_hypervolume(points: Sequence[Sequence[float]],
+                              reference: Sequence[float]) -> float:
+    """Exact union volume for small observed Pareto sets (all objectives maximize)."""
+    ref = tuple(float(value) for value in reference)
+    valid = [tuple(float(value) for value in point) for point in points
+             if len(point) == len(ref)
+             and all(value > boundary for value, boundary in zip(point, ref))]
+    if not valid:
+        return 0.0
+    front = _nondominated(valid)
+    if len(ref) == 1:
+        return max(point[0] for point in front) - ref[0]
+    levels = [ref[-1], *sorted({point[-1] for point in front})]
+    volume = 0.0
+    for lower, upper in zip(levels, levels[1:]):
+        active = [point[:-1] for point in front if point[-1] >= upper]
+        if active:
+            volume += (upper - lower) * _maximization_hypervolume(active, ref[:-1])
+    return float(volume)
+
+
+def observed_hypervolume_trace(history: Sequence[Mapping[str, Any]],
+                               objectives: Sequence[ObjectiveSpec],
+                               baseline: Mapping[str, Any], *,
+                               reference_point: float = -1.0) -> dict[str, Any]:
+    """Build observed-only anytime HV/Pareto evidence from replicated summaries."""
+    total_weight = sum(float(item.weight) for item in objectives)
+    points: list[tuple[float, ...]] = []
+    identities: list[str] = []
+    trace = []
+    for item in history:
+        summary = item.get("summary")
+        if item.get("kind") != "bo_candidate" or not summary or not summary.get("eligible"):
+            continue
+        point = []
+        for objective in objectives:
+            measured = float(summary["metrics"][objective.metric_name]["median"])
+            reference = float(baseline["metrics"][objective.metric_name]["median"])
+            scale = float(objective.normalization_scale or max(abs(reference), 1e-12))
+            gain = ((measured - reference) / scale if objective.direction == "max"
+                    else (reference - measured) / scale)
+            point.append(gain * float(objective.weight) / total_weight)
+        points.append(tuple(point))
+        identities.append(str(item.get("candidate_id") or item.get("round")))
+        trace.append({
+            "configuration_round": item.get("round"),
+            "candidate_id": item.get("candidate_id"),
+            "hypervolume": _maximization_hypervolume(
+                points, [reference_point] * len(objectives)),
+            "observed_full_configurations": len(points),
+        })
+    front = set(_nondominated(points))
+    pareto = [{"candidate_id": identity, "normalized_weighted_gains": list(point)}
+              for identity, point in zip(identities, points) if point in front]
+    return {
+        "reference_point": [reference_point] * len(objectives),
+        "objective_order": [item.metric_name for item in objectives],
+        "trace": trace, "pareto": pareto,
+        "hypervolume": trace[-1]["hypervolume"] if trace else 0.0,
+        "source": "observed_replicated_full_flow",
+        "predictions_included": False,
+    }
 
 
 def stalled_decision(*, candidate_utility: float | None, best_utility: float,
@@ -136,9 +262,14 @@ def stalled_decision(*, candidate_utility: float | None, best_utility: float,
 
 def diagnosis_packet(history: Sequence[Mapping[str, Any]],
                      objectives: Sequence[ObjectiveSpec]) -> dict[str, Any]:
-    failures = sum(int(item.get("summary", {}).get("failure_rate", 0) > 0)
+    # A configuration whose every Runtime replica failed intentionally has no
+    # QoR summary.  It is still a first-class negative observation and must
+    # reach diagnosis instead of crashing the controller.
+    failures = sum(1 if item.get("summary") is None else
+                   int((item.get("summary") or {}).get("failure_rate", 0) > 0)
                    for item in history)
-    constrained = [rule for item in history for rule in item.get("summary", {}).get("constraints", [])
+    constrained = [rule for item in history
+                   for rule in (item.get("summary") or {}).get("constraints", [])
                    if not rule.get("passed")]
     last = history[-1] if history else {}
     return {

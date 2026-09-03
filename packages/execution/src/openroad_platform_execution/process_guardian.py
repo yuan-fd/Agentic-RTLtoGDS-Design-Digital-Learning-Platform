@@ -86,8 +86,10 @@ class ProcessGuardian:
                         break
                     time.sleep(self.poll_interval)
             except BaseException:
-                # KeyboardInterrupt, a closed parent pipe, or an unexpected
-                # callback failure must not orphan a many-core EDA process.
+                # A controller interruption must not orphan a many-core EDA
+                # process.  Ordinary progress-observer failures are handled
+                # locally in _drain below: telemetry is useful evidence, but
+                # it is not an execution authority.
                 self._terminate_tree(proc)
                 raise
 
@@ -154,7 +156,21 @@ class ProcessGuardian:
             log.write("".join(batch))
             if on_line is not None:
                 for line in batch:
-                    on_line(line)
+                    try:
+                        on_line(line)
+                    except Exception as exc:
+                        # Runtime stage events and UI streaming are
+                        # best-effort telemetry.  Letting an event-store lock
+                        # or a disconnected observer terminate OpenROAD turns
+                        # a non-authoritative view failure into loss of a
+                        # protected experiment.  Preserve the failure beside
+                        # the raw process log instead; the caller can audit
+                        # the missing event without treating the tool result
+                        # as successful by fiat.
+                        log.write(
+                            "[guardian] progress observer failed: "
+                            f"{type(exc).__name__}: {exc}\\n"
+                        )
         return count
 
     def _terminate_tree(self, proc: subprocess.Popen[str]) -> None:

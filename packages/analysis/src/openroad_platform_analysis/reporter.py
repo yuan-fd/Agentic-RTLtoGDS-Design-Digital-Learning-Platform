@@ -30,6 +30,7 @@ STAGE_ZH = {
 }
 VERDICT_ZH = {
     "clean": "✅ 干净（无违例）",
+    "target_stage_complete": "目标阶段完成（非签核结果）",
     "acceptable": "⚠ 可接受（有警告）",
     "needs_improvement": "❌ 需要改进（有错误）",
     "failed": "💥 流程未完成",
@@ -110,6 +111,29 @@ def build_report(design: str, platform: str, stage_metrics: dict, diagnosis: dic
         "congestion_overflow": pick("route", "congestion_overflow"),
         "grt_overflow_iterations": pick("route", "grt_overflow_iterations"),
     }
+    expected_stage = str(summ.get("expected_stage") or "finish")
+    stage_order = ("synth", "floorplan", "place", "cts", "route", "finish")
+    covered = stage_order[:stage_order.index(expected_stage) + 1] \
+        if expected_stage in stage_order else stage_order
+
+    def latest_metric(*keys):
+        for stage in reversed(covered):
+            metrics = (stages.get(stage, {}).get("metrics", {}) or {})
+            for key in keys:
+                value = metrics.get(key)
+                if value is not None:
+                    return value
+        return None
+
+    # Intermediate measurements are explicit proxy fields.  They are never
+    # copied into final-QoR names, so downstream code cannot accidentally call
+    # a CTS estimate a signoff WNS or power result.
+    if expected_stage != "finish":
+        kpi.update({
+            "proxy_area_um2": latest_metric("instance_area_um2"),
+            "proxy_setup_wns_ns": latest_metric("setup_wns_ns", "setup_slack_ns"),
+            "proxy_power_W": latest_metric("power_W"),
+        })
 
     n_err = sum(1 for v in diagnosis.get("violations", []) if v["severity"] == "error")
     n_warn = sum(1 for v in diagnosis.get("violations", []) if v["severity"] == "warning")
@@ -119,12 +143,24 @@ def build_report(design: str, platform: str, stage_metrics: dict, diagnosis: dic
         f"{n_err} 个错误、{n_warn} 个警告。{diagnosis.get('summary', '')}"
     )
 
+    signoff_complete = bool(summ.get("signoff_complete"))
     return {
         "design": design,
         "platform": platform,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "flow_status": "completed" if summ.get("stages_completed") == summ.get("stages_total")
-                       else "incomplete",
+        "flow_status": (
+            "signoff_completed" if signoff_complete else
+            "target_stage_completed" if summ.get("stages_completed") == summ.get("stages_total") else
+            "incomplete"
+        ),
+        "coverage": {
+            "target_stage": summ.get("expected_stage"),
+            "target_stage_complete": summ.get("stages_completed") == summ.get("stages_total"),
+            "signoff_complete": signoff_complete,
+            "drc_observed": kpi["drc_errors"] is not None,
+        },
+        "metric_scope": "final_qor" if signoff_complete else "intermediate_proxy",
+        "proxy_stage": None if signoff_complete else expected_stage,
         "runtime_seconds": runtime_seconds,
         "verdict": verdict,
         "kpi": kpi,

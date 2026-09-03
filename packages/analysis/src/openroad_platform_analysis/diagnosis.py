@@ -237,6 +237,13 @@ def diagnose(stage_metrics: dict, density: dict | None = None) -> dict:
     elif n_warn:
         verdict = "acceptable"
         summary_txt = f"功能可用，但有 {n_warn} 个警告值得优化。"
+    elif summary.get("expected_stage", "finish") != "finish":
+        expected_stage = summary.get("expected_stage")
+        verdict = "target_stage_complete"
+        summary_txt = (
+            f"已完成目标阶段 {expected_stage}；route/finish 未运行，"
+            "因此不能声明布线 DRC、最终 PPA 或签核通过。"
+        )
     else:
         verdict = "clean"
         summary_txt = "设计质量良好：时序收敛、无 DRC 违例。"
