@@ -22,6 +22,7 @@ class TraceEventKind(str, Enum):
     TOOL_RECEIPT = "tool_receipt"
     STATE_TRANSITION = "state_transition"
     REFLECTION_RECORDED = "reflection_recorded"
+    L2_HANDOFF_AUTHORIZED = "l2_handoff_authorized"
     STOPPED = "stopped"
 
 
@@ -29,6 +30,27 @@ _FORBIDDEN_FIELDS = frozenset({
     "command", "shell", "script", "executable", "path", "cwd", "env", "environment",
     "credential", "api_key", "token", "password", "chain_of_thought", "hidden_reasoning",
 })
+_FORBIDDEN_SUMMARY_MARKERS = (
+    "chain of thought", "chain-of-thought", "hidden reasoning", "<think",
+    "system prompt", "api key", "api_key", "password", "token=",
+)
+
+
+def _planner_visible_summary(value: str | None) -> None:
+    """Accept a short operator-facing conclusion, never provider scratchpad.
+
+    This deliberately is a narrow text boundary.  The dashboard may show this
+    field, so raw model transcripts, hidden-CoT labels, and likely secret
+    material are rejected before they become durable trace data.
+    """
+    if value is None:
+        return
+    if (not isinstance(value, str) or not value.strip() or len(value) > 800
+            or "\n" in value or "\r" in value):
+        raise ValueError("planner_summary must be one bounded visible sentence")
+    lowered = value.lower()
+    if any(marker in lowered for marker in _FORBIDDEN_SUMMARY_MARKERS):
+        raise ValueError("planner_summary may not contain hidden reasoning or secrets")
 
 
 def _json_data(name: str, value: Mapping[str, Any]) -> None:
@@ -92,8 +114,7 @@ class L1TraceEvent:
         _digest("state_after_sha256", self.state_after_sha256)
         if (self.state_before_sha256 is None) != (self.state_after_sha256 is None):
             raise ValueError("trace state hashes must be supplied together")
-        if self.planner_summary is not None and (not isinstance(self.planner_summary, str) or len(self.planner_summary) > 4000):
-            raise ValueError("planner_summary must be bounded text")
+        _planner_visible_summary(self.planner_summary)
         if self.tool is not None and not isinstance(self.tool, ToolName):
             raise ValueError("trace tool must be typed")
         if self.policy_verdict not in {None, "allow", "deny", "needs_clarification"}:

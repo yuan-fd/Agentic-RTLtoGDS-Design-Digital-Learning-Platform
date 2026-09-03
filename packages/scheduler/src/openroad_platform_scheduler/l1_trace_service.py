@@ -201,3 +201,12 @@ class L1TraceService:
                             planner_summary=summary,
                             facts={"decision": decision, "basis_event_ids": list(basis_event_ids)},
                             hypotheses=hypotheses or {}, evidence=evidence)
+
+    def record_l2_handoff_authorization(self, trace_id: str, state: DesignState, *,
+                                        authorization: dict, evidence=()) -> L1TraceEvent:
+        """Append an explicit, evidence-only L1→L2 authorization receipt."""
+        self._require_current_state(trace_id, state)
+        return self._append(trace_id, kind=TraceEventKind.L2_HANDOFF_AUTHORIZED,
+                            goal_id=state.goal_id, state_before=state, state_after=state,
+                            planner_summary="Measured L1 evidence authorized the bounded external L2 handoff.",
+                            facts=dict(authorization), evidence=tuple(evidence))

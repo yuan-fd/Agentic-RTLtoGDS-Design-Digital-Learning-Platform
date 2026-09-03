@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any, Callable
 
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState
-from openroad_platform_contracts.l2_optimization import OptimizationRequest
+from openroad_platform_contracts.l2_optimization import OptimizationRequest, L2HandoffAuthorization
 from openroad_platform_contracts.platform import PluginManifest, TaskSpec
 from openroad_platform_contracts.product_surface import ProductRole, ProductSurface
 
@@ -22,6 +22,27 @@ class OptimizationHandoffService:
             raise ValueError("optimization request does not bind the finalized L1 goal/state")
         if state.status != "completed" or not state.evidence:
             raise ValueError("optimization handoff requires an evidence-backed terminal L1 state")
+        return self._task_for_bound(request, goal, state, manifest)
+
+    def task_for_authorized(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
+                            authorization: L2HandoffAuthorization, manifest: PluginManifest) -> TaskSpec:
+        """Accept only the explicit audited L1→L2 escalation projection.
+
+        This does *not* weaken :meth:`task_for`: arbitrary observed states are
+        still rejected.  The authorizer is responsible for reading the durable
+        trace and constructing this immutable receipt.
+        """
+        request.validate(); goal.validate(); state.validate(); authorization.validate(); manifest.validate()
+        if state.status != "observed" or not state.evidence:
+            raise ValueError("authorized L2 handoff requires an evidence-backed observed L1 state")
+        if (authorization.l1_trace_id != request.l1_trace_id or authorization.goal_id != goal.goal_id
+                or authorization.source_state_id != state.state_id or request.goal_id != goal.goal_id
+                or request.source_state_id != state.state_id):
+            raise ValueError("L2 authorization does not bind the finalized L1 goal/state/trace")
+        return self._task_for_bound(request, goal, state, manifest, authorization=authorization)
+
+    def _task_for_bound(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
+                        manifest: PluginManifest, authorization: L2HandoffAuthorization | None = None) -> TaskSpec:
         rule = self._surface.rule_for(ProductRole.L2_OPTIMIZATION)
         self._surface.authorize(ProductRole.L2_OPTIMIZATION, manifest)
         if (request.plugin_id, request.capability) != (rule.plugin_id, rule.capability):
@@ -34,11 +55,17 @@ class OptimizationHandoffService:
         task.validate()
         if task.plugin_id != request.plugin_id or task.project_id != goal.project_id or task.design_id != goal.design_id:
             raise ValueError("external L2 TaskSpec does not bind the approved Goal identity")
-        return replace(task, labels={**task.labels, "l1_trace_id": request.l1_trace_id,
+        labels = {**task.labels, "l1_trace_id": request.l1_trace_id,
                                      "l1_goal_id": goal.goal_id, "l1_state_id": state.state_id,
                                      "l2_request_id": request.request_id,
                                      "l2_protocol_evidence": request.protocol_evidence.ref,
-                                     "l2_protocol_sha256": request.protocol_evidence.sha256})
+                                     "l2_protocol_sha256": request.protocol_evidence.sha256}
+        if authorization:
+            labels.update({"l2_authorization_id": authorization.authorization_id,
+                           "l2_reflection_event_id": authorization.reflection_event_id,
+                           "l2_baseline_run_id": authorization.baseline_run_id,
+                           "l2_candidate_run_id": authorization.candidate_run_id})
+        return replace(task, labels=labels)
 
     def submit(self, runtime: Any, request: OptimizationRequest, goal: DesignGoal,
                state: DesignState, manifest: PluginManifest) -> Any:

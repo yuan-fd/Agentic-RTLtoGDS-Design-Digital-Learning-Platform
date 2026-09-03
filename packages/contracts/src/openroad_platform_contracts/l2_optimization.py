@@ -52,3 +52,50 @@ class OptimizationRequest:
         value["search_space_evidence"] = EvidencePointer.from_dict(value["search_space_evidence"])
         value["budget"] = AgentBudget.from_dict(value["budget"])
         result = cls(**value); result.validate(); return result
+
+
+@dataclass(frozen=True)
+class L2HandoffAuthorization:
+    """Immutable L1 receipt that permits one external L2 submission.
+
+    ``observed`` is intentionally not generally an L2-terminal state.  This
+    receipt records the narrow exception: a frozen L1 goal has two measured
+    Runtime observations and an explicit durable ``escalate`` reflection.
+    It contains no optimizer parameters or command material.
+    """
+    authorization_id: str
+    l1_trace_id: str
+    goal_id: str
+    source_state_id: str
+    reflection_event_id: str
+    baseline_run_id: str
+    candidate_run_id: str
+    evidence: tuple[EvidencePointer, ...]
+    schema_version: int = SCHEMA_VERSION
+
+    def validate(self) -> None:
+        _validate_version(self.schema_version)
+        for name, value in (("authorization_id", self.authorization_id),
+                            ("l1_trace_id", self.l1_trace_id), ("goal_id", self.goal_id),
+                            ("source_state_id", self.source_state_id),
+                            ("reflection_event_id", self.reflection_event_id),
+                            ("baseline_run_id", self.baseline_run_id),
+                            ("candidate_run_id", self.candidate_run_id)):
+            _validate_identifier(name, value)
+        if self.baseline_run_id == self.candidate_run_id:
+            raise ValueError("L2 handoff requires distinct measured baseline and candidate runs")
+        if not isinstance(self.evidence, tuple) or not self.evidence:
+            raise ValueError("L2 handoff authorization requires evidence")
+        for item in self.evidence:
+            if not isinstance(item, EvidencePointer):
+                raise ValueError("L2 handoff authorization evidence must be typed")
+            item.validate()
+
+    def to_dict(self) -> dict:
+        self.validate(); return _primitive(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "L2HandoffAuthorization":
+        value = _known_payload(cls, payload)
+        value["evidence"] = tuple(EvidencePointer.from_dict(item) for item in value.get("evidence", ()))
+        result = cls(**value); result.validate(); return result

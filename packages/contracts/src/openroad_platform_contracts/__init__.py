@@ -45,6 +45,27 @@ from .experiment_graph import (
     ExperimentNodeKind,
 )
 from .rtl_frontend import PortSpec, RTLCandidate, SpecIR, VerificationPackage
+from .agent_control import (
+    AgentBudget,
+    DesignGoal,
+    DesignState,
+    GoalPreference,
+    QoRConstraint,
+    READ_ONLY_TOOLS,
+    SemanticToolCall,
+    ToolName,
+    ToolReceipt,
+)
+from .task_factory import (
+    RTL_TO_GDS_CAPABILITY,
+    RTLToGDSFactory,
+    RTLToGDSRequest,
+)
+from .protected_evaluation import ProtectedEvaluator
+from .l2_optimization import OptimizationRequest, L2HandoffAuthorization
+from .product_surface import (
+    DEFAULT_PRODUCT_SURFACE, ProductCapabilityRule, ProductRole, ProductSurface,
+)
 
 __all__ = [
     "Artifact",
@@ -87,4 +108,19 @@ __all__ = [
     "RTLCandidate",
     "SpecIR",
     "VerificationPackage",
+    "AgentBudget",
+    "DesignGoal",
+    "DesignState",
+    "GoalPreference",
+    "QoRConstraint",
+    "READ_ONLY_TOOLS",
+    "SemanticToolCall",
+    "ToolName",
+    "ToolReceipt",
+    "RTL_TO_GDS_CAPABILITY",
+    "RTLToGDSFactory",
+    "RTLToGDSRequest",
+    "ProtectedEvaluator",
+    "OptimizationRequest", "L2HandoffAuthorization",
+    "DEFAULT_PRODUCT_SURFACE", "ProductCapabilityRule", "ProductRole", "ProductSurface",
 ]
