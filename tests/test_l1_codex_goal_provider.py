@@ -32,10 +32,9 @@ def _payload(text=_USER_TEXT, *, with_blocking=True):
 def _make_provider(tmp_path, payload, *, returncode=0):
     provider = CodexGoalDraftProvider(executable="/bin/echo")
 
-    def fake_run(prompt, schema_path, output_path, env):
-        if payload is not None:
-            output_path.write_text(json.dumps(payload), encoding="utf-8")
-        return returncode
+    def fake_run(prompt, cwd, env):
+        text = json.dumps(payload) if payload is not None else ""
+        return returncode, text, "boom" if returncode else ""
 
     provider._run_codex = fake_run  # type: ignore[assignment]
     return provider
@@ -82,9 +81,8 @@ def test_codex_provider_raises_when_no_structured_proposal(tmp_path):
 def test_codex_provider_raises_on_invalid_json(tmp_path):
     provider = CodexGoalDraftProvider(executable="/bin/echo")
 
-    def fake_bad(prompt, schema_path, output_path, env):
-        output_path.write_text("{not json", encoding="utf-8")
-        return 0
+    def fake_bad(prompt, cwd, env):
+        return 0, "{not json", ""
 
     provider._run_codex = fake_bad  # type: ignore[assignment]
     with pytest.raises(RuntimeError, match="invalid JSON"):

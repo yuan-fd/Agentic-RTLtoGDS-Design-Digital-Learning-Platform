@@ -6,6 +6,14 @@ and Policy keep all authority over the resulting Goal.  There is deliberately
 no fallback to a deterministic parser: a failed or unverifiable model output
 raises so the operator sees the failure instead of silently changing
 behaviour.  This module has no tool, shell, or Runtime execution port.
+
+The Codex CLI is invoked without a response-schema file because the managed
+relay's structured-output engine rejects dynamic-key objects such as
+``interpretation``; the returned text is therefore constrained by the prompt
+and decoded strictly here.  ``L1ModelBoundary`` still rejects unknown fields,
+forbidden literals and changed request text, and ``GoalDraft.validate`` still
+checks interpretation/source consistency, so an off-schema model reply cannot
+reach the Goal.
 """
 from __future__ import annotations
 
@@ -23,58 +31,6 @@ ALLOWED_L1_MODELS = frozenset({"gpt-5.6-terra"})
 _SOURCE_VALUES = ("user", "operator_profile", "safe_default", "derived")
 _INTENT_VALUES = tuple(item.value for item in GoalIntent)
 _FIELD_VALUES = tuple(item.value for item in ClarificationField)
-
-
-def _draft_schema() -> dict[str, Any]:
-    """Strict JSON Schema for the one bounded GoalDraft-shaped response."""
-    identifier = {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}
-    field_enum = {"type": "string", "enum": list(_FIELD_VALUES)}
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "request_text": {"type": "string", "minLength": 1, "maxLength": 8000},
-            "schema_version": {"const": 1},
-            "intent": {"type": "string", "enum": list(_INTENT_VALUES)},
-            "questions": {
-                "type": "array",
-                "items": {
-                    "type": "object", "additionalProperties": False,
-                    "properties": {
-                        "question_id": identifier,
-                        "field": field_enum,
-                        "prompt": {"type": "string", "minLength": 1, "maxLength": 2000},
-                        "blocking": {"type": "boolean"},
-                        "schema_version": {"const": 1},
-                    },
-                    "required": ["question_id", "field", "prompt", "blocking", "schema_version"],
-                },
-            },
-            "answers": {
-                "type": "array",
-                "items": {
-                    "type": "object", "additionalProperties": False,
-                    "properties": {
-                        "question_id": identifier,
-                        "field": field_enum,
-                        "value": {"type": "string", "minLength": 1, "maxLength": 4000},
-                        "schema_version": {"const": 1},
-                    },
-                    "required": ["question_id", "field", "value", "schema_version"],
-                },
-            },
-            "interpretation": {
-                "type": "object",
-                "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 4000},
-            },
-            "field_sources": {
-                "type": "object",
-                "additionalProperties": {"type": "string", "enum": list(_SOURCE_VALUES)},
-            },
-        },
-        "required": ["request_text", "schema_version", "intent", "questions",
-                     "answers", "interpretation", "field_sources"],
-    }
 
 
 class CodexGoalDraftProvider:
@@ -99,36 +55,45 @@ class CodexGoalDraftProvider:
             raise ValueError("goal provider received an unsupported request kind")
         prompt = self._prompt(request)
         with tempfile.TemporaryDirectory(prefix="openroad-l1-goal-") as raw:
-            root = Path(raw)
-            schema_path = root / "schema.json"
-            output_path = root / "proposal.json"
-            schema_path.write_text(json.dumps(_draft_schema()), encoding="utf-8")
             env = {key: os.environ[key] for key in (
                 "HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL", "TZ", "CODEX_HOME"
             ) if key in os.environ}
-            returncode = self._run_codex(prompt, schema_path, output_path, env)
-            if returncode != 0 or not output_path.is_file():
-                raise RuntimeError("Codex L1 goal provider returned no structured proposal")
-            try:
-                value = json.loads(output_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as exc:
-                raise RuntimeError("Codex L1 goal provider returned invalid JSON") from exc
+            returncode, text, detail = self._run_codex(prompt, raw, env)
+            if returncode != 0 or not text:
+                raise RuntimeError("Codex L1 goal provider returned no structured proposal"
+                                   + (f": {detail}" if detail else ""))
+        value = self._decode(text)
         if not isinstance(value, Mapping):
             raise RuntimeError("Codex L1 goal provider must return a JSON object")
         return value
 
-    def _run_codex(self, prompt: str, schema_path: Path, output_path: Path,
-                   env: Mapping[str, str]) -> int:
+    def _run_codex(self, prompt: str, cwd: str, env: Mapping[str, str]) -> tuple[int, str, str]:
         result = subprocess.run(
             [self.executable, "exec", "--ephemeral", "--ignore-rules",
              "--skip-git-repo-check", "--sandbox", "read-only", "--model", self.model,
-             "--output-schema", str(schema_path), "--output-last-message", str(output_path),
              "--color", "never", "-"],
-            input=prompt, cwd=str(output_path.parent), env=dict(env), text=True,
+            input=prompt, cwd=cwd, env=dict(env), text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=self.timeout_seconds, check=False,
         )
-        return result.returncode
+        detail = "\n".join((result.stderr or "").splitlines()[-6:])
+        return result.returncode, result.stdout or "", detail
+
+    @staticmethod
+    def _decode(text: str) -> Any:
+        """Extract the single JSON object from the model reply, fail closed."""
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```", 2)[1] if cleaned.count("```") >= 2 else cleaned
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start < 0 or end <= start:
+            raise RuntimeError("Codex L1 goal provider returned invalid JSON")
+        try:
+            return json.loads(cleaned[start:end + 1])
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("Codex L1 goal provider returned invalid JSON") from exc
 
     def _prompt(self, request: Mapping[str, Any]) -> str:
         """One bounded instruction; the model may return typed JSON only."""
@@ -136,22 +101,31 @@ class CodexGoalDraftProvider:
             context = (
                 "REVISION of an existing draft. Keep request_text, interpretation and "
                 "field_sources unchanged. Keep every existing question with the same "
-                "question_id, field and blocking value. Record the supplied answers by "
-                "question_id and add no answers for questions that were not asked."
+                "question_id, field and blocking value. Populate answers: for every supplied "
+                "ANSWER whose question_id matches a kept question, add one answers entry "
+                "{question_id, field (the same field as that question), value (the supplied "
+                "value), schema_version: 1}. Add no other answers."
             )
         else:
-            context = "INITIAL parse of one natural-language EDA goal."
+            context = ("INITIAL parse of one natural-language EDA goal. Return questions for every "
+                       "policy-relevant fact the request omits (each with blocking=true and a concise "
+                       "clarification prompt). Return answers as an empty array: no answer may be "
+                       "invented at parse time. Facts the user did state belong in interpretation, "
+                       "not in answers.")
         instruction = (
-            "You are a constrained EDA goal interpreter. Return only the JSON object "
-            "described by the schema. Do not invent a design, toolchain or budget: "
-            "when the request omits a policy-relevant fact, ask one concise blocking "
-            "clarification question (question_id, field, prompt, blocking=true). "
-            "intent must be one of diagnose/execute/optimize/compare/explain. "
-            "request_text must equal the supplied user request verbatim. "
-            "Every key in interpretation must have the same key in field_sources with "
-            "one of user/operator_profile/safe_default/derived. Never emit commands, "
-            "paths, credentials, tool names, or RTL source: this is a typed language "
-            "draft only.\n\n"
+            "You are a constrained EDA goal interpreter. Reply with exactly one JSON object and nothing else "
+            "(no markdown fences, no prose). The object must contain only these keys: "
+            "request_text (string, verbatim copy of USER_REQUEST), schema_version (integer 1), "
+            "intent (one of diagnose/execute/optimize/compare/explain), "
+            "questions (array of objects {question_id, field, prompt, blocking, schema_version}) where "
+            "field is one of " + ",".join(_FIELD_VALUES) + ", "
+            "answers (array of {question_id, field, value, schema_version}; each entry must match a "
+            "question with the same question_id and field; otherwise empty), "
+            "interpretation (object mapping interpreted field names to values) and "
+            "field_sources (object with exactly the same keys as interpretation, each value one of "
+            "user/operator_profile/safe_default/derived). "
+            "Do not invent a design, toolchain or budget. Never emit commands, paths, credentials, tool "
+            "names, or RTL source: this is a typed language draft only.\n\n"
             f"{context}\n"
             f"USER_REQUEST={json.dumps(request.get('request_text'), ensure_ascii=False)}\n"
             f"PRIOR_DRAFT={json.dumps(request.get('prior_draft'), ensure_ascii=False)}\n"
