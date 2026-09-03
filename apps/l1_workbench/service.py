@@ -27,6 +27,8 @@ from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 from openroad_platform_scheduler.l1_l2_authorization import L1L2AuthorizationService
 from openroad_platform_scheduler.l2_handoff import OptimizationHandoffService
 from openroad_platform_scheduler.l2_handoff_store import L2HandoffStore
+from openroad_platform_scheduler.external_l2_service import ExternalOptimizerLoopService
+from openroad_platform_scheduler.pipeline_checkpoint import PipelineCheckpointStore
 from openroad_platform_scheduler.runtime import WorkflowRuntime
 from openroad_platform_scheduler.runtime_store import RuntimeStore
 try:
@@ -78,6 +80,7 @@ class WorkbenchService:
         self.runtime=WorkflowRuntime(RuntimeStore(self.root/"runtime.sqlite"),PluginRegistry(manifests),workspace_root=self.root/"work",adapter=ProcessAdapter(ProcessGuardian(poll_interval=.01,terminate_grace=.1)))
         self.loop_store=L1LoopStore(self.root/"loop.sqlite")
         self.l2_handoff_store=L2HandoffStore(self.root/"l2_handoff.sqlite")
+        self.l2_checkpoints=PipelineCheckpointStore(self.root/"l2_campaign.sqlite")
         with sqlite3.connect(self.root/"workbench.sqlite") as c: c.execute("CREATE TABLE IF NOT EXISTS session_state(session_id TEXT PRIMARY KEY,state_json TEXT,plan_id TEXT)")
     def policy(self):
         evidence=EvidencePointer("artifact:workbench-rtl","a"*64); provenance=EvidencePointer("artifact:workbench-policy","b"*64)
