@@ -99,7 +99,9 @@ class Dashboard:
             elif kind == "goal_finalized": detail = f"objective={(facts.get('goal_ir') or {}).get('objective') or 'recorded'}"
             elif kind == "tool_called": detail = event.get("planner_summary") or "structured decision persisted"
             elif kind == "policy_decided": detail = f"verdict={event.get('policy_verdict') or facts.get('verdict') or 'recorded'}"
-            elif kind == "tool_receipt": detail = f"status={facts.get('status') or 'recorded'}; evidence={len(event.get('evidence') or [])}"
+            elif kind == "tool_receipt":
+                result = facts.get("result") or {}
+                detail = f"status={facts.get('status') or 'accepted'}; run_id={result.get('run_id') or 'recorded'}"
             elif kind == "state_transition": detail = f"terminal_status={facts.get('terminal_status') or facts.get('status') or 'recorded'}"
             else: detail = event.get("planner_summary") or "durable event recorded"
             rows.extend([f"#{event.get('sequence', '?'):>3} {labels.get(kind, kind)}", f"      {detail}"])
@@ -108,7 +110,10 @@ class Dashboard:
     def _client_rows(self) -> list[str]:
         rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Start:", "  :new Optimize this bounded flow", "Then answer clarification:", "  :answer <objective>", "Then permit visible bounded action:", "  :run <decision summary>", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
         rows.extend(f"  {command}" for command in self.COMMANDS)
-        if any(e.get("kind") == "goal_drafted" for e in self.events) and not any(e.get("kind") == "goal_finalized" for e in self.events): rows.extend(["", "Clarification pending", "  Answer with :answer <objective>"])
+        draft = next((e for e in reversed(self.events) if e.get("kind") == "goal_drafted"), None)
+        if draft and (draft.get("facts") or {}).get("blocking_fields"):
+            question = next(iter((draft.get("facts") or {}).get("clarification_questions") or []), {})
+            rows.extend(["", "Clarification pending", f"  {question.get('prompt', 'Answer with :answer <objective>')}", "  Reply: :answer <objective>"])
         return rows
 
     @staticmethod

@@ -5,6 +5,29 @@ dashboard. It composes `L1SessionService`, `L1TraceService`,
 `L1DurableLoop`, `L1RuntimeBridge`, and `WorkflowRuntime`; the HTTP handler
 only transports requests and renders stored facts.
 
+## Real EDA tutorial profile
+
+The default `smoke` backend exists only for API tests.  To run the managed
+local ORFS/OpenROAD toolchain through the very same L1 Session, use the frozen
+`p2_mux_2to1.v` tutorial RTL and an empty state root:
+
+```bash
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
+  .tools/venvs/orfs-agent/bin/python apps/l1_workbench/server.py \
+  --state-root /tmp/openroad-l1-orfs-workbench \
+  --port 8766 \
+  --backend orfs \
+  --rtl tests/fixtures/p2_mux_2to1.v \
+  --top mux_2to1 \
+  --platform nangate45 \
+  --clock-period-ns 10
+```
+
+This startup selection is operator-owned, not an LLM or browser field.  It
+uses the admitted `orfs` plugin and local managed toolchain.  The Session
+freezes `tutorial_mux/mux_2to1`, the RTL hash, `nangate45`, 10 ns, `finish`,
+and the bounded baseline parameter allowlist before it can submit a task.
+
 Run it with:
 
 ```bash
@@ -56,25 +79,28 @@ durable facts; it does not use a browser, local trace, or local state.
 
 ### A concrete teaching flow
 
-The following is a real sequence for the current vertical slice, suitable for
-trying in the right-hand **USER CLIENT** pane:
+With the real EDA tutorial profile above, try the following in the right-hand
+**USER CLIENT** pane:
 
 ```text
-Command> :new I want to run a bounded implementation flow and retain auditable evidence.
+Command> :new Implement the managed tutorial mux and retain QoR evidence.
 ```
 
 The API creates a durable Session and records `goal_drafted`.  The current
-deterministic teaching provider asks one real blocking typed question:
+teaching provider asks a real blocking typed confirmation about the fixed
+operator profile:
 
 ```text
 Client status: WAITING FOR CLARIFICATION
-Question: Confirm this bounded Runtime tool execution.
+Question: Confirm baseline implementation of frozen mux_2to1 RTL on nangate45,
+          clock period 10.0 ns. This will run the admitted local
+          ORFS/OpenROAD toolchain.
 ```
 
 The operator answers it through the same Session:
 
 ```text
-Command> :answer Complete one audited bounded flow.
+Command> :answer Run one baseline RTL-to-GDS implementation and retain reports.
 ```
 
 The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
@@ -83,26 +109,27 @@ The left **L1 AGENT HARNESS** pane then receives and renders the stored facts:
 #  0 GOAL DRAFT
       clarification requested
 #  1 FROZEN GOAL IR
-      objective=Complete one audited bounded flow.
+      objective=Run one baseline RTL-to-GDS implementation and retain reports.
 ```
 
 The operator explicitly requests the visible bounded decision:
 
 ```text
-Command> :run Execute one bounded typed Runtime tool.
+Command> :run Run the admitted ORFS baseline for frozen mux RTL at 10 ns.
 ```
 
 It produces the following durable event categories, in order (identifiers and
 timestamps vary):
 
 ```text
-TYPED TOOL / PLAN       Execute one bounded typed Runtime tool.
+TYPED TOOL / PLAN       Run the admitted ORFS baseline for frozen mux RTL at 10 ns.
 POLICY                  verdict=allow
-RUNTIME RECEIPT         status=succeeded; evidence=1
+RUNTIME RECEIPT         status=accepted; run_id=<runtime-id>
 RUNTIME STATE           terminal_status=succeeded
 ```
 
-For this teaching slice the final receipt records a real Runtime subprocess,
-exit code `0`, and a content-addressed `report` artifact.  It is not yet a
-claim that OpenROAD or ORFS-Agent ran; replacing this bounded smoke adapter
-with a pinned, admitted external EDA adapter is a separate integration slice.
+For the `--backend orfs` profile, the final state is produced by real ORFS
+stages (`synth → floorplan → place → cts → route → finish`) launched by
+Runtime in an attempt-local workspace.  It retains the raw logs, GDS/DEF/ODB,
+netlist, reports, metrics and content hashes.  This is a baseline EDA run, not
+an L2 ORFS-Agent optimization campaign or a QoR-improvement claim.
