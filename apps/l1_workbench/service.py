@@ -7,7 +7,7 @@ from typing import Any
 
 from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec
 from openroad_platform_contracts.agent_control import AgentBudget, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
-from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField
+from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField, ClarificationQuestion
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
 from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_execution import (ORFSRTLToGDSFactory, PluginRegistry,
@@ -21,13 +21,18 @@ from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 from openroad_platform_scheduler.runtime import WorkflowRuntime
 from openroad_platform_scheduler.runtime_store import RuntimeStore
+try:
+    from .tutorial_profile import ManagedTutorialProfile
+except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
+    from tutorial_profile import ManagedTutorialProfile
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
-    def __init__(self, clarification_prompt="Confirm this bounded Runtime tool execution."): self.clarification_prompt=clarification_prompt
+    def __init__(self, questions=()): self.questions=tuple(questions)
     def complete(self, request):
         if request["kind"] == "goal_draft":
-            return {"schema_version":1,"request_text": request["request_text"], "intent": "execute", "answers": [], "questions": [{"schema_version":1,"question_id":"objective-1","field":"objective","prompt":self.clarification_prompt,"blocking":True}]}
+            questions = self.questions or (ClarificationQuestion("objective-1", ClarificationField.OBJECTIVE, "Confirm this bounded Runtime tool execution.", True),)
+            return {"schema_version":1,"request_text": request["request_text"], "intent": "execute", "answers": [], "questions": [item.to_dict() for item in questions]}
         prior=request["prior_draft"]; return {"schema_version":1,"request_text":prior["request_text"],"intent":"execute","questions":prior["questions"],"answers":request["answers"]}
 
 class WorkbenchService:
@@ -38,7 +43,7 @@ class WorkbenchService:
         if backend not in {"smoke", "orfs"}: raise ValueError("backend must be smoke or orfs")
         self.backend, self.rtl, self.top = backend, Path(rtl).expanduser().resolve() if rtl else None, top
         self.platform_name, self.clock_period_ns = platform_name, clock_period_ns
-        self.trace=L1TraceService(L1TraceStore(self.root/"trace.sqlite")); self.sessions=L1SessionService(L1SessionStore(self.root/"sessions.sqlite"),self.trace)
+        self.trace=L1TraceService(L1TraceStore(self.root/"trace.sqlite"))
         if backend == "orfs":
             if self.rtl is None or not self.rtl.is_file(): raise FileNotFoundError("ORFS workbench requires frozen RTL")
             self.toolchain=ToolchainConfig.from_environment(name="orfs-2d-baseline"); self.toolchain.validate()
@@ -46,6 +51,9 @@ class WorkbenchService:
         else:
             self.toolchain=None; self.factory=None
             manifest=PluginManifest("l1-runtime-smoke","1",(sys.executable,str(Path(__file__).with_name("runtime_adapter.py"))),("eda.rtl_to_gds",),(platform.machine(),),{"type":"object"},{"type":"object"},({"kind":"report","required":True},),30)
+        self.profile=ManagedTutorialProfile() if backend == "orfs" else None
+        self.sessions=L1SessionService(L1SessionStore(self.root/"sessions.sqlite"),self.trace,
+                                       goal_finalizer=self.profile.compile if self.profile else None)
         self.runtime=WorkflowRuntime(RuntimeStore(self.root/"runtime.sqlite"),PluginRegistry([manifest]),workspace_root=self.root/"work",adapter=ProcessAdapter(ProcessGuardian(poll_interval=.01,terminate_grace=.1)))
         self.loop_store=L1LoopStore(self.root/"loop.sqlite")
         with sqlite3.connect(self.root/"workbench.sqlite") as c: c.execute("CREATE TABLE IF NOT EXISTS session_state(session_id TEXT PRIMARY KEY,state_json TEXT,plan_id TEXT)")
@@ -54,18 +62,15 @@ class WorkbenchService:
         if self.backend == "orfs":
             import hashlib
             digest=hashlib.sha256(self.rtl.read_bytes()).hexdigest(); evidence=EvidencePointer(f"artifact:rtl-{digest[:12]}",digest)
-            return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(1,4,7200),(ToolName.RUN_FULL_FLOW,ToolName.STOP_OR_ESCALATE))
+            return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),(ToolName.RUN_FULL_FLOW,ToolName.STOP_OR_ESCALATE))
         return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("density",),AgentBudget(1,4,30),(ToolName.RUN_FULL_FLOW,ToolName.STOP_OR_ESCALATE))
     def start(self, text):
-        prompt=(f"Confirm baseline implementation of frozen {self.top} RTL on {self.platform_name}, "
-                f"clock period {self.clock_period_ns} ns. This will run the admitted local ORFS/OpenROAD toolchain."
-                if self.backend == "orfs" else "Confirm this bounded Runtime tool execution.")
-        return self.sessions.start(text,_Provider(prompt),self.policy())
+        return self.sessions.start(text,_Provider(self.profile.questions() if self.profile else ()),self.policy())
     def answer(self,sid,answers):
         rows=tuple(ClarificationAnswer(a["question_id"],ClarificationField(a["field"]),a["value"]) for a in answers); session=self.sessions.answer(sid,_Provider(),rows)
         if session.goal_id:
-            policy=self.policy()
-            self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},policy.budget,evidence=(policy.rtl_artifact,)),None)
+            goal=self._goal(session.trace_id,session.goal_id)
+            self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},goal.budget,evidence=(goal.rtl_artifact,)),None)
         return session
     def execute(self,sid,summary,*,wait=True):
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)

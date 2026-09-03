@@ -32,7 +32,7 @@ def _wrap(value: object, width: int) -> list[str]:
 
 
 class Dashboard:
-    COMMANDS = (":new <goal>", ":answer <answer>", ":run [decision summary]", ":cancel [reason]", ":recover   :refresh   :quit")
+    COMMANDS = (":new <goal>", ":answer <question_id> <answer>", ":run [decision summary]", ":cancel [reason]", ":recover   :refresh   :quit")
 
     def __init__(self, client: Client):
         self.client, self.sid, self.after, self.events = client, None, -1, []
@@ -59,8 +59,14 @@ class Dashboard:
                 self.notice = f"Session created: {result['status']}. Review clarification in Client."; self.refresh()
             elif op == "answer":
                 self._need_session()
-                self.client.post(f"/api/l1/sessions/{self.sid}/answers", {"answers": [{"question_id": "objective-1", "field": "objective", "value": argument}]})
-                self.notice = "Clarification persisted; Goal IR is frozen."; self.refresh()
+                question_id, separator, value = argument.partition(" ")
+                draft = next((event for event in reversed(self.events) if event.get("kind") == "goal_drafted"), None)
+                questions = (draft or {}).get("facts", {}).get("clarification_questions", [])
+                question = next((item for item in questions if item.get("question_id") == question_id), None)
+                if not separator or not value.strip() or question is None:
+                    raise ValueError("Usage: :answer <pending-question-id> <answer>")
+                self.client.post(f"/api/l1/sessions/{self.sid}/answers", {"answers": [{"question_id": question_id, "field": question["field"], "value": value}]})
+                self.notice = "Clarification persisted; answer remaining questions or run the frozen Goal."; self.refresh()
             elif op == "run":
                 self._need_session()
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/execute", {"decision_summary": argument or "Execute one bounded typed Runtime tool."})
@@ -108,12 +114,15 @@ class Dashboard:
         return rows
 
     def _client_rows(self) -> list[str]:
-        rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Start:", "  :new Optimize this bounded flow", "Then answer clarification:", "  :answer <objective>", "Then permit visible bounded action:", "  :run <decision summary>", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
+        rows = ["You control the durable L1 Session here.", "Natural language becomes typed Goal IR; never shell text.", "", "Start:", "  :new Improve timing; preserve constraints", "Answer each typed clarification:", "  :answer <question_id> <answer>", "Then permit visible bounded action:", "  :run <decision summary>", "", "Session", f"  id: {self.sid or 'none'}", f"  phase: {self._phase()}", f"  event cursor: {self.after}", "", "Controls"]
         rows.extend(f"  {command}" for command in self.COMMANDS)
         draft = next((e for e in reversed(self.events) if e.get("kind") == "goal_drafted"), None)
         if draft and (draft.get("facts") or {}).get("blocking_fields"):
-            question = next(iter((draft.get("facts") or {}).get("clarification_questions") or []), {})
-            rows.extend(["", "Clarification pending", f"  {question.get('prompt', 'Answer with :answer <objective>')}", "  Reply: :answer <objective>"])
+            answered = {item.get("question_id") for item in (draft.get("facts") or {}).get("clarification_answers", [])}
+            pending = [item for item in (draft.get("facts") or {}).get("clarification_questions", []) if item.get("question_id") not in answered]
+            rows.extend(["", "Clarification pending"])
+            for question in pending:
+                rows.extend([f"  [{question.get('question_id')}] {question.get('prompt')}", f"  Reply: :answer {question.get('question_id')} <answer>"])
         return rows
 
     @staticmethod

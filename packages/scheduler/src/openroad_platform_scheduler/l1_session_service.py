@@ -98,8 +98,12 @@ class L1SessionStore:
 
 class L1SessionService:
     """Owns durable language-session heads, never a tool or Runtime operation."""
-    def __init__(self, store: L1SessionStore, trace: L1TraceService) -> None:
+    def __init__(self, store: L1SessionStore, trace: L1TraceService, *, goal_finalizer=None) -> None:
         self.store, self.trace = store, trace
+        # Composition may select a stricter profile compiler.  It receives only
+        # a typed draft and trusted policy and must return DesignGoal; it never
+        # receives Runtime, tools, shell text, or mutable workspace access.
+        self.goal_finalizer = goal_finalizer or GoalFinalizer.finalize
 
     def start(self, request_text: str, provider: L1StructuredProvider, policy: TrustedGoalPolicy) -> L1Session:
         draft = L1ModelBoundary.compile_draft(provider, request_text, draft_id=f"draft-{uuid4().hex}")
@@ -162,7 +166,8 @@ class L1SessionService:
         goal_id = f"goal-{session.session_id.removeprefix('l1-session-')}"
         finalized = next((event for event in self.trace.store.read(session.trace_id)
                           if event.kind.value == "goal_finalized" and event.goal_id == goal_id), None)
-        goal = DesignGoal.from_dict(finalized.facts["goal_ir"]) if finalized else GoalFinalizer.finalize(draft, policy, goal_id=goal_id)
+        goal = (DesignGoal.from_dict(finalized.facts["goal_ir"]) if finalized
+                else self.goal_finalizer(draft, policy, goal_id=goal_id))
         if finalized is None:
             self.trace.record_goal(session.trace_id, goal)
         return self.store.update(session_id, draft, L1SessionStatus.GOAL_FINALIZED, goal)
