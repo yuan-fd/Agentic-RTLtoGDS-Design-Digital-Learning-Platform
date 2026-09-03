@@ -10,7 +10,7 @@ class Client:
         if path.endswith("/m1-proposal"):
             return {"proposal_id": "proposal-1"}
         if path.endswith("/candidates"):
-            return {"runtime": {"run": {"status": "succeeded"}}}
+            return {"plan": {"run_id": "candidate-run-1"}}
         if path.endswith("/m1-compare"):
             return {"decision": "stop", "decision_reason": "no_measured_improvement",
                     "area_baseline_ratio": 1.0}
@@ -34,3 +34,20 @@ def test_terminal_m1_commands_only_use_published_api_and_store_no_authoritative_
     ]
     assert dashboard.events == []
     assert "M1 decision: stop" in dashboard.notice
+    candidate_payload = client.calls[1][1]
+    assert candidate_payload["wait"] is False
+
+
+def test_terminal_baseline_returns_to_cursor_polling_without_waiting_for_runtime() -> None:
+    class BaselineClient(Client):
+        def post(self, path, payload):
+            self.calls.append((path, payload))
+            assert path.endswith("/execute")
+            return {"plan": {"run_id": "baseline-run-1"}}
+
+    client = BaselineClient()
+    dashboard = Dashboard(client)
+    dashboard.sid = "session-1"
+    dashboard.command(":baseline")
+    assert client.calls[0][1]["wait"] is False
+    assert "polling durable cursor events" in dashboard.notice

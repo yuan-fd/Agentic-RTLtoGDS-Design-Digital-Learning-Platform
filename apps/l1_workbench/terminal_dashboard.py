@@ -75,8 +75,9 @@ class Dashboard:
                 self.notice = "Clarification persisted; answer remaining questions or run the frozen Goal."; self.refresh()
             elif op in {"run", "baseline"}:
                 self._need_session()
-                result = self.client.post(f"/api/l1/sessions/{self.sid}/execute", {"decision_summary": argument or "Execute one bounded typed Runtime tool."})
-                self.notice = f"Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/execute", {
+                    "decision_summary": argument or "Execute one bounded typed Runtime tool.", "wait": False})
+                self.notice = f"Runtime submitted: {result['plan']['run_id']}; polling durable cursor events."; self.refresh()
             elif op == "m1-propose":
                 self._need_session()
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/m1-proposal", {})
@@ -89,8 +90,9 @@ class Dashboard:
                 if not proposal_id: raise ValueError("Usage: :candidate <proposal-id>")
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/candidates", {
                     "proposal_id": proposal_id,
-                    "decision_summary": "Execute the exact durable, Policy-approved M1 parameter proposal."})
-                self.notice = f"Candidate Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+                    "decision_summary": "Execute the exact durable, Policy-approved M1 parameter proposal.",
+                    "wait": False})
+                self.notice = f"Candidate submitted: {result['plan']['run_id']}; polling durable cursor events."; self.refresh()
             elif op == "compare":
                 self._need_session()
                 baseline_run_id = argument.strip()
@@ -127,8 +129,8 @@ class Dashboard:
                 if not stage:
                     raise ValueError("Usage: :stage <allowed-stage>")
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/stages", {
-                    "stage": stage, "decision_summary": f"Operator requested permitted {stage} stage."})
-                self.notice = f"Stage Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+                    "stage": stage, "decision_summary": f"Operator requested permitted {stage} stage.", "wait": False})
+                self.notice = f"Stage submitted: {result['plan']['run_id']}; polling durable cursor events."; self.refresh()
             elif op == "cancel":
                 self._need_session(); self.client.post(f"/api/l1/sessions/{self.sid}/cancel", {"reason": argument or "operator cancellation"})
                 self.notice = "Cancellation requested through Runtime authority."; self.refresh()
