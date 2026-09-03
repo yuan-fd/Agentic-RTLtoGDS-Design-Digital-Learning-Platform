@@ -22,6 +22,7 @@ def main():
     sid=parts[3]
     if parts[-1]=="answers": return self.reply(svc.answer(sid,x["answers"]).to_dict())
     if parts[-1]=="execute": p,state=svc.execute(sid,x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
+    if parts[-1]=="queries": return self.reply(svc.query(sid,x["kind"],x["decision_summary"],limit=x.get("limit",20)))
     if parts[-1]=="cancel":return self.reply(svc.cancel(sid,x["reason"]))
     if parts[-1]=="recover":return self.reply(svc.recover(sid).to_dict())
     self.reply({"error":"not found"},404)

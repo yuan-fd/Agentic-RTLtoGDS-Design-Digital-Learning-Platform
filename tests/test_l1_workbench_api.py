@@ -28,6 +28,9 @@ def test_real_l1_workbench_api_vertical_slice(tmp_path):
   assert artifact["kind"]=="report" and artifact["sha256"]
   assert result["runtime"]["stages"][0]["attempts"][0]["exit_code"] == 0
   assert (tmp_path / "work" / result["plan"]["run_id"]).exists()
+  query=_post(base+f"/api/l1/sessions/{sid}/queries",{"kind":"timing","limit":20,"decision_summary":"Read timing facts from the Runtime-owned baseline."})
+  assert query["receipt"]["status"] == "completed"
+  assert query["receipt"]["result"]["runs"][0]["run_id"] == result["plan"]["run_id"]
   events=json.loads(urlopen(base+f"/api/l1/sessions/{sid}/events?after=1",timeout=10).read())["events"]
   kinds=[event["kind"] for event in events]
   assert "goal_finalized" in kinds and "tool_called" in kinds and "policy_decided" in kinds and "tool_receipt" in kinds and "state_transition" in kinds
