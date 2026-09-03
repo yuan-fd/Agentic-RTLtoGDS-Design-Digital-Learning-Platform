@@ -1,0 +1,194 @@
+{
+  "accepted": true,
+  "authorization": {
+    "authorization_id": "l2-auth-4e4754c0e13b08cd46b0e1e0",
+    "baseline_run_id": "26b841202015482791f5915d9d86a7c9",
+    "candidate_run_id": "f168a3a2308444f8beb7351752519311",
+    "evidence": [
+      {
+        "ref": "artifact:runtime-890069fcf3374237b4260839ed89e97f",
+        "schema_version": 1,
+        "sha256": "679b59c661c28073387be82e06113f35f301c261dc6d16bf9b8d0ef7f5755ee0"
+      },
+      {
+        "ref": "artifact:runtime-f4ad17419f8d4f33ae829811963654b7",
+        "schema_version": 1,
+        "sha256": "cf30a8d81e7dc8391b5ce57a55b3e3e1c2a8a17e080c1a3774bfc0d9eb64ff36"
+      },
+      {
+        "ref": "artifact:runtime-75e8246f0aea4007975ffdfc955ae6e4",
+        "schema_version": 1,
+        "sha256": "4ef11d84814040770488857c211e3fde2aef95d7d577af19bcc5ae2f4643cf2c"
+      },
+      {
+        "ref": "artifact:runtime-1097c1007ba349928a6345f96b8702f5",
+        "schema_version": 1,
+        "sha256": "03fef040439482d0b0d0e424dc5639e66d69ad09cff21cef456c737bb705b3d1"
+      },
+      {
+        "ref": "artifact:runtime-7c424972119c4f6fa56f345ee316a5ac",
+        "schema_version": 1,
+        "sha256": "29b5aa9874d194d5edd80ab9637a71296008de6e5eb9c9395a57c29d2dd04e79"
+      },
+      {
+        "ref": "artifact:runtime-ca9918bd528f4cd4ad94621c4780fe48",
+        "schema_version": 1,
+        "sha256": "9b3b183e14581f3bda01ce990c6bbc566173c9bbe5a20f6da934ceb89dba6deb"
+      },
+      {
+        "ref": "artifact:runtime-c4e57537217c42c4b54a7527a84bdaee",
+        "schema_version": 1,
+        "sha256": "ab9f9e85da5d92418f0782b183552cec734f3fb8e0447f0582847c4ccc5e2cd8"
+      },
+      {
+        "ref": "artifact:runtime-4a2b7ce99233453ebe35a823a74f04b4",
+        "schema_version": 1,
+        "sha256": "a7f07a915bffac5f924b747dc2a3cd798af8a3a9fe45fd7ac7f0ff87d5949593"
+      },
+      {
+        "ref": "artifact:runtime-27463d59e18d436c83adf910d4a601f6",
+        "schema_version": 1,
+        "sha256": "b43559f4e0dd823c77b9ecbe11bb3791dbcb37487ba041b0a1a7f515a0638bbd"
+      },
+      {
+        "ref": "artifact:runtime-051237a23d23425696415d58e9748131",
+        "schema_version": 1,
+        "sha256": "0e8001957990f7a8021528e0587f0b72a1166366a633644eebcb97d9b8e16fbf"
+      },
+      {
+        "ref": "artifact:runtime-b075a2ccf8814d06b094ba2b27f98ba5",
+        "schema_version": 1,
+        "sha256": "60f75bc06e591e1409ffb9bd0a267537e457c3189744d441b776f4bd1e9518ae"
+      },
+      {
+        "ref": "artifact:runtime-8e50f6fef16049e58e32367999c82619",
+        "schema_version": 1,
+        "sha256": "a88cb02ea46d871708c5c05d1d27a288bdbe84299756a48871c49caaabc66028"
+      },
+      {
+        "ref": "artifact:runtime-1ec41872379942e0b161fa4cc557b470",
+        "schema_version": 1,
+        "sha256": "d0ae76d81ea01619a9ea2d86fd39af7ba12f814fe3b004a11e05b724eb22f0b9"
+      },
+      {
+        "ref": "artifact:runtime-8fe93cd6975c49909ff7f4553f4297ce",
+        "schema_version": 1,
+        "sha256": "eef44579497a20ea54f3d40de30f7be806a522e8441e5da0d2c8d0b338937473"
+      },
+      {
+        "ref": "artifact:runtime-d07cac7f9de24ff1ae78758c0704da8e",
+        "schema_version": 1,
+        "sha256": "1c2856582b3825352c4ef274c880ce7ae07083cad8c067a5913eb57454a323d8"
+      },
+      {
+        "ref": "artifact:runtime-52724fe1b90c4dffaf6cfda05ab58404",
+        "schema_version": 1,
+        "sha256": "29ce34cc385eb83f686047bb4f6a6fd9497b65d37e38dbc4c1356032246cf810"
+      },
+      {
+        "ref": "artifact:runtime-9174925a07a643c98bb1265c3b8f9b3b",
+        "schema_version": 1,
+        "sha256": "8601893c8910c1fc75ac301ca1255fe881b81221aadc5ffca60b4a8d083c0184"
+      },
+      {
+        "ref": "artifact:runtime-d620a32f76574a4e8ef0e20f030823e6",
+        "schema_version": 1,
+        "sha256": "93573b147e68704b15d3cd4bb558dacc57e1583169e45d9a7bec58616969718b"
+      },
+      {
+        "ref": "artifact:runtime-9fc555b5eaa34a36a25996c301c74e32",
+        "schema_version": 1,
+        "sha256": "2a992050d707a823039cf7959192bd09beef658227f1684434803fc0a0fc12bb"
+      },
+      {
+        "ref": "artifact:runtime-02a9ae2515e340f8a9622de4d9485543",
+        "schema_version": 1,
+        "sha256": "039674c73001130f332e317ddac0cc4382588f9e2d27348955b4c1c787dba8a5"
+      },
+      {
+        "ref": "artifact:runtime-d29e1d2b3ad6490eaca0f27582410f63",
+        "schema_version": 1,
+        "sha256": "5b7116630e395950608da3ef526640d8bc2cc9d9d6e70fdbff6f5452e8e5502b"
+      },
+      {
+        "ref": "artifact:runtime-cecdbf2604d6431aa5b818e80b0e515d",
+        "schema_version": 1,
+        "sha256": "68d0121e1e4fcec9c5e3315d2624b8ca86d2bf266872dfcf76af1d3ef4542fd2"
+      },
+      {
+        "ref": "artifact:runtime-1a038016f74d4d5da8993a31185b75d7",
+        "schema_version": 1,
+        "sha256": "03b2110d1fb2ea18b53af1dc93d2985536e5dde6902bfc18234fe30adb43f9fd"
+      }
+    ],
+    "goal_id": "goal-50067332278b46c9b367d45ec2928faa",
+    "l1_trace_id": "l1-trace-06f2b7c44eab4b90b84e37b56a5dc6f9",
+    "reflection_event_id": "trace-event-f00c9978e4b7414a9cd9d2c899ee983b",
+    "schema_version": 1,
+    "source_state_id": "state-e4a8223687b14f96baecd8dcd34b4495"
+  },
+  "baseline_run_id": "26b841202015482791f5915d9d86a7c9",
+  "candidate_run_id": "f168a3a2308444f8beb7351752519311",
+  "claim_boundary": "L2 authorization gate passed with real ORFS evidence; no ORFS-Agent search execution was submitted",
+  "event_kinds": [
+    "goal_drafted",
+    "goal_drafted",
+    "goal_finalized",
+    "tool_called",
+    "policy_decided",
+    "tool_receipt",
+    "state_transition",
+    "tool_called",
+    "policy_decided",
+    "tool_receipt",
+    "tool_called",
+    "policy_decided",
+    "tool_receipt",
+    "state_transition",
+    "tool_called",
+    "policy_decided",
+    "tool_receipt",
+    "reflection_recorded",
+    "reflection_recorded",
+    "l2_handoff_authorized"
+  ],
+  "goal_id": "goal-50067332278b46c9b367d45ec2928faa",
+  "m1_decision": "stop",
+  "optimization_request": {
+    "budget": {
+      "max_eda_runs": 2,
+      "max_llm_calls": 4,
+      "max_parallel": 1,
+      "max_wall_clock_seconds": 7200,
+      "schema_version": 1
+    },
+    "capability": "optimizer.l2.propose",
+    "goal_id": "goal-50067332278b46c9b367d45ec2928faa",
+    "l1_trace_id": "l1-trace-06f2b7c44eab4b90b84e37b56a5dc6f9",
+    "objective": "maximize setup WNS subject to the frozen L1 constraints and budget",
+    "plugin_id": "orfs-agent",
+    "protocol_evidence": {
+      "ref": "artifact:orfs-agent-source-lock",
+      "schema_version": 1,
+      "sha256": "27ec0e1804b9e94cd36984977ff65349a1de7498fb6132c37c4b67ef757ed000"
+    },
+    "request_id": "l2-request-f1e5672e58bf4a74a02a60a0fbd05360",
+    "schema_version": 1,
+    "search_space_evidence": {
+      "ref": "artifact:orfs-agent-shared-domain",
+      "schema_version": 1,
+      "sha256": "f6b66f09a2c9b368ff46f9f68b398ad8be63269d3e3159c7ab3c922f660ebcf4"
+    },
+    "seed_policy": "managed-seed-20260903",
+    "source_state_id": "state-e4a8223687b14f96baecd8dcd34b4495"
+  },
+  "schema_version": 1,
+  "session_id": "l1-session-50067332278b46c9b367d45ec2928faa",
+  "terminal_reflection": {
+    "basis_event_ids": [
+      "trace-event-b32c09d95c934f8d8248c93be2979d78",
+      "trace-event-d140aae13353496f9d10645aaa7fed0a"
+    ],
+    "decision": "escalate"
+  }
+}
