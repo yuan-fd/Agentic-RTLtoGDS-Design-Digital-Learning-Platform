@@ -20,11 +20,8 @@ belong to the operator / codex, not to this slice.
 
 ## Test status
 
-`pytest tests/test_l1_*.py` → **129 passed**; the only failures are two
-pre-existing tests (`test_l1_semantic_tools.py::test_policy_proposal…`,
-`test_l1_orfs_service.py::test_l1_service_creates_validated_task…`) that
-reference the retired `PROPOSE_SEARCH_POLICY` tool against the current Goal
-allowlist; they predate this slice.
+`pytest tests/test_l1_*.py` → **130 passed, 0 failed** (after `6e01288`
+retired the `PROPOSE_SEARCH_POLICY` tool and aligned the two affected tests).
 
 ## Claim boundaries (deliberate)
 
@@ -39,12 +36,17 @@ allowlist; they predate this slice.
   `policy_decided` event after Goal freeze; that is a contract-level
   property, not an omission fixable in this slice.
 
-## Open decisions for the operator / codex
+## Decisions resolved (2026-09-03)
 
-1. Two pre-existing red tests reference `PROPOSE_SEARCH_POLICY`: retire the
-   tool + tests, or restore it to the default Goal allowlist?
-2. Accept "clarification-before-freeze = needs_clarification visibility", or
-   request a contract change for a post-freeze `policy_decided(
-   needs_clarification)` event?
-3. Optionally: wire the frozen `OptimizationRequest` into a real ORFS-Agent
+1. `PROPOSE_SEARCH_POLICY` retired (`6e01288`): removed from `ToolName`, the
+   read-only set, the scheduler policy, and the L1 ORFS registry; the
+   `state_tuning` historical decoder keeps a string guard for old records;
+   the two red tests are fixed and the suite is fully green.
+
+## Open decision for the operator / codex
+
+1. Accept "clarification-before-freeze = needs_clarification visibility"
+   (recommended for the MVP), or request a contract change for a post-freeze
+   `policy_decided(needs_clarification)` event.
+2. Optionally: wire the frozen `OptimizationRequest` into a real ORFS-Agent
    campaign run and produce a full search acceptance (long real-EDA run).
