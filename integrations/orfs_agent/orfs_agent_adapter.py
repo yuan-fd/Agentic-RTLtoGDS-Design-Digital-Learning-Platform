@@ -239,6 +239,12 @@ def main() -> int:
             raise ValueError("observations must be objects")
         if not isinstance(parameter_domain, Mapping):
             raise ValueError("a typed parameter_domain for the requested platform is required")
+        # The dataset bridge remains the default admission boundary.  Native
+        # GP/EI is an explicit, bounded mode and is delegated to the separate
+        # adapter so this file never reimplements upstream search logic.
+        if inputs.get("mode") == "native_agent":
+            from orfs_agent_native_adapter import main as native_main
+            return native_main()
         _validate_domain_and_observations(parameter_domain, observations, platform, _load_protocol_receipt(args.result.parent))
         upstream = _checked_source(_load_lock())
         rows = [_row(item, design=design, platform=platform) for item in observations]
