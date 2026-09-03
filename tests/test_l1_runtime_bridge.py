@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from dataclasses import replace
 import platform
 import sys
 import threading
@@ -165,6 +166,23 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     assert "text" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
     visible = excerpt.result["text"]
     assert "/private/work" not in visible and "supersecret" not in visible and "$ openroad" not in visible
+    policy = TrustedPolicyIdentity("policy-1", "v1", "platform", EvidencePointer("artifact:policy", "d" * 64))
+    goal = replace(goal, labels={
+        "l1_policy_id": "policy-1", "l1_policy_version": "v1", "l1_policy_issuer": "platform",
+        "l1_policy_provenance": "artifact:policy", "l1_policy_provenance_sha256": "d" * 64,
+    })
+    trace = L1TraceService(L1TraceStore(tmp_path / "safe-excerpt-trace.sqlite"))
+    trace.record_goal("trace-safe-excerpt", goal)
+    trace_call = SemanticToolCall("call-excerpt", goal.goal_id, state.state_id,
+                                  ToolName.QUERY_ARTIFACT_EXCERPT,
+                                  {"run_id": receipt.result["run_id"], "artifact_id": artifact_id, "max_bytes": 64},
+                                  "planner")
+    trace.record_call("trace-safe-excerpt", state, trace_call, planner_summary="Read bounded report excerpt.")
+    trace.record_policy("trace-safe-excerpt", goal, state, trace_call, policy,
+                        verdict="allow", summary="Typed policy accepted the read.")
+    trace.record_receipt("trace-safe-excerpt", state, excerpt)
+    durable = str(trace.store.read("trace-safe-excerpt")[-1].to_dict())
+    assert "/private/work" not in durable and "supersecret" not in durable and "$ openroad" not in durable
 
 
 def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):
