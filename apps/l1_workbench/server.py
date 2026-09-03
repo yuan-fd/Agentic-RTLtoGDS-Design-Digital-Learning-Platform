@@ -27,6 +27,7 @@ def main():
     if parts[-1]=="candidates": p,state=svc.run_candidate(sid,x["proposal_id"],x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
     if parts[-1]=="m1-compare": return self.reply(svc.compare_m1_candidate(sid,x["baseline_run_id"],x.get("decision_summary")))
     if parts[-1]=="l2-upgrade": return self.reply(svc.l2_upgrade(sid,wait=x.get("wait",False)))
+    if parts[-1]=="l2-escalate": return self.reply(svc.l2_escalate(sid))
     if parts[-1]=="queries": return self.reply(svc.query(sid,x["kind"],x["decision_summary"],limit=x.get("limit",20)))
     if parts[-1]=="artifacts": return self.reply(svc.artifact_excerpt(sid,x["kind"],x["decision_summary"],max_bytes=x.get("max_bytes",4096)))
     if parts[-1]=="stages": p,state=svc.run_stage(sid,x["stage"],x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})

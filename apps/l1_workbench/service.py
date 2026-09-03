@@ -5,7 +5,7 @@ from pathlib import Path
 from dataclasses import replace
 from typing import Any
 
-from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec, DEFAULT_PRODUCT_SURFACE
+from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec
 from openroad_platform_contracts.agent_control import DEFAULT_L1_TOOLS, AgentBudget, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
 from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField, ClarificationQuestion
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
@@ -14,9 +14,7 @@ from openroad_platform_contracts.l2_optimization import OptimizationRequest
 from openroad_platform_execution import (ORFSRTLToGDSFactory, PluginRegistry,
     ProcessAdapter, ProcessGuardian, ToolchainConfig, orfs_plugin_manifest,
 )
-from openroad_platform_execution.orfs_agent_plugin import (
-    orfs_agent_plugin_manifest, build_orfs_agent_native_task,
-)
+from openroad_platform_execution.orfs_agent_plugin import orfs_agent_plugin_manifest
 from openroad_platform_scheduler.l1_goal_finalizer import TrustedGoalPolicy
 from openroad_platform_scheduler.l1_loop import L1DurableLoop
 from openroad_platform_scheduler.l1_loop_store import L1LoopStore
@@ -25,7 +23,6 @@ from openroad_platform_scheduler.l1_session_service import L1SessionService, L1S
 from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 from openroad_platform_scheduler.l1_l2_authorization import L1L2AuthorizationService
-from openroad_platform_scheduler.l2_handoff import OptimizationHandoffService
 from openroad_platform_scheduler.l2_handoff_store import L2HandoffStore
 from openroad_platform_scheduler.external_l2_service import ExternalOptimizerLoopService
 from openroad_platform_scheduler.pipeline_checkpoint import PipelineCheckpointStore
@@ -276,51 +273,49 @@ class WorkbenchService:
         else: raise RuntimeError("tutorial planner returned an unsupported action")
         return payload
     def l2_upgrade(self, sid, *, wait=False):
-        """Submit one admitted upstream ORFS-Agent proposal task via Runtime.
+        """Retired direct-submission path (ba88043); use :l2 to pass the gate."""
+        raise ValueError("direct L2 submission is retired; use the :l2 escalation gate, then the durable external campaign controller")
+    def l2_escalate(self, sid, *, summary=None):
+        """Visible L1→L2 escalation gate (authorization stage only).
 
-        This is deliberately an admission-sized L1→L2 handoff, not a local
-        optimizer and not a performance claim.  The separate external campaign
-        service owns any later multi-candidate orchestration.
+        Records a durable ``escalate`` reflection and, when the trace holds
+        two distinct measured Runtime observations plus this newest escalation,
+        issues the typed ``L2HandoffAuthorization`` and freezes an
+        ``OptimizationRequest``.  It never submits ORFS-Agent work itself:
+        execution belongs to the durable external campaign controller, exactly
+        like the product L2 path.  No optimizer, shell, or QoR claim is made.
         """
         if self.backend != "orfs" or not self.orfs_agent_source:
-            raise ValueError("L2 upgrade requires --backend orfs and an explicit admitted ORFS-Agent checkout")
-        raise ValueError("direct L2 submission is retired; create the frozen-domain Runtime campaign before invoking ORFS-Agent")
-        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
-        transitions=[event for event in self.trace.store.read(session.trace_id)
-                     if event.kind.value == "state_transition" and event.facts.get("terminal_status") == "succeeded"]
+            raise ValueError("L2 escalation requires --backend orfs and an explicit admitted ORFS-Agent checkout")
+        session = self.sessions.store.get(sid)
+        goal = self._goal(session.trace_id, session.goal_id)
+        state, _ = self._load(sid)
+        if state.status != "observed" or not state.evidence:
+            raise ValueError("L2 escalation requires an evidence-backed observed L1 state")
+        transitions = [event for event in self.trace.store.read(session.trace_id)
+                       if event.kind.value == "state_transition"
+                       and event.facts.get("terminal_status") == "succeeded"
+                       and event.facts.get("run_id")]
         if len({event.facts.get("run_id") for event in transitions}) < 2:
-            raise ValueError("L2 upgrade requires measured baseline and candidate Runtime observations")
-        reflections=[event for event in self.trace.store.read(session.trace_id) if event.kind.value == "reflection_recorded"]
-        if not reflections or reflections[-1].facts.get("decision") != "escalate":
-            raise ValueError("L2 upgrade requires an existing Planner/Policy-approved durable escalate reflection")
-        authorization=L1L2AuthorizationService(self.trace).authorize(session.trace_id,goal,state)
-        lock=Path(__file__).resolve().parents[2]/"integrations/orfs_agent/source.lock.json"
-        domain=Path(__file__).resolve().parents[2]/"packages/execution/src/openroad_platform_execution/orfs_agent_plugin.py"
-        protocol=EvidencePointer("artifact:orfs-agent-source-lock",hashlib.sha256(lock.read_bytes()).hexdigest())
-        search=EvidencePointer("artifact:orfs-agent-shared-domain",hashlib.sha256(domain.read_bytes()).hexdigest())
-        request=OptimizationRequest(f"l2-request-{uuid.uuid4().hex}",session.trace_id,goal.goal_id,state.state_id,
-            "orfs-agent","optimizer.l2.propose","maximize setup WNS subject to frozen L1 constraints",
-            protocol,search,"managed-seed-20260903",AgentBudget(2,goal.budget.max_llm_calls,goal.budget.max_wall_clock_seconds))
-        observations=[]
-        for event in transitions:
-            run_id=str(event.facts["run_id"]); successor=DesignState.from_dict(event.facts["state_after"])
-            run=self.runtime.store.get_run(run_id)
-            observations.append({"observation_id":run_id,"run_id":run_id,"status":event.facts["terminal_status"],
-                "parameters":dict(run.task_spec.parameters),"metrics":dict(successor.metrics),
-                "artifact_refs":[item.ref for item in successor.evidence],"feasible":True})
-        def builder(bound_request,bound_goal,_bound_state):
-            return build_orfs_agent_native_task(project_id=bound_goal.project_id,design_id=bound_goal.design_id,
-                platform_name=bound_goal.platform,objective=bound_request.objective,observations=observations,
-                n_suggestions=2,optimizer_seed=20260903,timeout_seconds=min(1800,bound_goal.budget.max_wall_clock_seconds))
-        manifest=orfs_agent_plugin_manifest(self.orfs_agent_source)
-        handoff=OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,builder,trace_store=self.trace.store,consumption_store=self.l2_handoff_store)
-        run=handoff.submit_authorized(self.runtime,request,goal,state,authorization,manifest)
-        receipt=self.trace.record_l2_runtime_submission(session.trace_id,state,run_id=run.run_id,
-            handoff_id=authorization.authorization_id,evidence=(EvidencePointer(f"run:{run.run_id}",hashlib.sha256(run.run_id.encode()).hexdigest()),))
-        if wait: self.runtime.execute_once(run.run_id)
-        return {"request":request.to_dict(),"authorization":authorization.to_dict(),"run_id":run.run_id,
-                "runtime":self.runtime.describe(run.run_id),"trace_event_id":receipt.event_id,
-                "claim_boundary":"admitted upstream proposal smoke; no candidate QoR claim"}
+            raise ValueError("L2 escalation requires distinct measured baseline and candidate Runtime observations")
+        basis = tuple(event.event_id for event in transitions[-3:])
+        reflection = self.trace.record_reflection(
+            session.trace_id, state, summary=summary or "Operator requests entering the admitted L2 search stage.",
+            decision="escalate", evidence=state.evidence, hypotheses={}, basis_event_ids=basis)
+        authorization = L1L2AuthorizationService(self.trace).authorize(session.trace_id, goal, state)
+        lock = Path(__file__).resolve().parents[2] / "integrations/orfs_agent/source.lock.json"
+        domain = Path(__file__).resolve().parents[2] / "packages/execution/src/openroad_platform_execution/orfs_agent_plugin.py"
+        request = OptimizationRequest(
+            f"l2-request-{uuid.uuid4().hex}", session.trace_id, goal.goal_id, state.state_id,
+            "orfs-agent", "optimizer.l2.propose",
+            "maximize setup WNS subject to the frozen L1 constraints and budget",
+            EvidencePointer("artifact:orfs-agent-source-lock", hashlib.sha256(lock.read_bytes()).hexdigest()),
+            EvidencePointer("artifact:orfs-agent-shared-domain", hashlib.sha256(domain.read_bytes()).hexdigest()),
+            "managed-seed-20260903", AgentBudget(2, goal.budget.max_llm_calls, goal.budget.max_wall_clock_seconds))
+        return {"reflection_event_id": reflection.event_id,
+                "authorization": authorization.to_dict(),
+                "request": request.to_dict(),
+                "claim_boundary": "L2 authorization gate only; no ORFS-Agent execution was submitted"}
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):

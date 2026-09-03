@@ -46,7 +46,8 @@ class Dashboard:
         ":m1-propose", ":candidate <proposal-id>", ":compare <baseline-run-id>",
         ":query <timing|congestion|drc|power|metrics>",
         ":artifact <report|log|run_result|config>", ":stage <allowed-stage>",
-        ":advance   :explain   :cancel [reason]   :recover   :refresh   :quit",
+        ":advance   :explain   :l2 (authorize L2)   :cancel [reason]",
+        ":recover   :refresh   :quit",
     )
 
     def __init__(self, client: Client):
@@ -148,6 +149,12 @@ class Dashboard:
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/stages", {
                     "stage": stage, "decision_summary": f"Operator requested permitted {stage} stage.", "wait": False})
                 self.notice = f"Stage submitted: {result['plan']['run_id']}; polling durable cursor events."; self.refresh()
+            elif op in {"l2", "escalate"}:
+                self._need_session()
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/l2-escalate", {})
+                auth = result.get("authorization", {})
+                self.notice = (f"L2 gate authorized: {auth.get('authorization_id', 'recorded')}; "
+                               f"{result.get('claim_boundary', '')}"); self.refresh()
             elif op == "cancel":
                 self._need_session(); self.client.post(f"/api/l1/sessions/{self.sid}/cancel", {"reason": argument or "operator cancellation"})
                 self.notice = "Cancellation requested through Runtime authority."; self.refresh()
