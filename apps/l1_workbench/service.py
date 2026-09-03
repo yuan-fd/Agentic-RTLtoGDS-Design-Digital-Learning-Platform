@@ -23,8 +23,10 @@ from openroad_platform_scheduler.runtime import WorkflowRuntime
 from openroad_platform_scheduler.runtime_store import RuntimeStore
 try:
     from .tutorial_profile import ManagedTutorialProfile
+    from .tutorial_planner import TutorialEvidencePlanner
 except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
     from tutorial_profile import ManagedTutorialProfile
+    from tutorial_planner import TutorialEvidencePlanner
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
@@ -144,6 +146,27 @@ class WorkbenchService:
             self._save(sid,successor,plan["plan_id"])
         if wait: finish(); return plan,self._load(sid)[0]
         threading.Thread(target=finish,daemon=True).start(); return plan,state
+    def advance(self,sid):
+        """Execute one evidence-backed tutorial decision; never accept a shell action."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
+        decision=TutorialEvidencePlanner.choose(goal,state,self.events(sid))
+        payload={"decision":{"action":decision.action,"summary":decision.summary,"hypothesis":decision.hypothesis,"basis_event_ids":list(decision.basis_event_ids)}}
+        if decision.action == "run_full_flow":
+            plan,next_state=self.execute(sid,decision.summary); payload.update({"plan":plan,"state":next_state.to_dict()})
+        elif decision.action == "query_timing":
+            payload["plan"]=self.query(sid,"timing",decision.summary)
+        elif decision.action == "reflect_continue":
+            event=self.trace.record_reflection(session.trace_id,state,summary=decision.summary,decision="continue",evidence=state.evidence,hypotheses=decision.hypothesis,basis_event_ids=decision.basis_event_ids)
+            payload["reflection_event_id"]=event.event_id
+        elif decision.action == "run_route":
+            plan,next_state=self.run_stage(sid,"route",decision.summary); payload.update({"plan":plan,"state":next_state.to_dict()})
+        elif decision.action == "query_drc":
+            payload["plan"]=self.query(sid,"drc",decision.summary)
+        elif decision.action == "stop":
+            event=self.trace.record_reflection(session.trace_id,state,summary=decision.summary,decision="stop",evidence=state.evidence,hypotheses=decision.hypothesis,basis_event_ids=decision.basis_event_ids)
+            payload["reflection_event_id"]=event.event_id
+        else: raise RuntimeError("tutorial planner returned an unsupported action")
+        return payload
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):

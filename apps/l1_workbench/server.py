@@ -25,6 +25,7 @@ def main():
     if parts[-1]=="queries": return self.reply(svc.query(sid,x["kind"],x["decision_summary"],limit=x.get("limit",20)))
     if parts[-1]=="artifacts": return self.reply(svc.artifact_excerpt(sid,x["kind"],x["decision_summary"],max_bytes=x.get("max_bytes",4096)))
     if parts[-1]=="stages": p,state=svc.run_stage(sid,x["stage"],x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
+    if parts[-1]=="advance": return self.reply(svc.advance(sid))
     if parts[-1]=="cancel":return self.reply(svc.cancel(sid,x["reason"]))
     if parts[-1]=="recover":return self.reply(svc.recover(sid).to_dict())
     self.reply({"error":"not found"},404)
