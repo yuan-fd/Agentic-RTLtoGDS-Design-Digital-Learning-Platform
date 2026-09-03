@@ -129,10 +129,11 @@ class L1SessionService:
         merged_answers = tuple((*prior.answers, *answers))
         raw = L1ModelBoundary._output(provider, {"kind": "goal_draft_revision", "request_text": prior.request_text,
                                                  "prior_draft": prior.to_dict(), "answers": [item.to_dict() for item in merged_answers]})
-        allowed = {"request_text", "intent", "questions", "answers", "schema_version"}
+        allowed = {"request_text", "intent", "questions", "answers", "interpretation", "field_sources", "schema_version"}
         if set(raw) - allowed: raise ValueError("goal provider returned unsupported fields")
         draft = GoalDraft.from_dict({"draft_id": f"draft-{uuid4().hex}", "parser_id": provider.provider_id, **raw})
-        if draft.request_text != prior.request_text or tuple(draft.answers) != merged_answers:
+        if (draft.request_text != prior.request_text or tuple(draft.answers) != merged_answers
+                or draft.interpretation != prior.interpretation or draft.field_sources != prior.field_sources):
             raise ValueError("goal revision must preserve request and all typed answers")
         revised_questions = {item.question_id: item for item in draft.questions}
         if any((item.question_id not in revised_questions

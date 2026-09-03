@@ -105,6 +105,8 @@ class GoalDraft:
     intent: GoalIntent
     questions: tuple[ClarificationQuestion, ...] = ()
     answers: tuple[ClarificationAnswer, ...] = ()
+    interpretation: dict[str, str] = None
+    field_sources: dict[str, str] = None
     parser_id: str = "deterministic"
     schema_version: int = SCHEMA_VERSION
 
@@ -142,6 +144,17 @@ class GoalDraft:
                 raise ValueError("clarification answer does not match a draft question")
         if len({item.question_id for item in self.answers}) != len(self.answers):
             raise ValueError("goal draft answers must be unique")
+        interpretation = self.interpretation or {}
+        sources = self.field_sources or {}
+        if not isinstance(interpretation, dict) or not isinstance(sources, dict):
+            raise ValueError("goal draft interpretation and sources must be mappings")
+        if set(interpretation) != set(sources):
+            raise ValueError("each interpreted field requires a source attribution")
+        for name, value in interpretation.items():
+            _validate_identifier("interpreted field", name)
+            _text("interpreted value", value, maximum=4000)
+            if sources[name] not in {"user", "operator_profile", "safe_default", "derived"}:
+                raise ValueError("goal draft source attribution is unsupported")
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()

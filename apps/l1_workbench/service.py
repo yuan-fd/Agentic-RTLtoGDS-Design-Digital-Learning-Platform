@@ -24,9 +24,11 @@ from openroad_platform_scheduler.runtime_store import RuntimeStore
 try:
     from .tutorial_profile import ManagedTutorialProfile
     from .tutorial_planner import TutorialEvidencePlanner
+    from .tutorial_semantic import MuxHandsOnSemanticProvider
 except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
     from tutorial_profile import ManagedTutorialProfile
     from tutorial_planner import TutorialEvidencePlanner
+    from tutorial_semantic import MuxHandsOnSemanticProvider
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
@@ -67,9 +69,12 @@ class WorkbenchService:
             return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("synth","floorplan","place","cts","route","finish"),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),DEFAULT_L1_TOOLS)
         return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("density",),AgentBudget(1,4,30),DEFAULT_L1_TOOLS)
     def start(self, text):
-        return self.sessions.start(text,_Provider(self.profile.questions() if self.profile else ()),self.policy())
+        provider = MuxHandsOnSemanticProvider() if self.profile else _Provider()
+        return self.sessions.start(text, provider, self.policy())
     def answer(self,sid,answers):
-        rows=tuple(ClarificationAnswer(a["question_id"],ClarificationField(a["field"]),a["value"]) for a in answers); session=self.sessions.answer(sid,_Provider(),rows)
+        rows=tuple(ClarificationAnswer(a["question_id"],ClarificationField(a["field"]),a["value"]) for a in answers)
+        provider = MuxHandsOnSemanticProvider() if self.profile else _Provider()
+        session=self.sessions.answer(sid,provider,rows)
         if session.goal_id:
             goal=self._goal(session.trace_id,session.goal_id)
             self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},goal.budget,evidence=(goal.rtl_artifact,)),None)

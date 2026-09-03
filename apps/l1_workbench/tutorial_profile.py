@@ -47,8 +47,11 @@ class ManagedTutorialProfile:
         if draft.unresolved_blocking_fields():
             raise ValueError("tutorial Goal compilation requires all blocking clarifications")
         answers = {item.question_id: item.value.strip().lower() for item in draft.answers}
-        if set(answers) != {item[0] for item in self._required}:
+        required_ids = {item[0] for item in self._required}
+        if not required_ids.issubset(answers) or set(answers) - (required_ids | {"design_context"}):
             raise ValueError("tutorial Goal has missing or unexpected clarification answers")
+        if answers.get("design_context") not in {None, "managed_mux_default_corner_baseline"}:
+            raise ValueError("tutorial design context must use the managed baseline/corner")
         try:
             preference = self._objectives[answers["objective"]]
             runs = self._budgets[answers["budget"]]

@@ -77,6 +77,8 @@ class L1TraceService:
                             facts={"request_text": draft.request_text, "request_sha256": draft.request_sha256, "intent": draft.intent.value,
                                    "clarification_questions": [item.to_dict() for item in draft.questions],
                                    "clarification_answers": [item.to_dict() for item in draft.answers],
+                                   "interpretation": draft.interpretation or {},
+                                   "field_sources": draft.field_sources or {},
                                    "blocking_fields": [item.value for item in draft.unresolved_blocking_fields()]})
 
     def record_goal(self, trace_id: str, goal: DesignGoal) -> L1TraceEvent:

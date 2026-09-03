@@ -73,7 +73,7 @@ class L1ModelBoundary:
     @classmethod
     def compile_draft(cls, provider: L1StructuredProvider, request_text: str, *, draft_id: str) -> GoalDraft:
         raw = cls._output(provider, {"kind": "goal_draft", "request_text": request_text})
-        allowed = {"request_text", "intent", "questions", "answers", "schema_version"}
+        allowed = {"request_text", "intent", "questions", "answers", "interpretation", "field_sources", "schema_version"}
         if set(raw) - allowed:
             raise ValueError("goal provider returned unsupported fields")
         draft = GoalDraft.from_dict({"draft_id": draft_id, "parser_id": provider.provider_id, **raw})
