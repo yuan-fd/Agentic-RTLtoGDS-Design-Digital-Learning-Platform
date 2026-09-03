@@ -46,14 +46,15 @@ class Dashboard:
         ":m1-propose", ":candidate <proposal-id>", ":compare <baseline-run-id>",
         ":query <timing|congestion|drc|power|metrics>",
         ":artifact <report|log|run_result|config>", ":stage <allowed-stage>",
-        ":advance   :explain   :l2 (authorize L2)   :cancel [reason]",
-        ":recover   :refresh   :quit",
+        ":advance   :explain   :l2 (authorize L2)",
+        ":pause   :resume   :cancel [reason]   :recover   :refresh   :quit",
     )
 
     def __init__(self, client: Client):
         self.client, self.sid, self.after, self.events = client, None, -1, []
         self.notice, self.connection, self.input_buffer, self.last_refresh = "Ready. Create a durable session with :new <natural-language goal>.", "not contacted", "", 0.0
         self.teaching_lines = []
+        self.paused = False
 
     def refresh(self) -> None:
         if not self.sid: return
@@ -155,6 +156,12 @@ class Dashboard:
                 auth = result.get("authorization", {})
                 self.notice = (f"L2 gate authorized: {auth.get('authorization_id', 'recorded')}; "
                                f"{result.get('claim_boundary', '')}"); self.refresh()
+            elif op == "pause":
+                self._need_session(); self.paused = True
+                self.notice = "Replay paused. Use :advance to step one event and :resume to poll live again."
+            elif op in {"resume", "play"}:
+                self._need_session(); self.paused = False; self.refresh()
+                self.notice = "Live cursor polling resumed."
             elif op == "cancel":
                 self._need_session(); self.client.post(f"/api/l1/sessions/{self.sid}/cancel", {"reason": argument or "operator cancellation"})
                 self.notice = "Cancellation requested through Runtime authority."; self.refresh()
@@ -366,7 +373,7 @@ class Dashboard:
     def run(self, win) -> None:
         curses.curs_set(1); win.nodelay(True)
         while True:
-            if self.sid and time.monotonic() - self.last_refresh >= 1.0:
+            if self.sid and not self.paused and time.monotonic() - self.last_refresh >= 1.0:
                 try: self.refresh()
                 except Exception as exc: self.connection, self.notice = "error", f"poll error: {exc}"
             self.draw(win); key = win.getch()
