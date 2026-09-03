@@ -221,6 +221,57 @@ class WorkflowRuntime:
     def describe(self, run_id: str) -> dict:
         return self.store.describe_run(run_id)
 
+    def read_artifact_excerpt(self, run_id: str, artifact_id: str, *, offset: int,
+                              max_bytes: int) -> dict[str, str | int]:
+        """Read one registered artifact through the Runtime authority only.
+
+        Neither a bridge nor a UI receives the attempt workspace/store key.
+        This port verifies the registered content hash and returns a bounded,
+        display-safe projection suitable for the durable L1 trace.
+        """
+        if (not isinstance(offset, int) or isinstance(offset, bool) or offset < 0
+                or not isinstance(max_bytes, int) or isinstance(max_bytes, bool)
+                or not 0 < max_bytes <= 64 * 1024):
+            raise ValueError("artifact excerpt bounds are invalid")
+        view = self.describe(run_id)
+        matches = [(attempt, artifact) for stage in view.get("stages", ())
+                   for attempt in stage.get("attempts", ())
+                   for artifact in attempt.get("artifacts", ())
+                   if artifact.get("artifact_id") == artifact_id]
+        if len(matches) != 1:
+            raise ValueError("artifact is not registered in the specified Runtime run")
+        attempt, artifact = matches[0]
+        workspace = Path(str(attempt["workspace"])).resolve()
+        path = (workspace / str(artifact["store_key"])).resolve()
+        try:
+            path.relative_to(workspace)
+        except ValueError as exc:
+            raise ValueError("registered artifact escapes Runtime workspace") from exc
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != artifact["sha256"]:
+            raise ValueError("registered artifact content hash mismatch")
+        return {"artifact_id": artifact_id, "sha256": str(artifact["sha256"]),
+                "offset": offset,
+                "text": _safe_artifact_text(
+                    raw[offset:offset + max_bytes].decode("utf-8", errors="replace"))}
+
+
+def _safe_artifact_text(value: str) -> str:
+    """Remove path, command and credential-like material before L1 storage."""
+    value = re.sub(r"(?<![A-Za-z0-9_.-])/(?:[^\s'\"\\]+/?)+", "[redacted-path]", value)
+    value = re.sub(
+        r"(?i)\b(api[_-]?key|access[_-]?key|authorization|credential|password|secret|token)\b\s*[:=]\s*[^\s,}\]]+",
+        r"\1=[redacted]", value)
+    value = re.sub(r"(?i)\$\s*(?:bash|sh|zsh|python(?:3)?|openroad|yosys|make|env)\b[^\n\"]*",
+                   "[redacted-command]", value)
+    lines = []
+    for line in value.splitlines(keepends=True):
+        if re.match(r"\s*(?:\$|#\s*!|(?:bash|sh|zsh|python(?:3)?|openroad|yosys|make|env)\b)", line, re.I):
+            lines.append("[redacted-command]" + ("\n" if line.endswith("\n") else ""))
+        else:
+            lines.append(line)
+    return "".join(lines)
+
 
 class _LeasePulse:
     def __init__(

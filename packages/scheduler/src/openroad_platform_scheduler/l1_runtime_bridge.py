@@ -8,8 +8,6 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-import re
-from pathlib import Path
 from typing import Any, Mapping
 
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState, SemanticToolCall, ToolName, ToolReceipt
@@ -144,7 +142,7 @@ class L1RuntimeBridge:
         # tool-specific projection of registered Runtime facts instead.
         result: dict[str, Any] = self._read_projection(call, views)
         if call.tool is ToolName.QUERY_ARTIFACT_EXCERPT:
-            result = {"run_id": run_ids[0], **self._read_excerpt(views[run_ids[0]], call.arguments["artifact_id"],
+            result = {"run_id": run_ids[0], **self._read_excerpt(run_ids[0], call.arguments["artifact_id"],
                                                     offset=call.arguments.get("offset", 0), max_bytes=call.arguments["max_bytes"])}
         return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed",
                            result,
@@ -222,26 +220,12 @@ class L1RuntimeBridge:
     def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
         return {item["name"]: float(item["value"]) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ()) for item in attempt.get("metrics", ()) if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
 
-    @staticmethod
-    def _read_excerpt(view: Mapping[str, Any], artifact_id: str, *, offset: int, max_bytes: int) -> dict:
-        matches = [(attempt, artifact) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())
-                   for artifact in attempt.get("artifacts", ()) if artifact.get("artifact_id") == artifact_id]
-        if len(matches) != 1: raise ValueError("artifact is not registered in the specified Runtime run")
-        attempt, artifact = matches[0]; workspace = Path(attempt["workspace"]).resolve(); path = (workspace / artifact["store_key"]).resolve()
-        try: path.relative_to(workspace)
-        except ValueError as exc: raise ValueError("registered artifact escapes Runtime workspace") from exc
-        raw = path.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != artifact["sha256"]: raise ValueError("registered artifact content hash mismatch")
-        return {"artifact_id": artifact_id, "sha256": artifact["sha256"], "offset": offset,
-                "text": L1RuntimeBridge._visible_excerpt(
-                    raw[offset:offset + max_bytes].decode("utf-8", errors="replace"))}
-
-    @staticmethod
-    def _visible_excerpt(value: str) -> str:
-        """Keep a bounded source excerpt useful while removing local paths."""
-        # A report may include the Runtime workspace or another absolute local
-        # path.  Such a path is never a teachable L1 fact and is not exposed.
-        return re.sub(r"(?<![A-Za-z0-9_.-])/(?:[^\s'\"\\]+/?)+", "[redacted-path]", value)
+    def _read_excerpt(self, run_id: str, artifact_id: str, *, offset: int,
+                      max_bytes: int) -> dict:
+        reader = getattr(self._runtime, "read_artifact_excerpt", None)
+        if not callable(reader):
+            raise ValueError("Runtime does not expose controlled artifact excerpt access")
+        return dict(reader(run_id, artifact_id, offset=offset, max_bytes=max_bytes))
 
     @staticmethod
     def _require_owned_run(goal: DesignGoal, view: Mapping[str, Any]) -> None:

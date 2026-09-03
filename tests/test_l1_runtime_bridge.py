@@ -154,7 +154,7 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     manifest = PluginManifest("fixture", "1.0.0", (sys.executable, str(fixture)), ("eda.rtl_to_gds",), (platform.machine(),),
                               {"type": "object"}, {"type": "object"}, ({"kind": "report", "required": True},), 10)
     runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.sqlite"), PluginRegistry([manifest]), workspace_root=tmp_path / "work", adapter=ProcessAdapter(ProcessGuardian(poll_interval=0.01, terminate_grace=0.1)))
-    task = TaskSpec("base-task", "p1", "top", plugin_id="fixture", inputs={"message": "l1 smoke"}, expected_artifacts=("report",), timeout_seconds=10)
+    task = TaskSpec("base-task", "p1", "top", plugin_id="fixture", inputs={"message": "$ openroad /private/work token=supersecret"}, expected_artifacts=("report",), timeout_seconds=10)
     bridge = L1RuntimeBridge(runtime, task, _FixtureFactory())
     goal = DesignGoal("goal-1", "p1", "top", "platform-1", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("density",), AgentBudget(2, 2, 60))
     state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
@@ -163,6 +163,8 @@ def test_runtime_bridge_real_workflow_runtime_smoke(tmp_path):
     artifact_id = runtime.describe(receipt.result["run_id"])["stages"][0]["attempts"][0]["artifacts"][0]["artifact_id"]
     excerpt = bridge.execute(goal, state, SemanticToolCall("call-excerpt", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": receipt.result["run_id"], "artifact_id": artifact_id, "max_bytes": 64}, "planner"))
     assert "text" in excerpt.result and bridge.observation(receipt.result["run_id"]).terminal_status == "succeeded"
+    visible = excerpt.result["text"]
+    assert "/private/work" not in visible and "supersecret" not in visible and "$ openroad" not in visible
 
 
 def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):
