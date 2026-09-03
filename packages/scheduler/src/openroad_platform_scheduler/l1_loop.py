@@ -50,7 +50,10 @@ class L1DurableLoop:
         plan = self.store.get(plan_id)
         if plan["status"] != "submitted" or not plan["run_id"]: raise ValueError("plan has no Runtime submission to observe")
         if plan["trace_id"] != trace_id or plan["goal_id"] != state.goal_id or plan["state_id"] != state.state_id: raise ValueError("plan does not bind current trace/goal/state")
-        successor = self.bridge.reduce_and_trace(self.trace, trace_id, state, run_id=plan["run_id"], next_state_id=next_state_id)
+        successor = self.bridge.reduce_and_trace(
+            self.trace, trace_id, state, run_id=plan["run_id"], next_state_id=next_state_id,
+            consume_eda_run=plan["call"]["tool"] in {"run_stage", "run_full_flow"},
+        )
         if plan["call"]["tool"] == "stop_or_escalate":
             self.trace.record_stopped(trace_id, successor, run_id=plan["run_id"], reason=plan["call"]["arguments"]["reason"])
         return successor

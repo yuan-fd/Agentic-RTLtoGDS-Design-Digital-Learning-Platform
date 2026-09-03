@@ -75,6 +75,8 @@ class L1TraceService:
         draft.validate()
         return self._append(trace_id, kind=TraceEventKind.GOAL_DRAFTED, goal_id=draft.draft_id,
                             facts={"request_text": draft.request_text, "request_sha256": draft.request_sha256, "intent": draft.intent.value,
+                                   "clarification_questions": [item.to_dict() for item in draft.questions],
+                                   "clarification_answers": [item.to_dict() for item in draft.answers],
                                    "blocking_fields": [item.value for item in draft.unresolved_blocking_fields()]})
 
     def record_goal(self, trace_id: str, goal: DesignGoal) -> L1TraceEvent:
@@ -140,13 +142,14 @@ class L1TraceService:
                             evidence=receipt.evidence)
 
     def record_observation(self, trace_id: str, before: DesignState, after: DesignState,
-                           observation: RuntimeObservation) -> L1TraceEvent:
+                           observation: RuntimeObservation, *, consume_eda_run: bool = False) -> L1TraceEvent:
         before.validate(); after.validate()
         observation.validate()
         self._require_current_state(trace_id, before)
         if after.parent_state_id != before.state_id or after.goal_id != before.goal_id:
             raise ValueError("observation state lineage is invalid")
-        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
+        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id,
+                                        consume_eda_run=consume_eda_run)
         if after != expected:
             raise ValueError("observation successor state is not the canonical reducer result")
         existing = self.store.read(trace_id)
@@ -161,7 +164,8 @@ class L1TraceService:
             "state_after": after.to_dict()}, hypotheses={}, evidence=observation.evidence,
             parent_event_id=previous.event_id if previous else None,
         )
-        self.store.append_state_transition(event, before=before, after=after, observation=observation)
+        self.store.append_state_transition(event, before=before, after=after, observation=observation,
+                                           consume_eda_run=consume_eda_run)
         return event
 
     def record_stopped(self, trace_id: str, state: DesignState, *, run_id: str, reason: str) -> L1TraceEvent:
@@ -180,14 +184,18 @@ class L1TraceService:
                             facts={"run_id": run_id, "reason": reason}, evidence=state.evidence)
 
     def record_reflection(self, trace_id: str, state: DesignState, *, summary: str,
-                          decision: str, evidence=()) -> L1TraceEvent:
+                          decision: str, evidence=(), hypotheses: dict | None = None,
+                          basis_event_ids: tuple[str, ...] = ()) -> L1TraceEvent:
         """Persist a bounded planner decision separately from Runtime facts."""
-        if not isinstance(summary, str) or not summary.strip() or len(summary) > 4000:
-            raise ValueError("reflection summary is invalid")
         if decision not in {"continue", "stop", "escalate"}:
             raise ValueError("reflection decision is invalid")
         self._require_current_state(trace_id, state)
+        prior_ids = {event.event_id for event in self.store.read(trace_id)}
+        if (not isinstance(basis_event_ids, tuple) or not basis_event_ids
+                or any(not isinstance(item, str) or item not in prior_ids for item in basis_event_ids)):
+            raise ValueError("reflection requires durable basis event ids")
         return self._append(trace_id, kind=TraceEventKind.REFLECTION_RECORDED,
                             goal_id=state.goal_id, state_before=state, state_after=state,
-                            planner_summary=summary, facts={"decision": decision},
-                            evidence=evidence)
+                            planner_summary=summary,
+                            facts={"decision": decision, "basis_event_ids": list(basis_event_ids)},
+                            hypotheses=hypotheses or {}, evidence=evidence)

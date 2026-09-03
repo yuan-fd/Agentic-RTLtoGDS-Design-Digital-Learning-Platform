@@ -199,6 +199,7 @@ def test_durable_loop_real_runtime_submit_execute_observe(tmp_path):
     runtime.execute_once(plan["run_id"])
     successor=loop.observe("trace-loop",state,plan["plan_id"],next_state_id="state-2")
     assert successor.diagnosis["runtime_run_id"] == plan["run_id"]
+    assert successor.remaining_budget.max_eda_runs == 1
 
 
 def test_durable_loop_stop_observes_runtime_cancellation_and_traces_stopped(tmp_path):

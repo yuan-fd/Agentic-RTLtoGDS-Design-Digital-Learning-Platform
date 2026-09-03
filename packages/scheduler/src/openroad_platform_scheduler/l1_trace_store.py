@@ -68,10 +68,11 @@ class L1TraceStore:
         return self._append(event)
 
     def append_state_transition(self, event: L1TraceEvent, *, before, after,
-                                observation: RuntimeObservation) -> str:
+                                observation: RuntimeObservation, consume_eda_run: bool = False) -> str:
         if event.kind is not TraceEventKind.STATE_TRANSITION:
             raise ValueError("Runtime observation append boundary only accepts state transitions")
-        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id)
+        expected = L1StateReducer.apply(before, observation, next_state_id=after.state_id,
+                                        consume_eda_run=consume_eda_run)
         if after != expected:
             raise ValueError("state transition does not match canonical Runtime reducer result")
         if event.state_before_sha256 != _digest_event(before) or event.state_after_sha256 != _digest_event(after):

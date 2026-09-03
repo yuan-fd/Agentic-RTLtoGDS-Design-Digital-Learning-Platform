@@ -62,7 +62,7 @@ class WorkbenchService:
         if self.backend == "orfs":
             import hashlib
             digest=hashlib.sha256(self.rtl.read_bytes()).hexdigest(); evidence=EvidencePointer(f"artifact:rtl-{digest[:12]}",digest)
-            return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),DEFAULT_L1_TOOLS)
+            return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("synth","floorplan","place","cts","route","finish"),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),DEFAULT_L1_TOOLS)
         return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("density",),AgentBudget(1,4,30),DEFAULT_L1_TOOLS)
     def start(self, text):
         return self.sessions.start(text,_Provider(self.profile.questions() if self.profile else ()),self.policy())
@@ -72,10 +72,11 @@ class WorkbenchService:
             goal=self._goal(session.trace_id,session.goal_id)
             self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},goal.budget,evidence=(goal.rtl_artifact,)),None)
         return session
-    def _bridge(self, goal, *, wait=True):
+    def _bridge(self, goal, *, wait=True, target_stage="finish"):
         """Build an immutable base TaskSpec; Runtime remains the run authority."""
         if self.backend == "orfs":
-            task=self.factory.build(RTLToGDSRequest(rtl_path=str(self.rtl),project_id=goal.project_id,design_id=goal.design_id,top=self.top,task_id=f"l1-orfs-{uuid.uuid4().hex}",labels={"surface":"l1-workbench","mode":"baseline"},options={"platform_name":self.platform_name,"target_stage":"finish","clock_period_ns":self.clock_period_ns,"core_utilization_pct":10.0,"place_density":0.45,"stage_timeout_seconds":3600,"timeout_seconds":7200}))
+            if target_stage not in goal.allowed_stages: raise ValueError("stage is outside the finalized Goal")
+            task=self.factory.build(RTLToGDSRequest(rtl_path=str(self.rtl),project_id=goal.project_id,design_id=goal.design_id,top=self.top,task_id=f"l1-orfs-{uuid.uuid4().hex}",labels={"surface":"l1-workbench","mode":"baseline"},options={"platform_name":self.platform_name,"target_stage":target_stage,"clock_period_ns":self.clock_period_ns,"core_utilization_pct":10.0,"place_density":0.45,"stage_timeout_seconds":3600,"timeout_seconds":7200}))
             factory=self.factory
         else:
             task=TaskSpec(f"l1-workbench-{uuid.uuid4().hex}",goal.project_id,goal.design_id,plugin_id="l1-runtime-smoke",inputs={"kind":"bounded_l1_tool","bounded_mode":"normal" if wait else "cancellable"},expected_artifacts=("report",),timeout_seconds=30)
@@ -113,6 +114,36 @@ class WorkbenchService:
         call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,tool,{"run_id":run_id,"limit":limit},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         return loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
+    def artifact_excerpt(self,sid,kind,summary,*,max_bytes=4096):
+        """Read one registered artifact by approved kind, never by path."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
+        run_id=state.diagnosis.get("runtime_run_id")
+        if not isinstance(run_id,str) or not run_id: raise ValueError("artifact query requires an observed Runtime run")
+        if not isinstance(kind,str) or kind not in {"report","log","run_result","config"}: raise ValueError("artifact kind is not exposed by the L1 tutorial")
+        if not isinstance(max_bytes,int) or isinstance(max_bytes,bool) or not 1 <= max_bytes <= 64 * 1024: raise ValueError("artifact excerpt size is invalid")
+        view=self.runtime.describe(run_id)
+        matches=[item for stage in view.get("stages",()) for attempt in stage.get("attempts",()) for item in attempt.get("artifacts",()) if item.get("kind")==kind]
+        if not matches: raise ValueError("current Runtime run has no registered requested artifact kind")
+        artifact_id=matches[0].get("artifact_id")
+        if not isinstance(artifact_id,str) or not artifact_id: raise ValueError("registered artifact is missing its identity")
+        bridge=self._bridge(goal); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.QUERY_ARTIFACT_EXCERPT,{"run_id":run_id,"artifact_id":artifact_id,"offset":0,"max_bytes":max_bytes},"l1-workbench")
+        trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
+        return loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
+    def run_stage(self,sid,stage,summary,*,wait=True):
+        """Submit one allowed ORFS stage under the same Runtime lifecycle."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
+        bridge=self._bridge(goal,wait=wait,target_stage=stage); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_STAGE,{"stage":stage},"l1-workbench")
+        trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
+        plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
+        self._save(sid,state,plan["plan_id"])
+        def finish():
+            self.runtime.execute_once(plan["run_id"])
+            successor=loop.observe(session.trace_id,state,plan["plan_id"],next_state_id=f"state-{uuid.uuid4().hex}")
+            self._save(sid,successor,plan["plan_id"])
+        if wait: finish(); return plan,self._load(sid)[0]
+        threading.Thread(target=finish,daemon=True).start(); return plan,state
     def cancel(self,sid,reason):
         state,plan=self._load(sid); self.runtime.store.request_cancel(self.loop_store.get(plan)["run_id"]); return {"status":"cancel_requested","reason":reason}
     def recover(self,sid):

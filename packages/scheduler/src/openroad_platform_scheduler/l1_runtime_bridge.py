@@ -169,12 +169,14 @@ class L1RuntimeBridge:
         return RuntimeObservation(run_id, attempt["attempt_id"], stage, terminal_status, metrics, evidence)
 
     def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
-                         *, run_id: str, next_state_id: str) -> DesignState:
+                         *, run_id: str, next_state_id: str, consume_eda_run: bool = False) -> DesignState:
         """The only S3 handoff from Runtime facts into the S2 state authority."""
         observation = self.observation(run_id)
         self._require_owned_run_from_id(state.goal_id, run_id)
-        successor = L1StateReducer.apply(state, observation, next_state_id=next_state_id)
-        trace.record_observation(trace_id, state, successor, observation)
+        successor = L1StateReducer.apply(state, observation, next_state_id=next_state_id,
+                                         consume_eda_run=consume_eda_run)
+        trace.record_observation(trace_id, state, successor, observation,
+                                 consume_eda_run=consume_eda_run)
         return successor
 
     @classmethod
