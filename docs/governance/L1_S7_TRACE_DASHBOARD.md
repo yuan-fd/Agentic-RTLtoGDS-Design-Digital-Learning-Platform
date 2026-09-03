@@ -1,6 +1,7 @@
-# L1 S7 — fact-only Trace Dashboard
+# L1 S7 — frozen fact-only trace viewer prototype
 
-S7 adds a standalone read-only dashboard at `apps/l1_trace_dashboard/`.  It
+S7 added a standalone read-only completed-trace viewer at
+`apps/l1_trace_dashboard/`. It
 does not alter the legacy web application or API.  Its only data source is
 `L1TraceReader`, which opens SQLite with `mode=ro`, performs no mkdir/DDL or
 migration, fails closed for missing/old schemas, and validates the append-only
@@ -34,3 +35,13 @@ captured S6 trace; it must return `trace-1`, ten durable events, terminal
 
 Rollback: revert the S7 completion commit.  It has no schema migration,
 Runtime mutation, external side effect, or dependency installation.
+
+## P1 successor boundary
+
+As of 2026-09-03 this directory is retained as `TRACE_VIEWER_PROTOTYPE`, not
+as the operational L1 Dashboard. Do not extend it with a natural-language
+front door, Session state, Runtime commands, policy decisions, live event
+ownership, campaign control, or hidden-CoT display. The product successor is
+a separately-created `apps/l1_workbench/`, after a durable L1 session/event
+service exists. This classification preserves S7 evidence without allowing a
+static playback UI to become the product architecture.
