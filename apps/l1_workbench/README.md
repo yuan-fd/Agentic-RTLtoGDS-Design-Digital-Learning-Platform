@@ -43,6 +43,12 @@ PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:
   .tools/venvs/orfs-agent/bin/python apps/l1_workbench/terminal_dashboard.py
 ```
 
+The terminal client is deliberately split: the left 65% is an Agent Harness
+view of durable, visible execution facts; the right pane is the human Client
+surface for requests, clarification answers, and control. It never displays
+hidden chain-of-thought, raw provider transcripts, shell commands, secrets, or
+workspace paths.
+
 Commands are `:new <natural-language goal>`, `:answer <clarification>`,
 `:run [visible decision summary]`, `:cancel [reason]`, `:recover`,
 `:refresh`, and `:quit`. It polls the cursor API and displays only returned
