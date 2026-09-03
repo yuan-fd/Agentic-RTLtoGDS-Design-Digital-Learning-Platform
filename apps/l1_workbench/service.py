@@ -69,7 +69,7 @@ class WorkbenchService:
             import hashlib
             digest=hashlib.sha256(self.rtl.read_bytes()).hexdigest(); evidence=EvidencePointer(f"artifact:rtl-{digest[:12]}",digest)
             return TrustedGoalPolicy("l1-orfs-baseline-policy","v1","platform",provenance,"tutorial_mux","mux_2to1",self.platform_name,self.platform_name,self.toolchain.name,evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("synth","floorplan","place","cts","route","finish"),("core_utilization_pct","place_density","minimum_die_size_um"),AgentBudget(3,4,7200),DEFAULT_L1_TOOLS)
-        return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("density",),AgentBudget(1,4,30),DEFAULT_L1_TOOLS)
+        return TrustedGoalPolicy("workbench-policy","v1","platform",provenance,"workbench-project","workbench-design","workbench","workbench-pdk","workbench-toolchain",evidence,GoalPreference.BALANCED,(QoRConstraint("l1_tool_runs",">=",1),),("finish",),("place_density",),AgentBudget(3,4,30),DEFAULT_L1_TOOLS)
     def start(self, text):
         provider = MuxHandsOnSemanticProvider() if self.profile else _Provider()
         return self.sessions.start(text, provider, self.policy())
@@ -92,7 +92,7 @@ class WorkbenchService:
             class Factory:
                 capability="eda.rtl_to_gds"
                 def validate_task(self,t): t.validate()
-                def reconfigure(self,t,v): return t
+                def reconfigure(self,t,v): return replace(t,parameters={**t.parameters,**dict(v)})
             factory=Factory()
         return L1RuntimeBridge(self.runtime,task,factory,cancel_port=self.runtime.store.request_cancel)
     def execute(self,sid,summary,*,wait=True):
@@ -154,7 +154,13 @@ class WorkbenchService:
         decision,decision_summary,hypothesis=M1EvidencePlanner.decide(baseline_state,candidate)
         basis=tuple(event.event_id for event in self.trace.store.read(session.trace_id)[-3:])
         event=self.trace.record_reflection(session.trace_id,candidate,summary=decision_summary,decision=decision,evidence=candidate.evidence,hypotheses=hypothesis,basis_event_ids=basis)
-        return {"comparison":plan,"baseline_run_id":baseline_run_id,"candidate_run_id":candidate_run_id,"area_baseline_ratio":candidate.metrics["area_um2"]/baseline_state.metrics["area_um2"],"decision":decision,"decision_summary":decision_summary,"reflection_event_id":event.event_id}
+        baseline_area=baseline_state.metrics.get("area_um2")
+        candidate_area=candidate.metrics.get("area_um2")
+        ratio=(candidate_area / baseline_area
+               if isinstance(baseline_area,(int,float)) and not isinstance(baseline_area,bool)
+               and isinstance(candidate_area,(int,float)) and not isinstance(candidate_area,bool)
+               and baseline_area > 0 else None)
+        return {"comparison":plan,"baseline_run_id":baseline_run_id,"candidate_run_id":candidate_run_id,"area_baseline_ratio":ratio,"decision":decision,"decision_summary":decision_summary,"reflection_event_id":event.event_id}
     def query(self,sid,kind,summary,*,limit=20):
         """Read only the current Goal-owned Runtime result through typed tools."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)

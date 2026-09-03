@@ -40,3 +40,14 @@ def test_m1_planner_does_not_claim_candidate_success_without_measured_constraint
 def test_m1_planner_requires_complete_real_baseline_observation() -> None:
     with pytest.raises(ValueError, match="baseline metrics"):
         M1EvidencePlanner.propose(_goal(), _state({"setup_wns_ns": 0.1}, "run-baseline"))
+
+
+def test_m1_planner_records_stop_for_failed_or_metricless_candidate() -> None:
+    baseline = _state({"setup_wns_ns": 0.1, "area_um2": 100.0, "drc_errors": 0}, "run-baseline")
+    failed = DesignState("state-failed", "goal-1", 2, "failed", "state-run-baseline", {},
+                         AgentBudget(1, 4, 7200),
+                         diagnosis={"runtime_run_id": "run-failed", "runtime_terminal_status": "failed"})
+    decision, summary, facts = M1EvidencePlanner.decide(baseline, failed)
+    assert decision == "stop"
+    assert facts["reason"] == "candidate_not_observable"
+    assert "preserve failure evidence" in summary
