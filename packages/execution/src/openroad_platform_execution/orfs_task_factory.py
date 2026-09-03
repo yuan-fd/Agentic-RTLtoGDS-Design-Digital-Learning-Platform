@@ -5,11 +5,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Mapping
 
-from openroad_platform_contracts import (
-    RTL_TO_GDS_CAPABILITY,
-    RTLToGDSRequest,
-    TaskSpec,
-)
+from openroad_platform_contracts.platform import TaskSpec
+from openroad_platform_contracts.task_factory import RTL_TO_GDS_CAPABILITY, RTLToGDSRequest
 
 from .orfs_plugin import ORFS_PLUGIN_ID, build_orfs_task
 
