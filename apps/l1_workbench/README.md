@@ -28,6 +28,23 @@ uses the admitted `orfs` plugin and local managed toolchain.  The Session
 freezes `tutorial_mux/mux_2to1`, the RTL hash, `nangate45`, 10 ns, `finish`,
 and the bounded baseline parameter allowlist before it can submit a task.
 
+## Language front-end (`--goal-provider`)
+
+The operator chooses the natural-language front-end at server start:
+
+- `tutorial` (default): the deterministic mux parser — inspectable, offline.
+- `codex`: the managed Codex CLI (`gpt-5.6-terra`, read-only sandbox, env
+  allowlist) acting as a structured `GoalDraft` provider.  The model may only
+  return typed language facts: it is decoded against the `L1ModelBoundary`
+  allowlist and `GoalDraft` validation, and a failed or off-schema reply
+  raises instead of silently falling back.
+
+```bash
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
+  .tools/venvs/orfs-agent/bin/python apps/l1_workbench/server.py \
+  --state-root /tmp/l1-codex-workbench --port 8766 --goal-provider codex
+```
+
 Run it with:
 
 ```bash
@@ -46,6 +63,10 @@ Runtime boundary):
 - `POST /api/l1/sessions/{session_id}/candidates` consumes that exact durable proposal in a Runtime candidate
 - `POST /api/l1/sessions/{session_id}/m1-compare` compares the two Runtime observations and records the M1 stop decision
 - `POST /api/l1/sessions/{session_id}/advance` for the evidence-backed tutorial step
+- `POST /api/l1/sessions/{session_id}/l2-escalate` for the visible L1→L2 authorization gate
+  (requires two measured Runtime observations; records `escalate` and freezes an
+  `OptimizationRequest` — it never submits ORFS-Agent execution)
+- `GET /api/l1/sessions/{session_id}/teaching` for a read-only per-event teaching replay
 - `POST /api/l1/sessions/{session_id}/queries` for a typed timing/congestion/DRC/power/metrics read
 - `POST /api/l1/sessions/{session_id}/artifacts` for an allowlisted excerpt
 - `POST /api/l1/sessions/{session_id}/stages` for a permitted Runtime stage
@@ -85,7 +106,9 @@ hidden chain-of-thought, raw provider transcripts, shell commands, secrets, or
 workspace paths.
 
 Commands include `:new <natural-language goal>`, `:answer <question_id> <answer>`,
-`:baseline`, `:m1-propose`, `:candidate <proposal-id>`, and `:compare <baseline-run-id>`.
+`:baseline`, `:m1-propose`, `:candidate <proposal-id>`, `:compare <baseline-run-id>`,
+`:advance` (one teaching step), `:explain` (loads the per-event teaching replay),
+`:l2` (authorize the L1→L2 gate), `:pause`/`:resume` (replay rhythm),
 `:cancel [reason]`, `:recover`, `:refresh`, and `:quit`.  It polls the cursor
 API and displays only returned durable facts; it does not use a browser, local
 trace, or local state.  The left-hand Harness is split into four teaching
