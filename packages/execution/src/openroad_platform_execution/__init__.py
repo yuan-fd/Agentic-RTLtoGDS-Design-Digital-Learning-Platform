@@ -8,6 +8,7 @@ from .orfs_plugin import (
     build_orfs_task,
     orfs_plugin_manifest,
 )
+from .orfs_task_factory import ORFSRTLToGDSFactory
 from .process_guardian import ProcessGuardian, ProcessOutcome
 from .registry import PluginRegistry
 from .toolchain import ToolchainCatalog, ToolchainConfig, load_toolchain
@@ -75,6 +76,7 @@ __all__ = [
     "AdapterExecution", "ProcessAdapter", "ORFSRunner", "ProcessGuardian",
     "ProcessOutcome", "PluginRegistry", "ORFS_PLUGIN_ID", "ORFS_PLUGIN_VERSION",
     "build_orfs_task", "orfs_plugin_manifest", "ToolchainCatalog",
+    "ORFSRTLToGDSFactory",
     "ToolchainConfig", "load_toolchain",
     "RTLSCOUT_PLUGIN_ID", "RTLSCOUT_PLUGIN_VERSION", "RTLSCOUT_UPSTREAM_COMMIT",
     "build_rtlscout_task", "build_rtlscout_spec_task", "rtlscout_plugin_manifest",
