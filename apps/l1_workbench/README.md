@@ -42,6 +42,9 @@ Runtime boundary):
 - `POST /api/l1/sessions` `{ "text": "Run one bounded implementation flow." }`
 - `POST /api/l1/sessions/{session_id}/answers` with typed clarification answers
 - `POST /api/l1/sessions/{session_id}/execute` with a bounded visible decision summary
+- `POST /api/l1/sessions/{session_id}/m1-proposal` creates the baseline-fact-backed registered parameter proposal
+- `POST /api/l1/sessions/{session_id}/candidates` consumes that exact durable proposal in a Runtime candidate
+- `POST /api/l1/sessions/{session_id}/m1-compare` compares the two Runtime observations and records the M1 stop decision
 - `POST /api/l1/sessions/{session_id}/advance` for the evidence-backed tutorial step
 - `POST /api/l1/sessions/{session_id}/queries` for a typed timing/congestion/DRC/power/metrics read
 - `POST /api/l1/sessions/{session_id}/artifacts` for an allowlisted excerpt

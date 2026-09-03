@@ -25,10 +25,12 @@ try:
     from .tutorial_profile import ManagedTutorialProfile
     from .tutorial_planner import TutorialEvidencePlanner
     from .tutorial_semantic import MuxHandsOnSemanticProvider
+    from .m1_planner import M1EvidencePlanner
 except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
     from tutorial_profile import ManagedTutorialProfile
     from tutorial_planner import TutorialEvidencePlanner
     from tutorial_semantic import MuxHandsOnSemanticProvider
+    from m1_planner import M1EvidencePlanner
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
@@ -106,6 +108,53 @@ class WorkbenchService:
             self._save(sid,successor,plan["plan_id"])
         if wait: finish(); return plan, self._load(sid)[0]
         threading.Thread(target=finish,daemon=True).start(); return plan, state
+    def set_flow_params(self,sid,values,summary):
+        """Persist one Policy-approved parameter proposal; it does not run EDA."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
+        bridge=self._bridge(goal); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.SET_FLOW_PARAMS,{"values":dict(values)},"l1-workbench")
+        trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
+        plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
+        proposal_id=f"proposal-{call.call_id}"
+        # SET_FLOW_PARAMS is a durable proposal, not a Runtime submission; its
+        # stable identity is derived by L1DurableLoop and consumed exactly once
+        # by a later RUN_FULL_FLOW/RUN_STAGE plan.
+        return {**plan,"proposal_id":proposal_id}
+    def run_candidate(self,sid,proposal_id,summary,*,wait=True):
+        """Consume exactly one durable ParameterPlan in a Runtime candidate run."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
+        bridge=self._bridge(goal); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{"proposal_id":proposal_id},"l1-workbench")
+        trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
+        plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
+        self._save(sid,state,plan["plan_id"])
+        def finish():
+            self.runtime.execute_once(plan["run_id"])
+            successor=loop.observe(session.trace_id,state,plan["plan_id"],next_state_id=f"state-{uuid.uuid4().hex}")
+            self._save(sid,successor,plan["plan_id"])
+        if wait: finish(); return plan,self._load(sid)[0]
+        threading.Thread(target=finish,daemon=True).start(); return plan,state
+    def propose_m1_candidate(self,sid):
+        """Create a visible, evidence-backed M1 proposal; it does not run EDA."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); baseline,_=self._load(sid)
+        proposal=M1EvidencePlanner.propose(goal,baseline)
+        plan=self.set_flow_params(sid,proposal.values,proposal.summary)
+        return {"proposal": {"values":proposal.values,"summary":proposal.summary,"hypothesis":proposal.hypothesis}, **plan}
+    def compare_m1_candidate(self,sid,baseline_run_id,summary=None):
+        """Compare baseline and current candidate through the typed Runtime read surface."""
+        session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); candidate,_=self._load(sid)
+        candidate_run_id=candidate.diagnosis.get("runtime_run_id")
+        if not isinstance(baseline_run_id,str) or not baseline_run_id or not isinstance(candidate_run_id,str) or not candidate_run_id:
+            raise ValueError("M1 comparison requires baseline and observed candidate Runtime run ids")
+        baseline_state=self._state_for_run(session.trace_id,baseline_run_id)
+        bridge=self._bridge(goal); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,candidate.state_id,ToolName.COMPARE_RUNS,{"left_run_id":baseline_run_id,"right_run_id":candidate_run_id,"metrics":["setup_wns_ns","area_um2","drc_errors"]},"m1-evidence-planner")
+        trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
+        plan=loop.plan_validate_execute(session.trace_id,goal,candidate,call,identity,planner_summary=summary or "Compare canonical baseline and candidate Runtime QoR facts.")
+        decision,decision_summary,hypothesis=M1EvidencePlanner.decide(baseline_state,candidate)
+        basis=tuple(event.event_id for event in self.trace.store.read(session.trace_id)[-3:])
+        event=self.trace.record_reflection(session.trace_id,candidate,summary=decision_summary,decision=decision,evidence=candidate.evidence,hypotheses=hypothesis,basis_event_ids=basis)
+        return {"comparison":plan,"baseline_run_id":baseline_run_id,"candidate_run_id":candidate_run_id,"area_baseline_ratio":candidate.metrics["area_um2"]/baseline_state.metrics["area_um2"],"decision":decision,"decision_summary":decision_summary,"reflection_event_id":event.event_id}
     def query(self,sid,kind,summary,*,limit=20):
         """Read only the current Goal-owned Runtime result through typed tools."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
@@ -188,3 +237,8 @@ class WorkbenchService:
         with sqlite3.connect(self.root/"workbench.sqlite") as c:r=c.execute("SELECT state_json,plan_id FROM session_state WHERE session_id=?",(sid,)).fetchone()
         if not r: raise ValueError("session has no finalized Goal state")
         return DesignState.from_dict(json.loads(r[0])),r[1]
+    def _state_for_run(self,trace_id,run_id):
+        for event in reversed(self.trace.store.read(trace_id)):
+            if event.kind.value == "state_transition" and event.facts.get("run_id") == run_id:
+                return DesignState.from_dict(event.facts["state_after"])
+        raise ValueError("Runtime run has no observed DesignState in this Session")

@@ -233,7 +233,15 @@ class L1RuntimeBridge:
 
     @staticmethod
     def _metrics(view: Mapping[str, Any]) -> dict[str, float]:
-        return {item["name"]: float(item["value"]) for stage in view.get("stages", ()) for attempt in stage.get("attempts", ()) for item in attempt.get("metrics", ()) if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
+        aliases = {
+            "finish__timing__setup__ws": "setup_wns_ns",
+            "finish__design__instance__area": "area_um2",
+            "detailedroute__route__drc_errors": "drc_errors",
+        }
+        return {aliases.get(item["name"], item["name"]): float(item["value"])
+                for stage in view.get("stages", ()) for attempt in stage.get("attempts", ())
+                for item in attempt.get("metrics", ())
+                if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)}
 
     def _read_excerpt(self, run_id: str, artifact_id: str, *, offset: int,
                       max_bytes: int) -> dict:

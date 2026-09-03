@@ -22,6 +22,10 @@ def main():
     sid=parts[3]
     if parts[-1]=="answers": return self.reply(svc.answer(sid,x["answers"]).to_dict())
     if parts[-1]=="execute": p,state=svc.execute(sid,x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
+    if parts[-1]=="parameters": return self.reply(svc.set_flow_params(sid,x["values"],x["decision_summary"]))
+    if parts[-1]=="m1-proposal": return self.reply(svc.propose_m1_candidate(sid))
+    if parts[-1]=="candidates": p,state=svc.run_candidate(sid,x["proposal_id"],x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
+    if parts[-1]=="m1-compare": return self.reply(svc.compare_m1_candidate(sid,x["baseline_run_id"],x.get("decision_summary")))
     if parts[-1]=="queries": return self.reply(svc.query(sid,x["kind"],x["decision_summary"],limit=x.get("limit",20)))
     if parts[-1]=="artifacts": return self.reply(svc.artifact_excerpt(sid,x["kind"],x["decision_summary"],max_bytes=x.get("max_bytes",4096)))
     if parts[-1]=="stages": p,state=svc.run_stage(sid,x["stage"],x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
