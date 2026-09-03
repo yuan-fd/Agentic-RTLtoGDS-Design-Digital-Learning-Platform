@@ -37,7 +37,10 @@ def main():
    except Exception as e:self.reply({"error":str(e)},400)
   def do_GET(self):
    try:
-    parts=self.path.split("?")[0].strip("/").split("/");q=parse_qs(urlparse(self.path).query);self.reply({"events":svc.events(parts[3],int(q.get("after",[-1])[0]))})
+    parts=self.path.split("?")[0].strip("/").split("/")
+    if parts[-1]=="teaching":
+     return self.reply({"teaching":svc.teaching(parts[3])})
+    q=parse_qs(urlparse(self.path).query);self.reply({"events":svc.events(parts[3],int(q.get("after",[-1])[0]))})
    except Exception as e:self.reply({"error":str(e)},400)
  ThreadingHTTPServer(("127.0.0.1",a.port),H).serve_forever()
 if __name__=="__main__":main()

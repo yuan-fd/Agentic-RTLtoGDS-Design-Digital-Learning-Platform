@@ -37,12 +37,14 @@ try:
     from .tutorial_semantic import MuxHandsOnSemanticProvider
     from .m1_planner import M1EvidencePlanner
     from .codex_goal_provider import CodexGoalDraftProvider
+    from .teaching import teaching_replay
 except ImportError:  # Direct ``python apps/l1_workbench/server.py`` launch.
     from tutorial_profile import ManagedTutorialProfile
     from tutorial_planner import TutorialEvidencePlanner
     from tutorial_semantic import MuxHandsOnSemanticProvider
     from m1_planner import M1EvidencePlanner
     from codex_goal_provider import CodexGoalDraftProvider
+    from teaching import teaching_replay
 
 class _Provider:
     provider_id = "l1-workbench-deterministic-v1"
@@ -337,6 +339,9 @@ class WorkbenchService:
                 self._save(sid,successor,plan_id)
         return session
     def events(self,sid,after=-1): return [e.to_dict() for e in self.sessions.events(sid,after_sequence=after)]
+    def teaching(self,sid):
+        """Read-only per-event teaching replay derived only from stored facts."""
+        return teaching_replay(self.events(sid))
     def _goal(self,trace_id,gid):
         from openroad_platform_contracts.agent_control import DesignGoal
         return DesignGoal.from_dict(next(e.facts["goal_ir"] for e in self.trace.store.read(trace_id) if e.goal_id==gid and e.kind.value=="goal_finalized"))

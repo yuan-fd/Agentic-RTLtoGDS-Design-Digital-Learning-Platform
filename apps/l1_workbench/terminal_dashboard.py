@@ -46,12 +46,13 @@ class Dashboard:
         ":m1-propose", ":candidate <proposal-id>", ":compare <baseline-run-id>",
         ":query <timing|congestion|drc|power|metrics>",
         ":artifact <report|log|run_result|config>", ":stage <allowed-stage>",
-        ":cancel [reason]", ":recover   :refresh   :quit",
+        ":advance   :explain   :cancel [reason]   :recover   :refresh   :quit",
     )
 
     def __init__(self, client: Client):
         self.client, self.sid, self.after, self.events = client, None, -1, []
         self.notice, self.connection, self.input_buffer, self.last_refresh = "Ready. Create a durable session with :new <natural-language goal>.", "not contacted", "", 0.0
+        self.teaching_lines = []
 
     def refresh(self) -> None:
         if not self.sid: return
@@ -116,6 +117,13 @@ class Dashboard:
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/advance", {})
                 decision = result.get("decision", {})
                 self.notice = f"Teaching planner: {decision.get('action', 'recorded')} — {decision.get('summary', '')}"; self.refresh()
+            elif op == "explain":
+                self._need_session()
+                data = self.client.get(f"/api/l1/sessions/{quote(self.sid)}/teaching")
+                replay = data.get("teaching", [])
+                self.teaching_lines = [f"#{item.get('sequence', '?')} {item.get('kind', '')}: {_safe_text(item.get('text'))}" for item in replay]
+                self.notice = (f"Teaching replay loaded: {len(self.teaching_lines)} explained events "
+                               "(input / IR / why-allowed / facts / next). See the Reflection/Replay panel.")
             elif op == "query":
                 self._need_session()
                 kind = argument.strip()
@@ -229,9 +237,16 @@ class Dashboard:
     def _decision_rows(self) -> list[str]:
         reflections = [e for e in self.events if e.get("kind") == "reflection_recorded"]
         rows = ["Decision / reflection / teaching replay", "Visible summaries, never hidden chain-of-thought."]
+        if self.teaching_lines:
+            rows.append(f"Every event explained ({len(self.teaching_lines)}); latest steps:")
+            rows.extend(self.teaching_lines[-4:])
+            if not reflections:
+                return rows
         if not reflections:
-            return rows + ["No reflection is durable yet.", "Use :advance to follow the evidence-backed tutorial policy."]
-        for event in reflections[-4:]:
+            if not self.teaching_lines:
+                rows.append("No reflection is durable yet.", "Use :advance to follow the evidence-backed tutorial policy.")
+            return rows
+        for event in reflections[-2:]:
             facts = event.get("facts") or {}
             rows.extend([str(facts.get("decision") or "reflection").upper() + ": " + _safe_text(event.get("planner_summary") or facts.get("summary") or "recorded"),
                          "basis events: " + ", ".join(facts.get("basis_event_ids") or [])])
