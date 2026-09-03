@@ -34,9 +34,11 @@ class L1RuntimeBridge:
         self._runtime, self._base_task, self._factory = runtime, base_task, factory
         self._cancel_port = cancel_port
 
-    @staticmethod
-    def _binding(goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> None:
+    def _binding(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> None:
         L1SemanticToolPolicy.validate(goal, state, call)
+        if (self._base_task.project_id != goal.project_id
+                or self._base_task.design_id != goal.design_id):
+            raise ValueError("Runtime base task does not bind the typed DesignGoal project/design")
 
     @staticmethod
     def supported_tools() -> frozenset[ToolName]:

@@ -84,6 +84,18 @@ def test_runtime_bridge_enforces_goal_policy_and_runtime_artifact_read_contract(
         bridge.execute(goal, state, SemanticToolCall("call-5", "goal-1", "state-1", ToolName.QUERY_ARTIFACT_EXCERPT, {"run_id": "run-1", "artifact_id": "wrong", "max_bytes": 10}, "planner"))
 
 
+def test_runtime_bridge_rejects_goal_task_project_or_design_mismatch(tmp_path):
+    import pytest
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime()
+    bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="foreign-project", design_id="foreign-design"), ORFSRTLToGDSFactory())
+    goal = DesignGoal("goal-1", "goal-project", "goal-design", "nangate45", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "a" * 64), GoalPreference.BALANCED, (QoRConstraint("setup_wns_ns", ">=", 0),), ("route",), ("core_utilization_pct",), AgentBudget(2, 2, 60), allowed_tools=(ToolName.RUN_FULL_FLOW,))
+    state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(2, 2, 60))
+    with pytest.raises(ValueError, match="project/design"):
+        bridge.execute(goal, state, SemanticToolCall("foreign-call", goal.goal_id, state.state_id, ToolName.RUN_FULL_FLOW, {}, "planner"))
+    assert not hasattr(runtime, "task")
+
+
 def test_runtime_queries_project_safe_tool_specific_facts(tmp_path):
     rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
     runtime = _Runtime()
