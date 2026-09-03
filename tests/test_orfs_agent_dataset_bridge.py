@@ -10,7 +10,7 @@ import pytest
 
 from openroad_platform_contracts.platform import PluginManifest
 from openroad_platform_execution.orfs_agent_domain import ORFSAgentDomain
-from openroad_platform_execution.orfs_agent_task import build_orfs_agent_dataset_task
+from openroad_platform_execution.orfs_agent_task import build_orfs_agent_dataset_task, build_orfs_agent_native_task
 
 
 ROOT = Path(__file__).parents[1]
@@ -167,3 +167,11 @@ def test_main_materializes_only_dataset_from_a_clean_detached_source(monkeypatch
     assert {item["kind"] for item in payload["artifacts"]} == {
         "optimizer_dataset", "optimizer_input_manifest", "upstream_source_lock"}
     assert "optimizer_candidates" not in result.read_text(encoding="utf-8")
+
+
+def test_native_task_retains_frozen_domain_and_candidate_contract():
+    task = build_orfs_agent_native_task(project_id="p5", design_id="ibex", objective="ECP_final",
+        observations=[_observation()], domain=_domain(), n_suggestions=2, optimizer_seed=7)
+    assert task.inputs["mode"] == "native_agent"
+    assert task.inputs["parameter_domain"] == _domain().to_dict()
+    assert {"optimizer_candidates", "optimizer_trace"} <= set(task.expected_artifacts)
