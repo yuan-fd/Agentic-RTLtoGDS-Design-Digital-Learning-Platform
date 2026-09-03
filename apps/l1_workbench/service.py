@@ -164,7 +164,9 @@ class WorkbenchService:
                if isinstance(baseline_area,(int,float)) and not isinstance(baseline_area,bool)
                and isinstance(candidate_area,(int,float)) and not isinstance(candidate_area,bool)
                and baseline_area > 0 else None)
-        return {"comparison":plan,"baseline_run_id":baseline_run_id,"candidate_run_id":candidate_run_id,"area_baseline_ratio":ratio,"decision":decision,"decision_summary":decision_summary,"reflection_event_id":event.event_id}
+        return {"comparison":plan,"baseline_run_id":baseline_run_id,"candidate_run_id":candidate_run_id,
+                "area_baseline_ratio":ratio,"decision":decision,"decision_reason":hypothesis["reason"],
+                "decision_summary":decision_summary,"reflection_event_id":event.event_id}
     def query(self,sid,kind,summary,*,limit=20):
         """Read only the current Goal-owned Runtime result through typed tools."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)

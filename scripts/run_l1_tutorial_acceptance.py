@@ -37,6 +37,8 @@ def main() -> int:
     parser.add_argument("--top", default="mux_2to1")
     parser.add_argument("--platform", default="nangate45")
     parser.add_argument("--clock-period-ns", default=10.0, type=float)
+    parser.add_argument("--failure-candidate", action="store_true",
+                        help="exercise the real Runtime failed-candidate exit; never a QoR claim")
     args = parser.parse_args()
     output = args.output_root.expanduser().resolve()
     if output.exists() and any(output.iterdir()):
@@ -75,8 +77,15 @@ def main() -> int:
       sid = session["session_id"]
       baseline = _post(base, f"/api/l1/sessions/{sid}/execute", {"decision_summary":"Run the frozen baseline before selecting any registered parameter change."})
       baseline_run_id = baseline["plan"]["run_id"]
-      proposal = _post(base, f"/api/l1/sessions/{sid}/m1-proposal", {})
-      candidate = _post(base, f"/api/l1/sessions/{sid}/candidates", {"proposal_id":proposal["proposal_id"],"decision_summary":proposal["proposal"]["summary"]})
+      proposal = (_post(base, f"/api/l1/sessions/{sid}/parameters",
+                  {"values":{"minimum_die_size_um":1.0},
+                   "decision_summary":"Failure-exit acceptance: submit a bounded invalid floorplan size."})
+                  if args.failure_candidate else
+                  _post(base, f"/api/l1/sessions/{sid}/m1-proposal", {}))
+      candidate = _post(base, f"/api/l1/sessions/{sid}/candidates", {
+          "proposal_id":proposal["proposal_id"],
+          "decision_summary":(proposal.get("proposal", {}).get("summary")
+                              or "Execute the approved failure-exit parameter proposal.")})
       candidate_run_id = candidate["plan"]["run_id"]
       comparison = _post(base, f"/api/l1/sessions/{sid}/m1-compare", {"baseline_run_id":baseline_run_id})
       actions = ["run_full_flow_baseline", "set_flow_params", "run_full_flow_candidate",
@@ -85,13 +94,18 @@ def main() -> int:
       events = json.loads(urlopen(base+f"/api/l1/sessions/{sid}/events",timeout=10).read())["events"]
       if state["remaining_budget"]["max_eda_runs"] != 1:
         raise RuntimeError("baseline and candidate did not consume exactly two frozen EDA-run budget units")
-      if baseline["state"]["diagnosis"].get("runtime_terminal_status") != "succeeded" or state["diagnosis"].get("runtime_terminal_status") != "succeeded":
+      if baseline["state"]["diagnosis"].get("runtime_terminal_status") != "succeeded":
         raise RuntimeError("M1 acceptance requires successful Runtime baseline and candidate attempts")
-      if baseline["runtime"]["run"]["status"] != "succeeded" or candidate["runtime"]["run"]["status"] != "succeeded":
-        raise RuntimeError("M1 acceptance requires successful Runtime run records")
+      if not args.failure_candidate and state["diagnosis"].get("runtime_terminal_status") != "succeeded":
+        raise RuntimeError("M1 success acceptance requires successful candidate attempt")
+      if baseline["runtime"]["run"]["status"] != "succeeded":
+        raise RuntimeError("M1 acceptance requires successful Runtime baseline record")
       candidate_task = candidate["runtime"]["run"]["task_spec"]
-      if candidate_task["parameters"].get("place_density") != 0.5:
+      if not args.failure_candidate and candidate_task["parameters"].get("place_density") != 0.5:
         raise RuntimeError("candidate Runtime TaskSpec did not receive the approved parameter patch")
+      if args.failure_candidate and (comparison["decision"] != "stop" or comparison["area_baseline_ratio"] is not None
+          or comparison["decision_reason"] != "candidate_not_observable"):
+        raise RuntimeError("failed candidate was not returned as an auditable stop/unknown comparison")
       if not any(event["kind"] == "reflection_recorded" and event["facts"].get("decision") == comparison["decision"] for event in events):
         raise RuntimeError("M1 comparison has no durable evidence-backed final reflection")
       summary = {
