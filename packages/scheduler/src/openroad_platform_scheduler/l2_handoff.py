@@ -7,13 +7,14 @@ from typing import Any, Callable
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState
 from openroad_platform_contracts.l2_optimization import OptimizationRequest, L2HandoffAuthorization
 from openroad_platform_contracts.platform import PluginManifest, TaskSpec
+from openroad_platform_contracts.l1_trace import TraceEventKind
 from openroad_platform_contracts.product_surface import ProductRole, ProductSurface
 
 
 class OptimizationHandoffService:
     """Authorize and correlate a TaskSpec; never implement an optimizer."""
-    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec]) -> None:
-        self._surface, self._task_builder = surface, task_builder
+    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec], *, trace_store: Any | None = None) -> None:
+        self._surface, self._task_builder, self._trace_store = surface, task_builder, trace_store
 
     def task_for(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
                  manifest: PluginManifest) -> TaskSpec:
@@ -39,7 +40,27 @@ class OptimizationHandoffService:
                 or authorization.source_state_id != state.state_id or request.goal_id != goal.goal_id
                 or request.source_state_id != state.state_id):
             raise ValueError("L2 authorization does not bind the finalized L1 goal/state/trace")
+        self._verify_durable_authorization(authorization)
         return self._task_for_bound(request, goal, state, manifest, authorization=authorization)
+
+    def _verify_durable_authorization(self, authorization: L2HandoffAuthorization) -> None:
+        if self._trace_store is None:
+            raise ValueError("authorized L2 handoff requires a durable trace verifier")
+        events = self._trace_store.read(authorization.l1_trace_id)
+        matching = [event for event in events if event.kind is TraceEventKind.L2_HANDOFF_AUTHORIZED
+                    and event.facts.get("handoff_id") == authorization.authorization_id]
+        if len(matching) != 1:
+            raise ValueError("authorized L2 handoff requires one durable authorization receipt")
+        event = matching[0]
+        expected = {"l1_trace_id": authorization.l1_trace_id, "goal_id": authorization.goal_id,
+                    "source_state_id": authorization.source_state_id,
+                    "reflection_event_id": authorization.reflection_event_id,
+                    "baseline_run_id": authorization.baseline_run_id,
+                    "candidate_run_id": authorization.candidate_run_id}
+        if event.goal_id != authorization.goal_id or any(event.facts.get(key) != value for key, value in expected.items()):
+            raise ValueError("durable L2 authorization receipt binding mismatch")
+        if tuple(event.evidence) != authorization.evidence:
+            raise ValueError("durable L2 authorization receipt evidence mismatch")
 
     def _task_for_bound(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
                         manifest: PluginManifest, authorization: L2HandoffAuthorization | None = None) -> TaskSpec:

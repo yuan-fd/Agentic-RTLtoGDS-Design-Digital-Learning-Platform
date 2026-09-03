@@ -56,9 +56,23 @@ def test_only_explicit_escalation_with_two_runtime_facts_can_authorize(tmp_path)
     assert trace.store.read("trace-1")[-1].kind.value == "l2_handoff_authorized"
     task = OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,
         lambda request, bound_goal, state: TaskSpec("task-1", bound_goal.project_id, bound_goal.design_id,
-            plugin_id=request.plugin_id, inputs={"mode": "native_agent"}, timeout_seconds=60)
+            plugin_id=request.plugin_id, inputs={"mode": "native_agent"}, timeout_seconds=60), trace_store=trace.store
     ).task_for_authorized(_request(candidate), goal, candidate, auth, _manifest())
     assert task.labels["l2_authorization_id"] == auth.authorization_id
+    assert L1L2AuthorizationService(trace).authorize("trace-1", goal, candidate) == auth
+    assert len([e for e in trace.store.read("trace-1") if e.kind.value == "l2_handoff_authorized"]) == 1
+
+
+def test_handoff_rejects_forged_or_missing_durable_authorization(tmp_path):
+    goal = _goal(); state = _observed = L1StateReducer.apply(
+        DesignState("state-0", goal.goal_id, 0, "running", None, {}, AgentBudget(3, 1, 60), evidence=(goal.rtl_artifact,)),
+        RuntimeObservation("run-1", "attempt-run-1", "finish", "succeeded", {"setup_wns_ns": .1}, (EvidencePointer("run:run-1", "b" * 64),)), next_state_id="state-1", consume_eda_run=True)
+    from openroad_platform_contracts.l2_optimization import L2HandoffAuthorization
+    forged = L2HandoffAuthorization("l2-auth-forged", "trace-1", goal.goal_id, state.state_id, "reflection-1", "run-0", "run-1", state.evidence)
+    service = OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE,
+        lambda r, g, s: TaskSpec("task-1", g.project_id, g.design_id, plugin_id=r.plugin_id, inputs={}, timeout_seconds=60))
+    with pytest.raises(ValueError, match="durable trace verifier"):
+        service.task_for_authorized(_request(state), goal, state, forged, _manifest())
 
 
 def test_observed_state_still_cannot_use_legacy_handoff(tmp_path):

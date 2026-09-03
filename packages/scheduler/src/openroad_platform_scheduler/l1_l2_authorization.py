@@ -63,7 +63,7 @@ class L1L2AuthorizationService:
         )
         auth.validate()
         prior = [event for event in events if event.kind is TraceEventKind.L2_HANDOFF_AUTHORIZED
-                 and event.facts.get("authorization_id") == auth.authorization_id]
+                 and event.facts.get("handoff_id") == auth.authorization_id]
         if prior:
             if len(prior) != 1:
                 raise ValueError("duplicate L2 authorization receipt")
