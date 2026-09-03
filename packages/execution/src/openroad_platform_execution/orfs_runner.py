@@ -421,8 +421,15 @@ class ORFSRunner:
         path.write_text(f"stage={stage.value}\nreason={message}\n", encoding="utf-8")
 
     def _collect_metrics(self, plan: ExecutionPlan) -> list[Metric]:
-        """Keep execution facts independent; protected evaluation parses QoR."""
-        return self._collect_finish_metrics_fallback(plan)
+        """Return only bounded, artifact-cited ORFS report facts.
+
+        This is not a protected evaluator or a QoR success claim.  It exposes
+        the three M1 observations so Runtime can retain their exact report
+        provenance; a later policy/evaluator decides whether they satisfy a
+        frozen Goal.
+        """
+        return [*self._collect_finish_metrics_fallback(plan),
+                *self._collect_route_metrics(plan)]
 
     @staticmethod
     def _collect_finish_metrics_fallback(plan: ExecutionPlan) -> list[Metric]:
@@ -436,16 +443,28 @@ class ORFSRunner:
             "finish__design__instance__area",
             "finish__timing__setup__ws",
             "finish__power__total",
-            "finish__route__drc_errors",
-            "finish__detailedroute__route__drc_errors",
         )
         metrics = []
         for name in names:
             value = payload.get(name)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 metrics.append(Metric(name=name, value=value,
-                                      source="ORFS finish JSON fallback"))
+                                      source="orfs-finish-report-json-v1"))
         return metrics
+
+    @staticmethod
+    def _collect_route_metrics(plan: ExecutionPlan) -> list[Metric]:
+        route = (Path(plan.workdir) / "logs" / plan.request.platform / plan.design
+                 / "base" / "5_2_route.json")
+        try:
+            payload = json.loads(route.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        value = payload.get("detailedroute__route__drc_errors")
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return []
+        return [Metric(name="detailedroute__route__drc_errors", value=value,
+                       source="orfs-route-report-json-v1")]
 
     @staticmethod
     def _sha256(path: Path) -> str:

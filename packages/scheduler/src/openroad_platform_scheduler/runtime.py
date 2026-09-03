@@ -191,10 +191,29 @@ class WorkflowRuntime:
                             workspace=str(workspace),
                         ),
                     )
-                self.store.register_artifacts(
+                registered_artifact_ids = self.store.register_artifacts(
                     attempt.attempt_id, (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
                 )
-                self.store.register_metrics(attempt.attempt_id, execution.result.metrics)
+                registered_artifacts = (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
+                artifact_ids_by_store_key = {
+                    artifact["store_key"]: artifact_id
+                    for artifact, artifact_id in zip(registered_artifacts, registered_artifact_ids)
+                }
+                metrics = []
+                for metric in execution.result.metrics:
+                    item = dict(metric)
+                    context = dict(item.get("context") or {})
+                    source_key = context.pop("source_artifact_store_key", None)
+                    if source_key is not None:
+                        artifact_id = artifact_ids_by_store_key.get(source_key)
+                        if artifact_id is None:
+                            raise ValueError("metric references an unregistered Runtime artifact")
+                        item["source_artifact_id"] = artifact_id
+                    item["parser_id"] = context.pop("parser_id", None)
+                    item["parser_version"] = context.pop("parser_version", None)
+                    item["context"] = context
+                    metrics.append(item)
+                self.store.register_metrics(attempt.attempt_id, tuple(metrics))
             self.store.finish_attempt(
                 attempt.attempt_id,
                 execution.result.status,

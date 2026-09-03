@@ -104,6 +104,29 @@ def test_runner_registers_native_finish_timing_report(tmp_path):
     assert not any(item.path.endswith("5_route_drc.rpt") for item in artifacts)
 
 
+def test_runner_collects_m1_metrics_only_from_nonempty_json_report_artifacts(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    rtl = tmp_path / "top.v"
+    rtl.write_text("module top; endmodule\n")
+    runner = ORFSRunner(orfs_root=orfs, work_root=tmp_path / "runs",
+                        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys")
+    plan = runner.prepare(RunRequest(rtl_path=str(rtl), top="top"))
+    logs = Path(plan.workdir) / "logs/nangate45/top/base"
+    logs.mkdir(parents=True)
+    (logs / "6_report.json").write_text(json.dumps({
+        "finish__design__instance__area": 12.5,
+        "finish__timing__setup__ws": -0.2,
+    }))
+    (logs / "5_2_route.json").write_text(json.dumps({
+        "detailedroute__route__drc_errors": 0,
+    }))
+    artifacts = runner._collect_artifacts(plan)
+    metrics = {item.name: item for item in runner._collect_metrics(plan)}
+    assert {"6_report.json", "5_2_route.json"} <= {Path(item.path).name for item in artifacts}
+    assert metrics["finish__timing__setup__ws"].source == "orfs-finish-report-json-v1"
+    assert metrics["detailedroute__route__drc_errors"].source == "orfs-route-report-json-v1"
+
+
 def test_runner_fails_when_process_succeeds_without_required_artifact(tmp_path):
     orfs, bin_dir = _fake_runtime(tmp_path)
     makefile = orfs / "flow/Makefile"

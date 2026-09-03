@@ -174,11 +174,22 @@ def _plugin_result(result, *, plan_workdir: Path, workspace: Path, input_referen
     })
     snapshot_path = plan_workdir / "toolchain_snapshot.json"
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    metrics = [
-        {"name": metric.name, "value": metric.value, "unit": metric.unit,
-         "context": {"source": metric.source}}
-        for metric in result.metrics
-    ]
+    source_keys = {
+        "orfs-finish-report-json-v1": next((item["path"] for item in artifacts
+                                             if item["path"].endswith("/6_report.json")), None),
+        "orfs-route-report-json-v1": next((item["path"] for item in artifacts
+                                            if item["path"].endswith("/5_2_route.json")), None),
+    }
+    metrics = []
+    for metric in result.metrics:
+        source_key = source_keys.get(metric.source)
+        context = {"source": metric.source}
+        if source_key is not None:
+            context["source_artifact_store_key"] = source_key
+            context["parser_id"] = metric.source
+            context["parser_version"] = "1"
+        metrics.append({"name": metric.name, "value": metric.value,
+                        "unit": metric.unit, "context": context})
     status = {
         RunStatus.SUCCEEDED: RuntimeStatus.SUCCEEDED,
         RunStatus.CANCELLED: RuntimeStatus.CANCELLED,
