@@ -13,7 +13,10 @@ from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_contracts.l2_optimization import OptimizationRequest
 from openroad_platform_execution import (ORFSRTLToGDSFactory, PluginRegistry,
     ProcessAdapter, ProcessGuardian, ToolchainConfig, orfs_plugin_manifest,
-    orfs_agent_plugin_manifest, build_orfs_agent_native_task)
+)
+from openroad_platform_execution.orfs_agent_plugin import (
+    orfs_agent_plugin_manifest, build_orfs_agent_native_task,
+)
 from openroad_platform_scheduler.l1_goal_finalizer import TrustedGoalPolicy
 from openroad_platform_scheduler.l1_loop import L1DurableLoop
 from openroad_platform_scheduler.l1_loop_store import L1LoopStore
