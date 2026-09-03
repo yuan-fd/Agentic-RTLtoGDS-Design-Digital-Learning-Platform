@@ -33,7 +33,8 @@ def _wrap(value: object, width: int) -> list[str]:
 
 class Dashboard:
     COMMANDS = (
-        ":new <goal>", ":answer <question_id> <answer>", ":advance",
+        ":new <goal>", ":answer <question_id> <answer>", ":baseline",
+        ":m1-propose", ":candidate <proposal-id>", ":compare <baseline-run-id>",
         ":query <timing|congestion|drc|power|metrics>",
         ":artifact <report|log|run_result|config>", ":stage <allowed-stage>",
         ":cancel [reason]", ":recover   :refresh   :quit",
@@ -72,10 +73,33 @@ class Dashboard:
                     raise ValueError("Usage: :answer <pending-question-id> <answer>")
                 self.client.post(f"/api/l1/sessions/{self.sid}/answers", {"answers": [{"question_id": question_id, "field": question["field"], "value": value}]})
                 self.notice = "Clarification persisted; answer remaining questions or run the frozen Goal."; self.refresh()
-            elif op == "run":
+            elif op in {"run", "baseline"}:
                 self._need_session()
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/execute", {"decision_summary": argument or "Execute one bounded typed Runtime tool."})
                 self.notice = f"Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+            elif op == "m1-propose":
+                self._need_session()
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/m1-proposal", {})
+                self.notice = ("M1 proposal is durable, Policy-approved, and not yet executed. "
+                               f"Use :candidate {result['proposal_id']}")
+                self.refresh()
+            elif op == "candidate":
+                self._need_session()
+                proposal_id = argument.strip()
+                if not proposal_id: raise ValueError("Usage: :candidate <proposal-id>")
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/candidates", {
+                    "proposal_id": proposal_id,
+                    "decision_summary": "Execute the exact durable, Policy-approved M1 parameter proposal."})
+                self.notice = f"Candidate Runtime recorded: {result['runtime']['run']['status']}."; self.refresh()
+            elif op == "compare":
+                self._need_session()
+                baseline_run_id = argument.strip()
+                if not baseline_run_id: raise ValueError("Usage: :compare <baseline-run-id>")
+                result = self.client.post(f"/api/l1/sessions/{self.sid}/m1-compare", {
+                    "baseline_run_id": baseline_run_id})
+                self.notice = (f"M1 decision: {result['decision']} "
+                               f"({result['decision_reason']}); area ratio={result['area_baseline_ratio']}.")
+                self.refresh()
             elif op == "advance":
                 self._need_session()
                 result = self.client.post(f"/api/l1/sessions/{self.sid}/advance", {})
@@ -146,7 +170,10 @@ class Dashboard:
             goal = (final.get("facts") or {}).get("goal_ir") or {}
             rows.extend(["", "Frozen Goal IR (authoritative)",
                          "goal_id: " + str(goal.get("goal_id") or final.get("goal_id") or "recorded"),
-                         "objective: " + str(goal.get("objective") or "recorded"),
+                         "objective: " + str(goal.get("preference") or "recorded"),
+                         "hard constraints: " + ", ".join(
+                             f"{item.get('metric')} {item.get('operator')} {item.get('threshold')}"
+                             for item in goal.get("hard_constraints", [])),
                          "allowed tools: " + ", ".join(goal.get("allowed_tools") or [])])
         else:
             rows.append("Goal IR remains mutable until blocking answers are complete.")
@@ -180,6 +207,9 @@ class Dashboard:
                      "runtime run: " + str(facts.get("run_id") or "recorded"),
                      "state: " + str(state_after.get("state_id") or "recorded"),
                      "evidence refs: " + str(len(transition.get("evidence") or state_after.get("evidence") or []))])
+        metrics = facts.get("metrics") or state_after.get("metrics") or {}
+        for name in ("setup_wns_ns", "area_um2", "drc_errors"):
+            rows.append(f"{name}: {metrics.get(name, 'unknown')}")
         receipt = self._latest("tool_receipt")
         if receipt:
             rows.append("last receipt sequence: " + str(receipt.get("sequence", "?")))
