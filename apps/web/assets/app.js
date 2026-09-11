@@ -802,10 +802,12 @@ async function verifyDirectLlmCandidate() {
 async function loadRuns(preferred = null) {
   try {
     const dashboard = await api("/api/teaching/dashboard");
+    let campaigns = [];
+    try { campaigns = (await api("/api/v2/closed-loops")).closed_loops || []; } catch (_) { campaigns = []; }
     state.runs = dashboard.runs || [];
     const batch = (dashboard.batches || []).at(-1);
     const batchBox = $("#batchProgress");
-    if (batchBox) { batchBox.hidden = !batch; if (batch) batchBox.textContent = ui(`Batch ${batch.batch_id}: ${batch.succeeded}/${batch.total} complete · ${batch.active} active · ${batch.failed} failed`, `批次 ${batch.batch_id}：${batch.succeeded}/${batch.total} 完成 · ${batch.active} 运行中 · ${batch.failed} 失败`); }
+    if (batchBox) { batchBox.hidden = !batch && !campaigns.length; if (batch) batchBox.textContent = ui(`Batch ${batch.batch_id}: ${batch.succeeded}/${batch.total} complete · ${batch.active} active · ${batch.failed} failed`, `批次 ${batch.batch_id}：${batch.succeeded}/${batch.total} 完成 · ${batch.active} 运行中 · ${batch.failed} 失败`); if (!batch && campaigns.length) { const latest = campaigns.at(-1); batchBox.textContent = ui(`BO/GP campaign ${latest.pipeline_id}: ${latest.state?.status || "unknown"}`, `BO/GP campaign ${latest.pipeline_id}：${latest.state?.status || "未知"}`); } }
     const selectedDesignId = state.selectedDesign?.id;
     const physicalRuns = state.runs.filter(run => selectedDesignId && run.design_id === selectedDesignId && (["orfs", "taiwei-pin-3d", "implcraft"].includes(run.plugin_id) || ["edacraft-tcadcraft", "edacraft-momcraft", "edacraft-cktcraft"].includes(run.plugin_id)));
     $("#runSelect").innerHTML = `<option value="">${selectedDesignId ? ui("Choose a design task", "选择该设计的任务") : ui("Select a design first", "请先选择设计")}</option>` + physicalRuns.map((run, index) => `<option value="${esc(run.run_id)}">${ui("Task", "任务")} ${String(index + 1).padStart(2, "0")} · ${esc(humanStatus(run.status))}${run.dse_mode ? ` · ${esc(run.dse_mode)}` : ""}${run.candidate_count ? ` (${esc(run.candidate_count)})` : ""}</option>`).join("");
