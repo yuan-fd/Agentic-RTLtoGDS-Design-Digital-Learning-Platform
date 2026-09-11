@@ -3041,6 +3041,11 @@ class ApiState:
             item["dse_mode"] = labels.get("teaching_dse_mode")
             item["candidate_count"] = labels.get("teaching_candidate_count")
             item["agent_phase"] = labels.get("agent_phase") or labels.get("stage")
+            item["agent_action"] = labels.get("agent_action") or {
+                "queued": "waiting for Runtime worker", "running": "executing approved task",
+                "succeeded": "reviewing recorded evidence", "failed": "diagnosing failed attempt",
+            }.get(item["status"])
+            item["decision_summary"] = labels.get("decision_summary")
         active = {"queued", "preparing", "running", "retry_wait", "cancel_requested"}
         batches = {}
         for item in runs:
