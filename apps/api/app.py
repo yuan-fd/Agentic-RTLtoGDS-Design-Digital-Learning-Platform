@@ -273,6 +273,12 @@ class ApiState:
         self.server_spec_daily_limit = int(os.environ.get(
             "OPENROAD_PLATFORM_SERVER_SPEC_DAILY_LIMIT", "20"
         ))
+        # A2-ORFO remains session-bound to the separately managed Workbench.
+        # Expose its configured URL as discovery metadata; do not proxy or
+        # manufacture an unbound campaign in the main Runtime database.
+        self.l1_workbench_url = os.environ.get(
+            "OPENROAD_PLATFORM_L1_WORKBENCH_URL", ""
+        ).strip().rstrip("/")
         self._server_spec_lock = threading.Lock()
         self.designs = DesignService(
             design_root or ROOT / "var" / "designs",
@@ -3110,7 +3116,11 @@ class ApiState:
         campaigns.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
         return {"schema_version": 1, "campaigns": campaigns,
                 "authority": "WorkflowRuntime + durable BO/GP checkpoints",
-                "a2_authority": "L1 Workbench session-bound API"}
+                "a2_authority": "L1 Workbench session-bound API",
+                "a2": {"available": bool(self.l1_workbench_url),
+                        "workbench_url": self.l1_workbench_url or None,
+                        "required_flow": ["start session", "l2-escalate",
+                                           "l2-configure", "l2-advance"]}}
 
     def start_teaching_bo_campaign(self, payload: dict[str, Any], *,
                                    owner_id: str | None = None,
