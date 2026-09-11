@@ -46,6 +46,8 @@ Updated: 2026-09-11
   model with measured QoR metadata and a selectable trend metric.
 - Native BO/GP campaign creation is exposed at `/api/v2/closed-loops`; A2
   campaign status/list operations remain bound to the L1 Workbench session.
+- Rule Batch submits 1–6 independent Runtime candidates with a shared batch
+  identifier and the Dashboard projects aggregate progress for that batch.
 
 ## Evidence
 
