@@ -1307,6 +1307,8 @@ async function submitFlow() {
     const dseMode = $("#dseMode")?.value || "baseline";
     const result = dseMode === "bo_gp"
       ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
+      : dseMode === "batch"
+      ? await post("/api/teaching/dse/batch", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module, platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk", candidate_count: Number($("#candidateCount")?.value || 3)})
       : await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
       platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk",
       teaching_mode: mode, teaching_context: context, execute: true});
