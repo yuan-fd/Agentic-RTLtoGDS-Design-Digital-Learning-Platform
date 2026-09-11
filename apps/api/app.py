@@ -3861,7 +3861,10 @@ class ApiState:
 
     def start_rule_batch(self, payload: dict[str, Any], *, owner_id: str | None = None,
                          include_legacy: bool = False) -> dict[str, Any]:
-        count = int(payload.get("candidate_count") or 3)
+        raw_count = payload.get("candidate_count")
+        if isinstance(raw_count, bool):
+            raise ValueError("candidate_count must be an integer")
+        count = int(raw_count or 3)
         if not 1 <= count <= 6:
             raise ValueError("candidate_count must be between 1 and 6")
         design_id = str(payload.get("design_id") or "").strip()
