@@ -974,6 +974,7 @@ async function selectRun(id) {
   if (!id) return resetRunResult();
   const detail = await api(`/api/runtime/runs/${encodeURIComponent(id)}`);
   state.selectedRun = detail;
+  await loadRtlGeneratorComparison();
   const run = detail.run;
   const task = run.task_spec || {};
   $("#runHeading").innerHTML = `<div><b>${esc(runDisplayName(run.run_id))} · ${esc(designModule(task.design_id))}</b><span>${esc(task.parameters?.target_stage || ui("extension task", "扩展任务"))} · ${esc(formatDate(run.created_at))}</span></div><span class="status ${esc(run.status)}">${esc(humanStatus(run.status))}</span>`;
