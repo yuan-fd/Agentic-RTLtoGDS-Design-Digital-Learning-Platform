@@ -3073,6 +3073,45 @@ class ApiState:
             "authority": "WorkflowRuntime",
         }
 
+    def teaching_campaigns(self, *, owner_id: str | None = None,
+                           include_legacy: bool = False) -> dict[str, Any]:
+        """Return one compact campaign index for the teaching UI.
+
+        Rule batches are reconstructed from Runtime labels; BO/GP entries come
+        from their durable checkpoints.  The projection intentionally omits
+        optimizer internals and never merges the session-bound A2 workbench
+        database into the main API authority.
+        """
+        dashboard = self.teaching_dashboard(owner_id=owner_id,
+                                            include_legacy=include_legacy,
+                                            limit=500)
+        campaigns: list[dict[str, Any]] = []
+        for batch in dashboard["batches"]:
+            campaigns.append({**batch, "kind": "batch", "status": (
+                "running" if batch["active"] else
+                "failed" if batch["failed"] else
+                "succeeded" if batch["succeeded"] == batch["total"] else "queued")})
+        loops = self.pipeline_checkpoints.list(
+            pipeline_kind="bo-gp-closed-loop-v2", owner_id=owner_id, limit=100)
+        if include_legacy:
+            loops += [item for item in self.pipeline_checkpoints.list(
+                pipeline_kind="bo-gp-closed-loop-v2", limit=100)
+                if item.get("owner_id") is None and item["pipeline_id"] not in
+                {loop["pipeline_id"] for loop in loops}]
+        for loop in loops:
+            state = loop.get("state") or {}
+            campaigns.append({
+                "campaign_id": loop["pipeline_id"], "kind": "bo_gp",
+                "status": state.get("status", "unknown"),
+                "candidate_count": state.get("repetitions"),
+                "updated_at": loop.get("updated_at"),
+                "experiment_id": loop["pipeline_id"],
+            })
+        campaigns.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+        return {"schema_version": 1, "campaigns": campaigns,
+                "authority": "WorkflowRuntime + durable BO/GP checkpoints",
+                "a2_authority": "L1 Workbench session-bound API"}
+
     def copy_teaching_run(self, run_id: str, *, parameters: dict[str, Any] | None = None,
                           owner_id: str | None = None,
                           include_legacy: bool = False) -> dict[str, Any]:
@@ -5043,6 +5082,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=list_owner,
                         include_legacy=session.legacy_access or developer_all,
                         limit=min(100, max(1, int((parse_qs(parsed.query).get("limit") or [50])[0]))),
+                    ))
+                elif path == "/api/teaching/dse/campaigns":
+                    self._json(state.teaching_campaigns(
+                        owner_id=list_owner,
+                        include_legacy=session.legacy_access or developer_all,
                     ))
                 elif re.fullmatch(r"/api/runtime/runs/[^/]+/artifacts/[^/]+/excerpt", path):
                     parts = path.split("/")
