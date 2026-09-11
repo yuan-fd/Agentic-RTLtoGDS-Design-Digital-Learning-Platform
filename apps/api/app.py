@@ -3877,8 +3877,12 @@ class ApiState:
             raise ValueError("batch template is unavailable")
         batch_id = f"teaching-batch-{uuid.uuid4().hex}"
         runs = []
+        baseline_density = _number(payload, "place_density", 0.45)
+        if not 0.1 <= baseline_density <= 0.95:
+            raise ValueError("place_density must be between 0.1 and 0.95")
         for index in range(count):
-            density = 0.35 + (0.10 * index / max(count - 1, 1))
+            offset = (index - (count - 1) / 2) * 0.05
+            density = min(0.95, max(0.1, baseline_density + offset))
             task = dataclasses.replace(template, task_id=f"{batch_id}-{index + 1}",
                 parameters={**template.parameters, "place_density": round(density, 4)},
                 labels={**template.labels, "teaching_batch_id": batch_id,
