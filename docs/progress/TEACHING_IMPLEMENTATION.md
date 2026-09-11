@@ -19,19 +19,22 @@ Updated: 2026-09-11
   exposed at `GET /api/teaching/modes`.
 - L1 session creation accepts the bounded `teaching_mode` value and carries it
   into Runtime TaskSpec labels for Dashboard projection; default is `guided`.
-- Mode-specific request validation now rejects custom Guided fields, rejects
-  hypotheses in Open Lab, and requires objective plus hypothesis for Challenge;
-  accepted context is carried as TaskSpec labels.
+- Mode-specific request validation rejects custom Guided fields and requires
+  objective plus hypothesis for Challenge; accepted context is carried as
+  TaskSpec labels. Open Lab may record a hypothesis for free exploration.
 - Guided/Open/Challenge validation is covered by focused contract tests; the
   existing L1 API remains backward compatible because omitted mode defaults to
   Guided.
-- Backend workspace now exposes the three learning modes and Challenge-only
-  objective/hypothesis fields with client-side validation; legacy historical
-  DSE submission remains read-only until the formal experiment creation route
-  is wired.
+- Backend workspace exposes the three learning modes and submits them through
+  the real L1 Runtime session route; Open has an objective field and Challenge
+  adds a hypothesis field.
 - The managed launcher now starts four Runtime worker slots by default
   (`WORKER_COUNT`, bounded to 1–16); each slot has its own heartbeat/lock while
   Runtime lease claiming remains the concurrency authority.
+- Teaching metadata is durable in the existing L1 session store, survives
+  Workbench restart, and reaches baseline and candidate Runtime tasks.
+- Web submission creates and executes a real L1 Runtime experiment, then
+  refreshes the Runtime-backed run list.
 
 ## Evidence
 
@@ -45,5 +48,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Next: add the formal experiment creation route and connect these controls to
-it, then implement the first Open Lab copy-from-run flow.
+Next: validate the connected route in a browser and with a bounded smoke, then
+implement the first Open Lab copy-from-run flow.
