@@ -5133,6 +5133,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         self._read_json(), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
+                if path == "/api/v2/closed-loops":
+                    self._json(state.start_bayesian_closed_loop(
+                        scoped(self._read_json()), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
                 match = re.fullmatch(r"/api/v2/external-optimizer-loops/([^/]+)/advance", path)
                 if match:
                     self._read_json()
