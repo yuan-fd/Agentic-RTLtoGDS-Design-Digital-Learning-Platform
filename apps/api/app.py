@@ -3960,10 +3960,17 @@ class ApiState:
     def _rtlscout_candidate_path(self, candidate: dict[str, Any]) -> Path:
         ref = str(candidate.get("rtl_artifact_ref") or "")
         prefix = "artifact:rtl-candidate:"
-        if not ref.startswith(prefix) or not re.fullmatch(r"[0-9a-f]{64}", ref.removeprefix(prefix)):
-            raise ValueError("Candidate does not originate from a managed RTLScout-v2 artifact")
-        path = self.rtl_candidate_root / f"{ref.removeprefix(prefix)}.sv"
-        if not path.is_file() or _sha256(path) != ref.removeprefix(prefix):
+        direct = "artifact:rtl-candidate:direct-llm-"
+        if ref.startswith(prefix):
+            digest = ref.removeprefix(prefix); filename = f"{digest}.sv"
+        elif ref.startswith(direct):
+            digest = ref.removeprefix(direct); filename = f"direct-llm-{digest}.sv"
+        else:
+            raise ValueError("Candidate does not originate from a managed RTL artifact")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("Candidate artifact reference has an invalid digest")
+        path = self.rtl_candidate_root / filename
+        if not path.is_file() or _sha256(path) != digest:
             raise ValueError("Managed RTLScout-v2 artifact is missing or changed")
         return path
 
