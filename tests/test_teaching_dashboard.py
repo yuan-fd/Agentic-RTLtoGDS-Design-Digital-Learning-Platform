@@ -20,3 +20,4 @@ def test_teaching_dashboard_is_a_compact_runtime_projection():
     assert result["summary"] == {"total": 3, "active": 1, "succeeded": 1, "failed": 1}
     assert result["polling"]["recommended_seconds"] == 2
     assert result["runs"][0]["experiment_id"] == "exp-1"
+    assert result["runs"][0]["agent_action"] == "waiting for Runtime worker"
