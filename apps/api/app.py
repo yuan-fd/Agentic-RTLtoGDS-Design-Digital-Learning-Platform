@@ -3941,8 +3941,9 @@ class ApiState:
                          "generator": candidate.get("generator"),
                          "verification_id": candidate.get("verification_id"),
                          "checks": checks,
-                         "qor": [item.get("metrics") for item in checks
-                                 if item.get("metrics")],
+                         "qor": [item.get("metrics") or item.get("detail", {}).get("metrics")
+                                 for item in checks
+                                 if item.get("metrics") or item.get("detail", {}).get("metrics")],
                          "functional_status": "passed" if any(
                              item.get("check_kind") in {"simulation", "formal", "equivalence"}
                              and item.get("status") == "passed" for item in checks)
