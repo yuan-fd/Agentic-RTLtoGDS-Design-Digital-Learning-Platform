@@ -52,3 +52,12 @@ schema -> DesignGoal / typed policy -> measured baseline and candidate -> L2
 authorization -> complete 12-D variable-clock ORFS-Agent -> immutable TaskSpec
 -> Runtime -> raw artifacts -> protected QoR`. The older SpecIR/RTLScout path
 is not an alternative L2 entry.
+
+## Teaching session API
+
+When started with `--workbench-config <operator.json>`, the main web server
+exposes the session-bound L1/A2 teaching surface at
+`POST /api/teaching/sessions`, `GET /api/teaching/sessions/<id>`, and
+`POST /api/teaching/sessions/<id>/{answers,execute,parameters,candidates,l2-escalate,l2-configure,l2-advance}`.
+The config is operator-owned and instantiates the existing WorkbenchService;
+A2 campaign state remains bound to its Session and Goal.

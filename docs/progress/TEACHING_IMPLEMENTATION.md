@@ -80,3 +80,8 @@ historical assertion to the approved teaching authority. Recommendation and
 implementation: B. The HTTP handler again calls the native service directly;
 verified-lineage and protocol validation stay in that service. The P0 snapshot
 is retained and labelled historical. Rollback: revert the correction commit.
+
+- Main Web now exposes the configured Workbench through owner-scoped teaching
+  session routes and the backend page provides Start L1, execute, authorize A2,
+  and schedule-next controls. A2 remains session/Goal bound; no state is copied
+  into the main Runtime database. Commit `643b3e1`.
