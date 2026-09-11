@@ -11,6 +11,7 @@ const state = {
   health: null, auth: null, workspaceLoaded: false, locale: "en",
   specSession: null, developerView: false,
   backendMode: "2d", activeClosedLoop: null, closedLoopPoll: null,
+  teachingMode: "guided",
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
 const ZH = {
@@ -1271,6 +1272,35 @@ function backendMode(mode) {
   if (mode === "2d" && state.selectedDesign) renderDesignChips();
 }
 
+function updateTeachingMode() {
+  const mode = $("#teachingMode")?.value || "guided";
+  state.teachingMode = mode;
+  const challenge = mode === "challenge";
+  $("#teachingObjectiveField")?.toggleAttribute("hidden", !challenge);
+  $("#teachingHypothesisField")?.toggleAttribute("hidden", !challenge);
+  const notes = {
+    guided: ui("Guided mode uses the managed example and protected defaults.", "引导模式使用托管示例和受保护默认值。"),
+    open: ui("Open Lab accepts a registered design and bounded objective.", "开放实验室允许登记设计和受控目标。"),
+    challenge: ui("Challenge requires an objective and hypothesis before execution.", "挑战模式执行前必须填写目标和假设。"),
+  };
+  $("#teachingModeNote").textContent = notes[mode];
+}
+
+function teachingContext() {
+  const mode = $("#teachingMode")?.value || "guided";
+  const context = {};
+  if (mode !== "guided" && state.selectedDesign?.id) context.design_id = state.selectedDesign.id;
+  if (mode === "challenge") {
+    context.objective = $("#teachingObjective")?.value.trim() || "";
+    context.hypothesis = $("#teachingHypothesis")?.value.trim() || "";
+    if (!context.objective || !context.hypothesis) {
+      message("#flowMessage", ui("Challenge mode needs an objective and hypothesis.", "挑战模式需要填写目标和假设。"), true);
+      return null;
+    }
+  }
+  return context;
+}
+
 function renderTaiwei3dPane() {
   const root = $("#taiwei3dPane");
   if (!root) return;
@@ -1692,6 +1722,8 @@ $("#approveSpecRtl").addEventListener("click", approveSpecRtl);
 $("#runRtlscout").addEventListener("click", submitRtlscout);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
+$("#teachingMode")?.addEventListener("change", updateTeachingMode);
+updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.
 $$('[data-locale]').forEach(button => button.addEventListener("click", () => { applyLocale(button.dataset.locale); if (!state.selectedRun) renderStageRail(new Map()); }));
 $("#refreshResults").addEventListener("click", loadResults);

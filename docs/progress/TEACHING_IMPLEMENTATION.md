@@ -25,6 +25,10 @@ Updated: 2026-09-11
 - Guided/Open/Challenge validation is covered by focused contract tests; the
   existing L1 API remains backward compatible because omitted mode defaults to
   Guided.
+- Backend workspace now exposes the three learning modes and Challenge-only
+  objective/hypothesis fields with client-side validation; legacy historical
+  DSE submission remains read-only until the formal experiment creation route
+  is wired.
 
 ## Evidence
 
@@ -38,5 +42,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Next: expose the mode catalog and context controls in the simplified Web
-workspace, then add the first Open Lab copy-from-run flow.
+Next: add the formal experiment creation route and connect these controls to
+it, then implement the first Open Lab copy-from-run flow.
