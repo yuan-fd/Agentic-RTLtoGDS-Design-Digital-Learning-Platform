@@ -803,13 +803,27 @@ async function loadRuns(preferred = null) {
   try {
     const dashboard = await api("/api/teaching/dashboard");
     let campaigns = [];
-    try { campaigns = (await api("/api/teaching/dse/campaigns")).campaigns || []; } catch (_) {
+    let campaignIndex = null;
+    try { campaignIndex = await api("/api/teaching/dse/campaigns"); campaigns = campaignIndex.campaigns || []; } catch (_) {
       try { campaigns = (await api("/api/v2/closed-loops")).closed_loops || []; } catch (_) { campaigns = []; }
     }
     state.runs = dashboard.runs || [];
     const batch = (dashboard.batches || []).at(-1);
     const batchBox = $("#batchProgress");
     if (batchBox) { batchBox.hidden = !batch && !campaigns.length; if (batch) batchBox.textContent = ui(`Batch ${batch.batch_id}: baseline ${batch.baseline} · ${batch.candidates} candidates · ${batch.succeeded}/${batch.total} complete · ${batch.active} active`, `批次 ${batch.batch_id}：baseline ${batch.baseline} · ${batch.candidates} 个候选 · ${batch.succeeded}/${batch.total} 完成 · ${batch.active} 运行中`); if (!batch && campaigns.length) { const latest = campaigns[0]; batchBox.textContent = ui(`${latest.kind} campaign ${latest.campaign_id || latest.pipeline_id}: ${latest.status || "unknown"}`, `${latest.kind} campaign ${latest.campaign_id || latest.pipeline_id}：${latest.status || "未知"}`); } }
+    const a2 = campaignIndex?.a2;
+    const a2Box = $("#a2Workbench");
+    if (a2Box) {
+      if (a2?.available && a2.workbench_url) {
+        const href = String(a2.workbench_url).replaceAll('"', "%22");
+        const steps = (a2.required_flow || []).join(" → ");
+        a2Box.hidden = false;
+        a2Box.innerHTML = `${ui("A2-ORFO is managed by the session-bound L1 Workbench.", "A2-ORFO 由绑定 Session 的 L1 Workbench 管理。")} <a href="${esc(href)}" target="_blank" rel="noopener">${ui("Open Workbench", "打开 Workbench")}</a><br><small>${esc(steps)}</small>`;
+      } else if (a2) {
+        a2Box.hidden = false;
+        a2Box.textContent = ui("A2-ORFO Workbench is not configured on this server.", "本服务器尚未配置 A2-ORFO Workbench。");
+      } else a2Box.hidden = true;
+    }
     const selectedDesignId = state.selectedDesign?.id;
     const physicalRuns = state.runs.filter(run => selectedDesignId && run.design_id === selectedDesignId && (["orfs", "taiwei-pin-3d", "implcraft"].includes(run.plugin_id) || ["edacraft-tcadcraft", "edacraft-momcraft", "edacraft-cktcraft"].includes(run.plugin_id)));
     $("#runSelect").innerHTML = `<option value="">${selectedDesignId ? ui("Choose a design task", "选择该设计的任务") : ui("Select a design first", "请先选择设计")}</option>` + physicalRuns.map((run, index) => `<option value="${esc(run.run_id)}">${ui("Task", "任务")} ${String(index + 1).padStart(2, "0")} · ${esc(humanStatus(run.status))}${run.dse_mode ? ` · ${esc(run.dse_mode)}` : ""}${run.candidate_count ? ` (${esc(run.candidate_count)})` : ""}</option>`).join("");
