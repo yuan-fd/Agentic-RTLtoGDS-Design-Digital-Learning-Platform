@@ -1279,7 +1279,9 @@ async function copySelectedRunToOpen() {
   const runId = state.selectedRun?.run?.run_id;
   if (!runId) return message("#flowMessage", ui("Select a completed run first.", "请先选择一个已完成的运行。"), true);
   try {
-    await post("/api/teaching/open/copy", {run_id: runId});
+    const raw = window.prompt(ui("Optional place density (0.1–0.95):", "可选布局密度（0.1–0.95）："), "");
+    const parameters = raw?.trim() ? {place_density: Number(raw)} : {};
+    await post("/api/teaching/open/copy", {run_id: runId, parameters});
     message("#flowMessage", ui("Copied into an independent Open Lab run.", "已复制为独立的 Open Lab 实验。"));
     await loadRuns();
   } catch (error) { message("#flowMessage", error.message, true); }
