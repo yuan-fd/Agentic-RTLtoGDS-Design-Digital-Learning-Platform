@@ -115,3 +115,14 @@ Every completed slice records:
 - upstream/commit/license/native-smoke evidence for an external plugin; and
 - a precise rollback method.
 
+
+## Current implementation authority (2026-09-11)
+
+The owner approved `docs/LLM_TEACHING_PLATFORM_SPEC.md` and
+`docs/LLM_TEACHING_PLATFORM_PLAN.md` and authorized continuous goal-mode
+implementation. They supersede historical product-menu restrictions (including
+RTLScout-only generation and prohibition of baseline/batch/BO teaching paths).
+Reuse the Runtime, evidence gates and admitted upstream algorithms. Preserve
+raw evidence and protocol identity. Do not add course management or public
+deployment work. Read `docs/progress/TEACHING_IMPLEMENTATION.md` for the current
+slice before continuing; report checkpoints without repeatedly asking to resume.

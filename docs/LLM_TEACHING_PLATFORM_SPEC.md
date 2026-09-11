@@ -1,6 +1,6 @@
 # LLM Teaching Platform：共识规格 v0.1
 
-状态：待实施计划审批
+状态：已批准；2026-09-11 进入目标模式实施
 日期：2026-09-11
 
 ## 目标
@@ -19,7 +19,7 @@
 - 用户可以输入自然语言规格、上传/粘贴 RTL，并使用登记过的参数白名单。
 - RTL 教学同时保留 Direct LLM 与 RTLScout 对比，但两者必须共用验证和后端评估协议。
 - DSE 首版提供四种可比较模式：Rule Batch、Bayesian/GP、A2-ORFO、Random Baseline。
-- batch 默认 3 个候选，上限 6 个；算法模式共享冻结 baseline 和统一预算。
+- 规则 batch 默认 3 个候选，上限 6 个；baseline 可独立执行。算法对比必须计入各方法原生初始化和反馈预算，不能将完整 A2 强行简化成 3 点算法。
 - A2-ORFO 是优化策略；ORFS/ORFS-Agent 是执行器。
 - 前端核心对象压缩为 Project、Experiment、Run、Evidence。
 - 正式产品只保留一条主链路：
