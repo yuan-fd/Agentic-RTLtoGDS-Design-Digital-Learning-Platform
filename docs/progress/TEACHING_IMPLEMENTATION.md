@@ -35,6 +35,8 @@ Updated: 2026-09-11
   Workbench restart, and reaches baseline and candidate Runtime tasks.
 - Web submission creates and executes a real L1 Runtime experiment, then
   refreshes the Runtime-backed run list.
+- The browser path uses the main API's existing `/api/craft/plans` execution
+  route; the standalone L1 server remains an internal vertical-slice harness.
 
 ## Evidence
 
