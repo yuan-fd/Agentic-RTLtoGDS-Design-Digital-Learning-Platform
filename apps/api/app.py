@@ -47,7 +47,7 @@ from openroad_platform_contracts import (  # noqa: E402
     SemanticToolCall, ToolName,
     LearningContext, LearningObservation, PortSpec, RTLCandidate, SpecIR, TaskSpec,
     VerificationPackage,
-    TEACHING_MODES, validate_teaching_mode,
+    TEACHING_MODES, validate_teaching_mode, validate_teaching_request,
 )
 from openroad_platform_analysis import (  # noqa: E402
     EvidenceKnowledgeRecordV2, EvidenceRAG, RuntimeEvidenceExporter,
@@ -3764,11 +3764,8 @@ class ApiState:
         include_legacy = payload.get("include_legacy") is True
         design_id = str(payload.get("design_id") or "").strip()
         teaching_mode = validate_teaching_mode(payload.get("teaching_mode", "guided")).value
-        teaching_context = payload.get("teaching_context") or {}
-        if not isinstance(teaching_context, dict):
-            raise ValueError("teaching_context must be an object")
-        if teaching_mode == "challenge" and not teaching_context.get("hypothesis"):
-            raise ValueError("challenge mode requires a hypothesis")
+        teaching_context = validate_teaching_request(
+            teaching_mode, payload.get("teaching_context"))
         design = self._owned_design(design_id, owner_id, include_legacy=include_legacy)
         plan = build_craft_flow_plan(
             self.designs.rtl_path(design_id, owner_id=owner_id,
