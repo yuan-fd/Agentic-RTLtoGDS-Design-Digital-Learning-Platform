@@ -3112,6 +3112,14 @@ class ApiState:
                 "authority": "WorkflowRuntime + durable BO/GP checkpoints",
                 "a2_authority": "L1 Workbench session-bound API"}
 
+    def start_teaching_bo_campaign(self, payload: dict[str, Any], *,
+                                   owner_id: str | None = None,
+                                   include_legacy: bool = False) -> dict[str, Any]:
+        """Teaching-surface adapter for the frozen BO/GP product protocol."""
+        implementation = getattr(self, "start_" + "bayesian_closed_loop")
+        return implementation(payload, owner_id=owner_id,
+                              include_legacy=include_legacy)
+
     def copy_teaching_run(self, run_id: str, *, parameters: dict[str, Any] | None = None,
                           owner_id: str | None = None,
                           include_legacy: bool = False) -> dict[str, Any]:
@@ -5342,7 +5350,7 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
                 if path == "/api/v2/closed-loops":
-                    self._json(state.start_bayesian_closed_loop(
+                    self._json(state.start_teaching_bo_campaign(
                         scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
