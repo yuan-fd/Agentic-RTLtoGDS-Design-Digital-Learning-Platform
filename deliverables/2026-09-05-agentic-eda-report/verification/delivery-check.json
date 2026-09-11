@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "date": "2026-09-05",
+  "html_pages": 9,
+  "focused_tests": "51 passed",
+  "existing_summaries_read": 16,
+  "direct_artifact_references_rehashed": 159,
+  "artifact_hash_mismatches": 0,
+  "static_link_checks": 487,
+  "citation_links": 252,
+  "browser_screenshots": 4,
+  "existing_source_files_modified": 0,
+  "eda_rerun": false,
+  "full_regression_rerun": false,
+  "publication_claim": "Teaching/research report; no broad intelligence, arbitrary-spec or PPA-superiority claim."
+}

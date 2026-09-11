@@ -1,0 +1,90 @@
+<div class="callout"><strong>给新贡献者的一句话：</strong>你不是来往网页里加一个能跑命令的按钮，而是提交一个别人能够安全调用、独立验证、失败后可定位和恢复的能力。默认顺序是 <strong>Reuse → Adapt → Reimplement</strong>；上游拥有算法，平台拥有可信控制面。</div>
+<h2>1. 开始前先读什么？</h2>
+<ol><li><code>AGENTS.md</code>：治理边界、外部准入、保护对象、停止条件。</li><li><code>ARCHITECTURE.md</code>：层间职责；<code>docs/PLUGINS.md</code>：真实插件协议。</li><li><code>docs/governance/L1_L2_TUTORIAL_PROPOSAL_ACCEPTANCE.md</code>：当前有界能力和缺口；<code>docs/progress/CURRENT_STATUS.md</code>：现状与历史的区别。</li><li><code>packages/contracts/.../platform.py</code>、<code>product_surface.py</code>：公共接口和产品角色；不要只看目录名。[[C01]][[C02]][[C03]][[C05]]</li><li>选择一个已存在的 adapter 和对应测试；最小协议教学例子在 <code>integrations/examples/echo_adapter.py</code> 和 <code>echo.plugin.json</code>。echo 只证明协议，不证明任何 EDA 算法。</li></ol>
+<p>现有 CONTRIBUTING 末段的“缺少顶层 LICENSE”已经与根目录 MIT LICENSE 不符。请以具体版本的许可文件和维护者审查为准；根仓库有许可不等于第三方项目、PDK、数据集自动获得相同许可。[[C17]][[C18]]</p>
+<h2>2. 选择一个边界明确的贡献，不要一口气重构平台</h2>
+<div class="table-wrap"><table><thead><tr><th>贡献类型</th><th>推荐写入范围</th><th>评审重点</th></tr></thead><tbody><tr><td>新外部算法插件</td><td>该插件 intake、source/environment locks、adapter、任务工厂和专属测试。</td><td>原生算法是否保留，入口是否有界，许可证/commit 是否可核验。</td></tr><tr><td>已有能力的数据接口</td><td>分析器/解析器与契约必要增量、专属测试。</td><td>单位、缺失值、阶段/运行来源、证据哈希；不把预测变实测。</td></tr><tr><td>工作台体验</td><td>一个界面/读模型切片；接口缺口另提后续切片。</td><td>显示存储事实，不重算 QoR、不在点击事件内启动 EDA。</td></tr><tr><td>Runtime 可靠性</td><td>一个 lifecycle 故障点及其回归测试。</td><td>幂等、超时、取消、恢复和产物权威；不要同时改优化策略。</td></tr><tr><td>研究评测</td><td>冻结协议、对照配置、评价脚本和证据目录。</td><td>公平预算、失败保留、统计边界；不触碰隐藏 oracle 来帮助 agent。</td></tr><tr><td>教学和文档</td><td>准确的讲解、代码定位、真实案例、错误示例。</td><td>区分当前实现、受限证据与建议方案；不制造已完成的印象。</td></tr></tbody></table></div>
+<h2>3. 外部项目 intake：七项缺一不可</h2>
+<ol><li><strong>身份：</strong>canonical URL、维护者、精确 commit，不使用未固定分支头。</li><li><strong>许可：</strong>许可文件、哈希和 Green/Yellow/Red 审查结论；无许可/授权则仅 source-audit。</li><li><strong>原生入口：</strong>哪条原生命令或函数真正运行算法，输入什么，产生什么。</li><li><strong>环境：</strong>Python/编译器/架构、依赖、凭据、模型与网络需求，来源需锁定。</li><li><strong>安全：</strong>检查脚本的文件写入、清理、shell、SSH、远程执行、序列化加载和环境变量行为。</li><li><strong>最小适配：</strong>逐项映射输入/输出、checkpoint、失败和日志；写清哪些行为不能直接保留。</li><li><strong>证据：</strong>先 native smoke，再有界平台 smoke。初始文档先登记待完成步骤；未满足要求前不得提升为已准入执行能力。</li></ol>
+<p>不要复制 README 的安装命令就运行；不要在检查之前执行下载脚本。需要 API key 的项目，通过平台运营者批准的凭据与网络机制提供，不能放进 TaskSpec、网页表单、日志或 Git。</p>
+<h2>4. 最小协议示例：只讲接口，不是可用研究插件</h2>
+<p><span class="badge plan">示意代码，未注册、未执行</span>以下字段来自当前公共契约。路径是占位值；不要直接执行。真实业务仍需要专门的输入与权限校验，JSON schema 描述本身不能替代语义 Policy。[[C01]][[C02]]</p>
+<pre data-language="python"><code>from openroad_platform_contracts import PluginManifest, TaskSpec
+
+manifest = PluginManifest(
+    plugin_id="example-analyzer",
+    plugin_version="1.0.0",
+    adapter_entry=("python3", "/reviewed/plugin/adapter.py"),
+    capabilities=("eda.analysis.example",),
+    supported_arch=("aarch64",),
+    input_schema={"type": "object"},
+    output_schema={"type": "object"},
+    required_tools=("python3",),
+    default_timeout_seconds=120,
+    artifact_rules=({"kind": "diagnosis", "required": True},),
+)
+manifest.validate()
+
+task = TaskSpec(
+    task_id="example-01",
+    project_id="teaching",
+    design_id="design-01",
+    plugin_id="example-analyzer",
+    inputs={"observation_ref": "approved-observation-01"},
+    parameters={"mode": "read_only"},
+    timeout_seconds=120,
+    max_attempts=1,
+    expected_artifacts=("diagnosis",),
+)
+task.validate()</code></pre>
+<p><strong>这段代码没有做的事：</strong>没有安装上游、没有注册产品角色、没有批准输入引用，也没有启动 Runtime。真实 factory 需解析批准的 artifact 引用，检查哈希、权限、适用阶段和参数范围，而不是相信用户传来的字符串。</p>
+<h3>Adapter 进程边界</h3>
+<pre>adapter.py --request &lt;attempt&gt;/adapter_request.json \
+           --result  &lt;attempt&gt;/adapter_result.json</pre>
+<p>adapter 读取协议版本、插件身份和任务，在私有 attempt 工作区处理输入，调用已审查的原生入口，原子写出结果。不得后台脱离进程管理，不得自行修改 Runtime 数据库，不得写共享工具源代码。</p>
+<pre data-language="json"><code>{
+  "schema_version": 1,
+  "status": "succeeded",
+  "exit_code": 0,
+  "started_at": "2026-09-05T00:00:00+00:00",
+  "ended_at": "2026-09-05T00:00:01+00:00",
+  "metrics": [],
+  "artifacts": [{"kind": "diagnosis", "path": "outputs/diagnosis.json"}],
+  "failure": null,
+  "provenance": {"scope": "protocol-example-only"}
+}</code></pre>
+<p>这个结果仍由 Runtime 检查：进程退出与声明是否一致，产物是否存在、非空、类型获准、路径不逃逸，再计算哈希。插件输出的建议或指标，不自动取得最终 QoR 权威。[[C03]][[C06]][[C07]]</p>
+<h2>5. 原生研究逻辑与 adapter 到底怎么划线？</h2>
+<div class="table-wrap"><table><thead><tr><th>允许的薄适配</th><th>需要停止评审的变化</th></tr></thead><tbody><tr><td>把 approved observations 映射为上游读入格式。</td><td>因为格式复杂，改成自己用几条规则选择参数。</td></tr><tr><td>把工作目录改成 attempt 私有目录，并保留所有输出。</td><td>直接修改共享 ORFS 或删除旧结果，让上游脚本跑得通。</td></tr><tr><td>把上游 checkpoint、提案与原始轨迹转成明确产物。</td><td>丢弃失败、只保留最好一次，或拿插件自报分数当 canonical QoR。</td></tr><tr><td>在准入时声明支持的输入范围与不兼容项。</td><td>悄悄缩减搜索域、增加本地 fallback，再宣称完整复现上游。</td></tr><tr><td>把凭据调用替换为平台运营者批准的提供方式，并披露模型差异。</td><td>把替换后的模型与硬件结果写成未经限定的论文复现。</td></tr></tbody></table></div>
+<h2>6. 注册成功不等于成为产品默认能力</h2>
+<p><code>PluginRegistry</code> 回答“安装了什么、哪个版本具备什么能力”；<code>ProductSurface</code> 回答“哪个身份可承担某个产品角色”。当前默认 RTL、L2 和知识角色分别对应 RTLScout、A2-ORFO、ORAssistant。新增 manifest 不会自动成为默认按钮，也不应靠注册顺序覆盖现有角色。[[C05]]</p>
+<p>更改产品角色是维护者批准的独立产品决策，需有兼容性、证据和回滚记录。不要在普通插件 PR 中顺手更换默认优化器。</p>
+<h2>7. 必需测试与验收包</h2>
+<ol><li>版本、架构、capability、schema 与任务字段校验。</li><li>输入身份、大小、哈希、工具链和 checkpoint 不匹配时拒绝。</li><li>必需产物缺失、空文件、未知类型、绝对路径、<code>..</code> 或符号链接逃逸等拒绝路径。</li><li>结果 JSON 错误、进程退出码与声明不一致、插件自报成功但无产物。</li><li>超时、取消、子进程清理、恢复和重复提交；失败不可被覆盖成成功。</li><li>原生 smoke：真正调用算法入口，不用 import、help 或 mock 候选冒充。</li><li>平台 smoke：冻结一个任务与预算，经过 Runtime、评价与反馈，保留完整终态和产物。</li></ol>
+<pre>python -m pytest -q tests/test_plugin_registry.py tests/test_process_adapter.py
+# 再运行你所改模块的针对性测试；真实工具 smoke 需单独获准。
+python scripts/check_tracked_secrets.py
+git diff --check
+git status --short</pre>
+<p>在已审查且正确的开发环境中执行；不要为跑测试随便升级系统依赖。完整回归是评审流程的一部分，必须注明实际运行结果和跳过项。本次报告只运行列出的 51 项测试，未冒充完整回归。</p>
+<h3>PR 必须带这张清单</h3>
+<pre>标题：&lt;一个边界明确的变化&gt;
+Problem / Evidence：为什么要改，依据是什么？
+Scope / Non-goals：要做什么，明确不做什么？
+Changed files：每一个改动文件及作用。
+Dependency edge：改前 → 改后；是否引入跨域导入？
+Upstream：URL、commit、license、环境、安全审查。
+Protocol：设计、RTL/PDK/工具/SDC、种子、预算、评价版本。
+Tests：命令、环境、结果、未运行项。
+Native smoke：入口、状态、证据路径与 SHA-256。
+Platform smoke：run/attempt ID、终态、日志、产物哈希、失败。
+Claim boundary：证明了什么，不能证明什么？
+Protected components：确认未改，或明确为何必须停止。
+Rollback：精确恢复方法；不删除原始实验记录。</pre>
+<h2>8. 多人并行开发：先锁接口，再分开写</h2>
+<p><strong>当前工作树还有大量未提交功能。</strong>维护者先整理出一个已评审的集成基线或明确补丁集，新同学再从该基线建立独立 worktree/分支。直接从当前 HEAD 分支，并不能获得今天工作树里的全部能力。</p>
+<div class="table-wrap"><table><thead><tr><th>角色 / 子任务</th><th>主要写集</th><th>不得越界</th></tr></thead><tbody><tr><td>接口维护者</td><td>必要 contracts 与 capability schema，先合并版本化契约。</td><td>不能让多个插件作者同时修改同一公共类型而无兼容协调。</td></tr><tr><td>A：一个 L3 上游接入</td><td>该插件 intake、locks、adapter、专属测试。</td><td>不碰其他插件、主 UI、受保护评价器。</td></tr><tr><td>B：一个诊断数据接口</td><td>独立分析模块和测试、证据字段。</td><td>不写自创修复算法，不拿隐藏标签做输入。</td></tr><tr><td>C：工作台证据视图</td><td>已约定只读接口对应的页面和视图测试。</td><td>不在前端维护第二套实验状态，不暗中增加执行端点。</td></tr><tr><td>D：独立验收 / 研究协议</td><td>fixture、测试、冻结实验和证据校验脚本。</td><td>不为了让测试通过修改算法、裁判或弱化断言。</td></tr></tbody></table></div>
+<p>并行开发不等于并行运行全部 EDA。共享内存、CPU、工具服务与磁盘必须由批准的 Runtime 预算协调。不同分支也不能各自修改同一套共享上游 checkout。</p>
+<h2>9. 新同学的第一个贡献建议</h2>
+<p>先选“一个只读、有原生来源、能回指证据的能力”：例如接入一个已准入上游的额外查询结果，而不是第一天就改优化策略。完成一个小闭环：合法输入 → 原生返回 → artifact → 校验 → 只读展示 → 拒绝测试。证明自己理解边界后，再接更复杂的优化能力。</p>
+<div class="callout danger"><strong>遇到这些情况立即停：</strong>无可核验许可/commit；必须重写上游算法；必须改受保护输入或评价器；缺真实验收产物；必须弱化测试；跨越无关子系统。提交 <code>Problem / Evidence / Why the current plan fails / Option A / Option B / Recommendation</code>，不要靠“先做出来再说”绕过治理。</div>

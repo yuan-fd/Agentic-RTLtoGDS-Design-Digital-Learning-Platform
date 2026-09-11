@@ -6,7 +6,10 @@ from .orfs_generated_design import (
     generated_design_from_platform_plan, generated_design_from_reference_design,
     install_generated_design_adapter, validate_generated_design_adapter,
 )
-from .orfs_reference_designs import ORFSReferenceDesign, load_orfs_reference_design
+from .orfs_reference_designs import (
+    ORFS_AGENT_PAPER_ORFS_COMMIT, ORFSReferenceDesign,
+    load_orfs_agent_paper_reference_design, load_orfs_reference_design,
+)
 from .orfs_plugin import (
     ORFS_PLUGIN_ID,
     ORFS_PLUGIN_VERSION,
@@ -16,9 +19,33 @@ from .orfs_plugin import (
 from .orfs_task_factory import ORFSRTLToGDSFactory
 from .orfs_agent_plugin import (
     ORFS_AGENT_PLUGIN_ID, ORFS_AGENT_PLUGIN_VERSION, ORFS_AGENT_UPSTREAM_COMMIT,
-    build_orfs_agent_dataset_task, build_orfs_agent_native_task,
     build_orfs_agent_initial_warmup_recipes,
-    orfs_agent_plugin_manifest,
+    orfs_agent_full_protocol_receipts, orfs_agent_plugin_manifest,
+)
+from .orfs_agent_domain import ORFSAgentDomain, ORFSAgentFullDomain
+from .a2_orfo_plugin import (
+    A2_ORFO_MODEL_COMMIT, A2_ORFO_OBJECTIVES, A2_ORFO_PARAMETERS,
+    A2_ORFO_PLUGIN_ID, A2_ORFO_PLUGIN_VERSION, A2_ORFO_UPSTREAM_COMMIT,
+    A2ORFODomain, a2_orfo_plugin_manifest, build_a2_orfo_initialization_task,
+    build_a2_orfo_policy_task,
+)
+from .orassistant_plugin import (
+    ORAssistantKnowledgeTaskFactory,
+    ORASSISTANT_CAPABILITY, ORASSISTANT_CORPUS_ID, ORASSISTANT_PLUGIN_ID,
+    ORASSISTANT_PLUGIN_VERSION, build_orassistant_task,
+    orassistant_plugin_manifest,
+)
+from .posteda_bench_plugin import (
+    POSTEDA_ADMITTED_TASKS, POSTEDA_BENCH_EVALUATE_CAPABILITY,
+    POSTEDA_BENCH_ID, POSTEDA_BENCH_PLUGIN_ID, POSTEDA_BENCH_PLUGIN_VERSION,
+    POSTEDA_BENCH_PUBLIC_CAPABILITY, POSTEDA_BENCH_UPSTREAM_COMMIT,
+    build_posteda_evaluation_task, build_posteda_public_case_task,
+    posteda_bench_plugin_manifest,
+)
+from .orfs_agent_task import (
+    build_orfs_agent_dataset_task, build_orfs_agent_native_task,
+    build_orfs_agent_full_policy_task, build_orfs_agent_full_initialization_task,
+    build_orfs_agent_full_candidate_task,
 )
 from .orfs_agent_reproduction_plugin import (
     ORFS_AGENT_REPRODUCTION_PLUGIN_ID, ORFS_AGENT_REPRODUCTION_VERSION,
@@ -108,13 +135,30 @@ __all__ = [
     "install_generated_design_adapter",
     "validate_generated_design_adapter",
     "ORFSReferenceDesign", "load_orfs_reference_design",
+    "ORFS_AGENT_PAPER_ORFS_COMMIT", "load_orfs_agent_paper_reference_design",
     "ProcessOutcome", "PluginRegistry", "ORFS_PLUGIN_ID", "ORFS_PLUGIN_VERSION",
     "build_orfs_task", "orfs_plugin_manifest", "ToolchainCatalog",
     "ORFSRTLToGDSFactory",
     "ORFS_AGENT_PLUGIN_ID", "ORFS_AGENT_PLUGIN_VERSION", "ORFS_AGENT_UPSTREAM_COMMIT",
     "build_orfs_agent_dataset_task", "build_orfs_agent_native_task",
+    "build_orfs_agent_full_policy_task", "ORFSAgentDomain", "ORFSAgentFullDomain",
+    "build_orfs_agent_full_initialization_task", "build_orfs_agent_full_candidate_task",
     "build_orfs_agent_initial_warmup_recipes",
     "orfs_agent_plugin_manifest",
+    "orfs_agent_full_protocol_receipts",
+    "A2_ORFO_MODEL_COMMIT", "A2_ORFO_OBJECTIVES", "A2_ORFO_PARAMETERS",
+    "A2_ORFO_PLUGIN_ID", "A2_ORFO_PLUGIN_VERSION", "A2_ORFO_UPSTREAM_COMMIT",
+    "A2ORFODomain", "a2_orfo_plugin_manifest", "build_a2_orfo_policy_task",
+    "build_a2_orfo_initialization_task",
+    "ORASSISTANT_CAPABILITY", "ORASSISTANT_CORPUS_ID", "ORASSISTANT_PLUGIN_ID",
+    "ORAssistantKnowledgeTaskFactory",
+    "ORASSISTANT_PLUGIN_VERSION", "build_orassistant_task",
+    "orassistant_plugin_manifest",
+    "POSTEDA_ADMITTED_TASKS", "POSTEDA_BENCH_EVALUATE_CAPABILITY",
+    "POSTEDA_BENCH_ID", "POSTEDA_BENCH_PLUGIN_ID", "POSTEDA_BENCH_PLUGIN_VERSION",
+    "POSTEDA_BENCH_PUBLIC_CAPABILITY", "POSTEDA_BENCH_UPSTREAM_COMMIT",
+    "build_posteda_evaluation_task", "build_posteda_public_case_task",
+    "posteda_bench_plugin_manifest",
     "ORFS_AGENT_REPRODUCTION_PLUGIN_ID", "ORFS_AGENT_REPRODUCTION_VERSION",
     "ORFS_AGENT_REPRODUCTION_UPSTREAM_COMMIT", "ORFS_AGENT_REPRODUCTION_ORFS_COMMIT",
     "ORFS_AGENT_REPRODUCTION_PARAMETERS", "build_orfs_agent_reproduction_task",

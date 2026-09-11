@@ -152,17 +152,18 @@ class WorkflowRuntime:
             runtime_receipt: dict | None = None
             runtime_receipt_sha256: str | None = None
             environment = dict(self.environment_resolver(run) if self.environment_resolver else {})
-            if ready.plugin_id == "orfs-agent":
+            if ready.plugin_id in {"orfs-agent", "a2-orfo"}:
                 domain = run.task_spec.inputs.get("parameter_domain")
                 if not isinstance(domain, dict) or not isinstance(domain.get("experiment_protocol"), dict):
-                    raise ValueError("ORFS-Agent task lacks an immutable experiment protocol")
+                    raise ValueError(f"{ready.plugin_id} task lacks an immutable experiment protocol")
                 workspace.mkdir(parents=True, exist_ok=True)
                 receipt = workspace / "runtime_protocol_receipt.json"
                 receipt.write_text(json.dumps({"schema_version": 1, "protocol": domain["experiment_protocol"],
                                                "run_id": run_id, "attempt_id": attempt.attempt_id}, sort_keys=True), encoding="utf-8")
-                environment["ORFS_AGENT_PROTOCOL_RECEIPT"] = str(receipt)
+                receipt_prefix = "ORFS_AGENT" if ready.plugin_id == "orfs-agent" else "A2_ORFO"
+                environment[f"{receipt_prefix}_PROTOCOL_RECEIPT"] = str(receipt)
                 runtime_receipt_sha256 = hashlib.sha256(receipt.read_bytes()).hexdigest()
-                environment["ORFS_AGENT_PROTOCOL_RECEIPT_SHA256"] = runtime_receipt_sha256
+                environment[f"{receipt_prefix}_PROTOCOL_RECEIPT_SHA256"] = runtime_receipt_sha256
                 runtime_receipt = {
                     "kind": "runtime_protocol_receipt", "path": receipt.name,
                     "metadata": {"producer": "runtime", "attempt_id": attempt.attempt_id},
@@ -175,26 +176,39 @@ class WorkflowRuntime:
                 on_line=line_observer,
                 environment=environment,
             )
-            if execution.result.status is RuntimeStatus.SUCCEEDED:
-                if any(item.get("kind") == "runtime_protocol_receipt" for item in execution.artifacts):
-                    raise ValueError("adapter declared Runtime-reserved artifact kind: runtime_protocol_receipt")
-                if runtime_receipt is not None and runtime_receipt_sha256 != hashlib.sha256(receipt.read_bytes()).hexdigest():
-                    raise ValueError("adapter modified the Runtime protocol receipt")
-                runtime_artifacts = self.adapter.validate_additional_artifacts(
-                    workspace, manifest, (runtime_receipt,) if runtime_receipt is not None else ())
-                evaluator_artifacts: tuple[dict, ...] = ()
-                if self.protected_evaluator is not None:
-                    evaluator_artifacts = self.adapter.validate_additional_artifacts(
-                        workspace, manifest,
-                        self.protected_evaluator.evaluate(
-                            manifest=manifest, task=run.task_spec,
-                            workspace=str(workspace),
-                        ),
-                    )
-                registered_artifact_ids = self.store.register_artifacts(
-                    attempt.attempt_id, (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
+            if any(item.get("kind") == "runtime_protocol_receipt" for item in execution.artifacts):
+                raise ValueError("adapter declared Runtime-reserved artifact kind: runtime_protocol_receipt")
+            if any(
+                item.get("metadata", {}).get("official_qor") is not None
+                or item.get("metadata", {}).get("runtime_authority") == "protected_evaluator"
+                or str(item.get("metadata", {}).get("producer", "")).startswith("protected-")
+                for item in execution.artifacts
+            ):
+                raise ValueError("adapter declared Runtime-reserved protected evaluator metadata")
+            if runtime_receipt is not None and runtime_receipt_sha256 != hashlib.sha256(receipt.read_bytes()).hexdigest():
+                raise ValueError("adapter modified the Runtime protocol receipt")
+            runtime_artifacts = self.adapter.validate_additional_artifacts(
+                workspace, manifest, (runtime_receipt,) if runtime_receipt is not None else ())
+            evaluator_artifacts: tuple[dict, ...] = ()
+            if (execution.result.status is RuntimeStatus.SUCCEEDED
+                    and self.protected_evaluator is not None):
+                validated_evaluator_artifacts = self.adapter.validate_additional_artifacts(
+                    workspace, manifest,
+                    self.protected_evaluator.evaluate(
+                        manifest=manifest, task=run.task_spec,
+                        workspace=str(workspace),
+                    ),
                 )
-                registered_artifacts = (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
+                evaluator_artifacts = tuple({
+                    **item,
+                    "metadata": {**dict(item.get("metadata") or {}),
+                                 "runtime_authority": "protected_evaluator"},
+                } for item in validated_evaluator_artifacts)
+            registered_artifacts = (*runtime_artifacts, *execution.artifacts, *evaluator_artifacts)
+            registered_artifact_ids = self.store.register_artifacts(
+                attempt.attempt_id, registered_artifacts
+            )
+            if execution.result.status is RuntimeStatus.SUCCEEDED:
                 artifact_ids_by_store_key = {
                     artifact["store_key"]: artifact_id
                     for artifact, artifact_id in zip(registered_artifacts, registered_artifact_ids)

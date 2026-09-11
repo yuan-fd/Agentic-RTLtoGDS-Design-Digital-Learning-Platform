@@ -1,0 +1,54 @@
+<div class="callout"><strong>核心修正：</strong>L2/L3/L4 是“优化服务”，不是设计从无到有的全部步骤。平台还需要需求契约、前端设计、功能验证、基础实现、证据接口和交付服务。这些服务可以调用插件，不必由平台重写算法。</div>
+<h2>1. 功能架构：一套共同控制平面，多个研究能力</h2>
+<div class="matrix" role="img" aria-label="建议的平台分层架构"><div class="tier"><strong>用户工作台</strong><small>规格导入 / 澄清确认 / 状态 / 证据 / 候选行动 / 授权 / 交付</small></div><div class="tier"><strong>目标与任务组织</strong><small>SpecIR / DesignGoal / 能力发现 / 受控规划 / 可恢复 workflow</small></div><div class="tier plugin"><strong>外部研究能力</strong><small>RTL 生成与验证辅助 ｜ 参数搜索 L2 ｜ 有限动作 L3 ｜ 源码演化 L4 ｜ 专业诊断 / 知识检索</small></div><div class="tier core"><strong>平台拥有的确定性控制平面</strong><small>Contracts → Policy → Runtime → 受限 adapter；超时、取消、隔离、预算、事件、产物、恢复</small></div><div class="tier protected"><strong>受保护的验证与评价</strong><small>固定验收条件 / 原始证据 / 合格性 / QoR / 统计 / provenance</small></div></div>
+<p class="caption">建议逻辑图，不表示插件可绕过 Policy 直接启动进程。所有执行都须经过共同控制平面；研究能力的输出只是提案或待验证产物。</p>
+<h2>2. 从一个 UART 改造规格开始：第一次工作不是优化</h2>
+<p><span class="badge plan">教学设计示例，未验收</span>用户希望在经典 UART 上增加 APB 接口、深度 16 的接收 FIFO、可配置波特率和错误状态，使用指定开源工艺完成教学级版图。这个示例用于解释职责，不能拿当前 8 位加法器验收替它背书。</p>
+<div class="rail"><article><h3>① 需求澄清：先把“对”定义出来</h3><p><strong>输入：</strong>规格书、自然语言、可复用项目版本。<strong>工作：</strong>澄清 FIFO 满/空行为、复位、寄存器语义、配置生效时机、接口时序、时钟和验收目标。<strong>输出：</strong>用户确认的 SpecIR、需求编号、验证计划、DesignGoal、权限和预算。</p><p>系统不能把“低功耗”偷偷解释为任意数值。默认值要标成建议，经确认后再冻结。对于上传文件，本次未验证已具备通用 PDF/DOCX 规格摄取能力。</p></article>
+<article><h3>② 执行前检查：决定任务是否具备条件</h3><p>检查可复用源码权限、接口和工艺支持、验证入口、工具环境、输入哈希、资源预算。输出可执行计划或具体阻塞项。<strong>此时不需要 L2，也不应该盲目生成 RTL。</strong></p></article>
+<article><h3>③ 前端设计插件：产生第一个候选</h3><p>调用获准 RTL 生成/复用能力，保存候选与来源。验证组件依据冻结需求检查候选，把编译、仿真、反例等反馈给原生设计插件。这里已经有“候选 → 检查 → 修订”的闭环。当前原生 RTLScout 的单任务例子有真实证据。[[E01]][[C26]]</p></article>
+<article><h3>④ 前端验收：形成精确 checkpoint</h3><p>区分语法可编译、功能通过当前检查、测试质量三个结论。同一模型生成 RTL 和 testbench 互相认可，并不足以证明需求正确。保存需求版本、冻结 oracle、验证覆盖、候选哈希与未覆盖项。</p><p>当前加法器的穷举对这个组合逻辑任务很有说服力，但不能外推到包含复杂状态的设计。mutation gate 说明测试能捕获所选扰动，也不等于任意缺陷都可检测。</p></article>
+<article><h3>⑤ 基础实现：建立第一份物理证据</h3><p>Runtime 提交受控综合/布局/CTS/布线任务，采集阶段报告与最终结果。baseline 是比较基准，也是把“这个设计在此条件下怎么样”变成事实的第一步；它不是 L1 的全部价值。</p></article>
+<article><h3>⑥ 观察与优化：此时才挑选 L2/L3/L4</h3><p>目标已满足则交付；信息不足则补充查询；适合参数搜索则请求 L2；具备受控 checkpoint 和局部修复能力才考虑 L3；证据和授权支持机制实验才考虑 L4。没有适用能力时必须停止或请求人工，而不是让模型自行执行 shell。</p></article>
+<article><h3>⑦ 交付：给结果，也给剩余风险</h3><p>交付规格版本、RTL、验证结果、GDS、约束、工具版本、QoR、失败历史和未满足项。应明确“教学级”，不以文件存在代替功能或签核结论。</p></article></div>
+<h2>3. 三种工具粒度：命令、平台能力、优化 campaign</h2>
+<div class="table-wrap"><table><thead><tr><th>层级</th><th>例子</th><th>谁承担责任</th></tr></thead><tbody><tr><td>OpenROAD 原生命令</td><td><code>repair_timing</code>、<code>repair_design</code> 等原生功能。[[R10]]</td><td>OpenROAD 实现优化机制；必须满足它的设计状态与分析前置条件。</td></tr><tr><td>平台语义工具</td><td><code>query_timing</code>、<code>run_stage</code>、<code>compare_runs</code>。[[C04]]</td><td>Policy 验参数、Runtime 执行与登记、适配器映射。一个平台工具可能封装多条审查过的原生命令。</td></tr><tr><td>研究能力 / campaign</td><td>在冻结搜索域和预算下运行 A2 参数搜索。[[C10]]</td><td>上游拥有候选生成；外层控制器持久化阶段与预算；不能由 HTTP handler 长时间运行 EDA。</td></tr></tbody></table></div>
+<p><strong>同一个命令可以出现在不同层级的任务里。</strong>固定流程调用一次修复，与围绕 checkpoint 自适应编排修复动作不同；修改该命令的实现则是源码级优化。不要用命令名字代替修改权限的定义。</p>
+<h2>4. 代码模块：现在在哪里，未来在哪里扩展？</h2>
+<div class="table-wrap"><table><thead><tr><th>模块</th><th>当前路径 / 入口</th><th>应拥有 / 不应拥有</th></tr></thead><tbody>
+<tr><td>公共协议</td><td><code>packages/contracts</code><br><code>platform.py</code>、<code>agent_control.py</code>、<code>product_surface.py</code> [[C01]][[C04]][[C05]]</td><td>类型、校验、版本和产品角色；不导入 Runtime、应用或具体插件实现。</td></tr>
+<tr><td>交互与组装</td><td><code>apps/l1_workbench/service.py</code>、<code>terminal_dashboard.py</code>；<code>apps/api</code>、<code>apps/web</code> [[C24]]</td><td>验证传输、组装服务、展示存储事实；不在 UI 里重建优化历史或宣告 QoR。</td></tr>
+<tr><td>语义工具与策略边界</td><td><code>l1_tool_registry.py</code>、<code>l1_runtime_bridge.py</code>、<code>l1_model_boundary.py</code> [[C08]][[C09]][[C25]]</td><td>将有类型调用接到受控任务；研究型规划不应藏在 transport handler。</td></tr>
+<tr><td>Workflow / 控制器</td><td><code>packages/scheduler</code> 的 L1 状态、handoff、campaign、checkpoint。[[C10]][[C19]]</td><td>持久化计划进展、资源和授权；不重写上游搜索算法。</td></tr>
+<tr><td>Runtime</td><td><code>runtime.py</code>、<code>runtime_store.py</code>；类 <code>WorkflowRuntime</code>。[[C07]]</td><td>run/attempt、终态、工作区、取消、恢复、产物；不是 LLM 可任意改写的记录。</td></tr>
+<tr><td>执行边界</td><td><code>packages/execution</code>；<code>ProcessAdapter</code>、插件任务工厂、进程控制。[[C06]]</td><td>有界子进程、产物校验和薄适配；不接管插件研究策略。</td></tr>
+<tr><td>分析与评价</td><td><code>packages/analysis</code>；受保护 evaluator、诊断、artifact graph、convergence。[[C12]][[C14]][[C20]][[C21]]</td><td>可核验事实、指标语义、派生视图；诊断假设不能变成 canonical QoR。</td></tr>
+<tr><td>外部接入</td><td><code>integrations/&lt;plugin&gt;</code> 的锁文件、adapter；当前 A2 adapter 原生调用。[[C11]]</td><td>版本、环境、I/O 映射、原始轨迹；不能偷偷用本地等价算法替代上游。</td></tr>
+</tbody></table></div>
+<p class="small">这张表既标明当前代码位置，也说明建议维持的职责；不是声称所有模块已经完全解耦。本轮仅确认 contracts 的指定禁止导入边未出现。</p>
+<h2>5. 一次请求在代码里怎样旅行？</h2>
+<pre>用户 / API
+  → SpecIR 或 GoalDraft → 用户确认的 DesignGoal
+  → SemanticToolCall（类型化操作，不是 shell）
+  → Policy（目标、当前状态、能力、权限、预算）
+  → TaskSpec（冻结输入与参数、超时、产物要求）
+  → WorkflowRuntime（run → stage → attempt）
+  → ProcessAdapter（私有工作区与有界进程）
+  → 上游原生工具 / 插件
+  ← PluginResult + 原始日志 / 候选 / checkpoint
+  → 退出码、路径、类型、哈希等校验
+  → 受保护评价：实测指标与合格性
+  ← 持久化事件、ToolReceipt、下一次观察</pre>
+<p>公开契约分别定义 <code>TaskSpec</code>、<code>PluginManifest</code> 和 <code>PluginResult</code>。插件返回 <code>succeeded</code> 只是待验证的结果声明；Runtime 还要核对进程退出和必需产物。优化目标是否满足，又是另一层判断。[[C01]][[C02]][[C03]][[C06]]</p>
+<h2>6. A2 的两层循环：不要让工作台抢算法的工作</h2>
+<pre>外层：用户目标 / 授权 / 能力选择 / 停止与恢复
+   └─ A2 campaign 的持久化控制器
+       ├─ 调用原生初始化或策略插件 → 参数候选
+       ├─ Runtime 调 ORFS 候选执行器
+       ├─ 受保护评价 → observation
+       └─ observation 回到原生 A2，生成下一轮候选</pre>
+<p>A2 adapter 调用锁定源码中的 <code>OptimizationWorkflow</code> 与 <code>run_iteration()</code>；当前还在提案生成前绑定同一上游 commit 的完整参数约束，因为原生硬编码范围与发布的约束文件存在差异。这是需要披露的适配，不应说“零改动精确论文复现”。平台没有在返回候选后偷偷裁剪维度。[[C11]][[E02]]</p>
+<p>恢复 controller 应重新加载已存在的 run ID 与 checkpoint，不能因为浏览器刷新就再花一次 EDA 预算。HTTP 负责调度和返回 ID，独立 worker 负责获准执行。[[C10]][[C23]][[E10]][[E16]]</p>
+<h2>7. 冻结什么，允许变什么？</h2>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>可变对象</th><th>必须单独保护的对象</th></tr></thead><tbody><tr><td>前端设计迭代</td><td>候选 RTL；每版有独立哈希和谱系。</td><td>已确认 spec、独立验收条件、oracle。不能改测试答案使候选过关。</td></tr><tr><td>固定目标的 L2</td><td>事先授权的参数域。</td><td>RTL、PDK、验收 SDC、目标、评价规则、种子策略和比较预算。</td></tr><tr><td>当前 A2 上游协议</td><td>完整 12 维域，包括候选时钟。</td><td>固定的是“搜索/评价协议”，不能把它混成固定 SDC 实验。[[C14]]</td></tr><tr><td>L3 局部动作</td><td>授权 checkpoint 上的指定设计变换。</td><td>功能、外部约束与受保护评价；每个候选必须保存可回退来源。</td></tr><tr><td>L4 源码演化</td><td>独立源码工作区的获准引擎文件与候选二进制。</td><td>基线版本、编译配方、设计/PDK/SDC、测试、评价和统计。候选工具变化是实验处理，不是允许评价器变化。</td></tr></tbody></table></div>
+<div class="callout danger"><strong>协议变化必须显式：</strong>当前源码显示 L2 请求会申请完整 151 次预算并进入可变时钟域。演示时必须把它讲成单独授权的研究 campaign，而不是原封不动地继续“最多 3 次、不改 SDC”的任务。后续若要支持用户固定目标，须先解决协议映射并通过治理，不可今天直接改受保护评价器。[[C15]][[C14]]</div>

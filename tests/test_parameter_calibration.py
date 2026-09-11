@@ -23,6 +23,8 @@ def test_plan_is_single_factor_repeated_and_constraint_safe(tmp_path):
         rtl=tmp_path / "gcd.v",
     )
     assert len(cases) == 90
+    addon = [row for row in cases if row["parameter"] == "place_density_lb_addon"]
+    assert {row["requested_value"] for row in addon} == {0, .25, .50}
     detail = [row for row in cases if row["parameter"] == "detail_placement_padding"]
     assert all(row["control_parameters"]["global_placement_padding"] == 3 for row in detail)
     assert all(row["control_parameters"]["place_density_lb_addon"] == 0 for row in detail)

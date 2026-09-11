@@ -13,7 +13,7 @@ from openroad_platform_execution import PluginRegistry
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = Path(__file__).parent / "fixtures" / "closed_loop_orfs_adapter.py"
+FIXTURE = (Path(__file__).parent / "fixtures" / "closed_loop_orfs_adapter.py").resolve()
 
 
 def _state(tmp_path: Path, monkeypatch) -> tuple[ApiState, dict]:
@@ -36,7 +36,7 @@ def _state(tmp_path: Path, monkeypatch) -> tuple[ApiState, dict]:
         source=("module closed_loop_top(input clk, input a, output reg y); "
                 "always @(posedge clk) y <= a; endmodule\n"),
     )
-    kinds = ("report", "odb", "config", "toolchain_snapshot", "parameter_contract", "run_result",
+    kinds = ("report", "log", "odb", "config", "toolchain_snapshot", "parameter_contract", "run_result",
              "design_input_manifest",
              "def", "netlist", "gds")
     manifest = PluginManifest(

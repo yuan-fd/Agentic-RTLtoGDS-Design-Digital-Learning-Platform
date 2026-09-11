@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "plugin_id": "a2-orfo",
+  "source": {
+    "repository": "https://github.com/CODA-Team/TaiWei-flow-Agent.git",
+    "commit": "8b20a3c1f22934a39c7ba51ed0ec6dffe730da2d",
+    "tree": "b3906db597359f5786e6cfc69f308479e26f5800",
+    "execution_checkout": "var/external-sources/a2-orfo-8b20a3c-clean",
+    "license": {
+      "spdx": "BSD-3-Clause",
+      "sha256": "243601633b171278cd98f9ea495cbfc74aad9d7fc062c6e7c81e20d1fc44a22f",
+      "redistribution": "Green with notice retention and separate nested-asset review"
+    },
+    "nested_trees": {
+      "AutoTuner-integration": "133c3a3caac4190045237d88f375ca240696671a",
+      "EDA-Corpus-main": "4ca82f3a590d70433bba9085d0b2de88321b8db3",
+      "rag": "81915dff86431358322aad7a405cba6f2e43bcff",
+      "rag_data": "e69c0c46d052c3a2cef833194649fb1bef11c461"
+    },
+    "nested_licenses": {
+      "EDA-Corpus-main": {
+        "spdx": "CC-BY-4.0",
+        "sha256": "7e7170e3cebf88a9f60c7b8421418323c09304da1af4d5e90f4da1dc1c8a2661"
+      }
+    },
+    "algorithm_files": {
+      "optimize.py": "01d3ac68abf03880c6b9b2bf6e6db5484ab247314a2df0643f865c3565a14ad5",
+      "constraint_optimizer.py": "0b891e70c4c80b390909795281a6a786e29ece9175dfe52c99d130b1d4d10ceb",
+      "inspectfuncs.py": "39179bf246a2b0a9cd7d950ec9c52c5392fc8c1c38aa0434a001cf1c7dc00cfb",
+      "modelfuncs.py": "342307d8efbf60bed755aa137dc9ec07c097da69ee81d549e3498d65bc7fc60d",
+      "prompts.py": "7edc2d26739324128623b7dcb5e0e5a3956ab8ea191b5ddeff5263624a38e852",
+      "rag/index.py": "5bf91f3ee43247c9e2648bc7fc932a2f499b3079c07f5c9339fabd69ee3249ef",
+      "rag/util.py": "fa4338b8918c40adb3a2fabd2227763691c234ac365c0a5751d8e737a06e1391",
+      "rag_data/docs.pkl": "47665c700e5391c26ceb6f257c0230d4edfe05bafd5eb4fab2bb5727512e47f3",
+      "rag_data/embeddings.npy": "f7fe86e357fd53613459aa7fe252e80686bc4a5dd467279dbec159ef7a91f9ef",
+      "AutoTuner-integration/ORFS-with-AutoTuner/constraints.json": "9de2da8058266f8287b153a06ecafbc3698281b24ea226f9e72e458336dcf7ad"
+    }
+  },
+  "embedding_model": {
+    "repository": "https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1",
+    "retrieval_mirror": "https://hf-mirror.com/mixedbread-ai/mxbai-embed-large-v1",
+    "commit": "b33106f585b9ce46904ad7443a3b52b7a63e231c",
+    "license": {
+      "spdx": "Apache-2.0",
+      "sha256": "4b0dfefcb74f1e50a8df72a9f2bf0088753f8568bc479387292469b4948705d4"
+    },
+    "checkout": "var/external-models/mxbai-embed-large-v1-b33106f"
+  },
+  "execution_policy": {
+    "require_detached_clean_source": true,
+    "deny_native_launchers": [
+      "maindriver.sh",
+      "run_parallel.sh",
+      "AutoTuner-integration/AutoTuner/run_or_job.py",
+      "AutoTuner-integration/ORFS-with-AutoTuner/run_or_job.py"
+    ],
+    "adapter_boundary": "A2-ORFO policy only; Runtime owns all EDA execution and protected evaluation",
+    "credential_policy": "platform-managed model authority only; never persist credentials"
+  }
+}

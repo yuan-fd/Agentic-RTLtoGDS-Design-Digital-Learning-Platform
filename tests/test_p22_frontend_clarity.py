@@ -50,11 +50,12 @@ def test_frontend_and_backend_follow_the_reference_task_sequence() -> None:
     assert 'id="backendDesignChips"' in html
     assert ".task-panel .stage" in css and "grid-template-columns: 18px 95px 1fr 55px" in css
     assert "attempt.metrics" in javascript
-    assert 'post("/api/v2/external-optimizer-loops", base)' in javascript
+    assert 'post("/api/v2/external-optimizer-loops"' not in javascript
     assert "repetitions: 3" not in javascript and "stall_window: 3" not in javascript
     assert "max_transitions: 64" not in javascript
     assert 'api(`/api/v2/external-optimizer-loops/${encodeURIComponent(pipelineId)}`)' in javascript
-    assert "setTimeout(() => pollClosedLoop(pipelineId), 5000)" in javascript
+    assert "historical checkpoints are read-only" not in javascript
+    assert "legacy reduced-domain controller cannot be created" in javascript
     assert "run-to-boundary" not in javascript
     assert 'id="flowUtil"' not in html
     assert 'id="flowDensity"' not in html
@@ -72,7 +73,8 @@ def test_frontend_and_backend_follow_the_reference_task_sequence() -> None:
     assert "runtime_worker_ready" in javascript
     assert "dse_controller_ready" in javascript
     assert 'api("/api/v2/external-optimizer-loops")' in javascript
-    assert "restoreActiveClosedLoop" in javascript
+    assert "restoreActiveClosedLoop" not in javascript
+    assert "restoreHistoricalExternalLoop" in javascript
     assert "v=20260828d" in html
     assert "renderBackendEvidence" in javascript
     assert "paintDensityHeatmap" in javascript
@@ -89,7 +91,7 @@ def test_language_switch_has_persisted_real_translations() -> None:
 
     assert 'data-locale="zh"' in html and 'data-locale="en"' in html
     assert 'data-i18n="backend.run.action"' in html
-    assert '"backend.run.action": "开始 Agent 自主 BO/GP 优化"' in javascript
+    assert '"backend.run.action": "查看历史 L2 记录"' in javascript
     assert 'localStorage.setItem("openroad-platform-locale"' in javascript
     assert 'document.documentElement.lang = state.locale === "zh" ? "zh-CN" : "en"' in javascript
     html_keys = set(re.findall(r'data-i18n="([^"]+)"', html))
@@ -108,8 +110,8 @@ def test_rtlscout_benchmark_only_entry_is_deleted(tmp_path: Path) -> None:
     assert not hasattr(state, "submit_rtlscout")
 
 
-def test_product_state_exposes_only_the_autonomous_bogp_business_path(tmp_path: Path) -> None:
-    """Old tutorial modes must be deleted, not merely hidden in the browser."""
+def test_product_state_retires_legacy_external_l2_writes(tmp_path: Path) -> None:
+    """Historical controller records stay readable but cannot be mutated."""
     state = ApiState(
         tmp_path / "platform.db", tmp_path / "uploads", tmp_path / "orfs",
         design_root=tmp_path / "designs", legacy_root=tmp_path / "legacy",
@@ -128,6 +130,10 @@ def test_product_state_exposes_only_the_autonomous_bogp_business_path(tmp_path: 
     assert hasattr(state, "run_bayesian_closed_loop_to_boundary")
     assert hasattr(state, "start_external_optimizer_loop")
     assert hasattr(state, "advance_external_optimizer_loop")
+    with pytest.raises(ValueError, match="complete 12-D variable-clock"):
+        state.start_external_optimizer_loop({"spec_id": "legacy"})
+    with pytest.raises(ValueError, match="historical checkpoints are read-only"):
+        state.advance_external_optimizer_loop("legacy")
 
     # The autonomous Agent trace uses one stable vocabulary shared by the
     # dashboard, experiment exporter and paper figures.

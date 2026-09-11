@@ -26,6 +26,17 @@ class L1SemanticToolPolicy:
             cls._exact(a, {"run_id", "artifact_id", "offset", "max_bytes"}, {"run_id", "artifact_id", "max_bytes"})
             cls._id(a["run_id"], "run_id"); cls._id(a["artifact_id"], "artifact_id"); cls._integer(a.get("offset", 0), "offset", 64 * 1024 * 1024); cls._integer(a["max_bytes"], "max_bytes", 64 * 1024)
             if not a["max_bytes"]: raise ValueError("max_bytes must be positive")
+        elif call.tool is ToolName.QUERY_OPENROAD_KNOWLEDGE:
+            cls._exact(a, {"query", "purpose", "top_k"}, {"query"})
+            query = a["query"]
+            if (not isinstance(query, str) or not query.strip()
+                    or len(query.encode("utf-8")) > 16_384 or "\x00" in query):
+                raise ValueError("OpenROAD knowledge query is invalid")
+            if a.get("purpose", "knowledge") not in {"knowledge", "error_explanation"}:
+                raise ValueError("OpenROAD knowledge purpose is invalid")
+            cls._integer(a.get("top_k", 5), "top_k", 10)
+            if not a.get("top_k", 5):
+                raise ValueError("top_k must be positive")
         elif call.tool is ToolName.SET_FLOW_PARAMS:
             cls._exact(a, {"values"}, {"values"}); values = a["values"]
             if not isinstance(values, Mapping) or not values or set(values) - set(goal.allowed_parameters): raise ValueError("parameter values are outside DesignGoal policy")

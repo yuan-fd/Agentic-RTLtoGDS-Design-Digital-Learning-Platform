@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "html_pages": 9,
+  "checked_links": 487,
+  "evidence_citations": 252,
+  "syntax_checked_snippets": 4,
+  "failures": [],
+  "limits": "Static structure/link/syntax checks, supplemented by separately saved real browser screenshots; not full accessibility or backend UI validation."
+}

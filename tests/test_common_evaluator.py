@@ -144,3 +144,79 @@ def test_protected_evaluator_never_writes_error_evidence_through_adapter_symlink
     assert artifact["path"] == "protected_evaluator_error.log"
     assert (workspace / artifact["path"]).is_file()
     assert not list(outside.rglob("*"))
+
+
+def test_protected_evaluator_separates_full_candidate_signoff_from_upstream_objective(tmp_path):
+    workspace = tmp_path / "candidate-workspace"
+    logs = workspace / "work/logs/sky130hd/aes/candidate"
+    results = workspace / "work/results/sky130hd/aes/candidate"
+    logs.mkdir(parents=True); results.mkdir(parents=True)
+    for prefix in ("1_synth", "2_1_floorplan", "3_5_place_dp", "4_1_cts"):
+        payload = {"design__instance__count": 1}
+        if prefix == "2_1_floorplan":
+            payload["run__flow__platform__time_units"] = "1ns"
+        _json(logs / f"{prefix}.json", payload)
+    _json(logs / "5_2_route.json", {
+        "detailedroute__design__instance__count": 1,
+        "detailedroute__route__drc_errors": 0,
+    })
+    _json(logs / "6_report.json", {
+        "finish__design__instance__area": 123.0,
+        "finish__design__die__area": 456.0,
+        "finish__timing__setup__ws": 0.15,
+        "finish__power__total": 0.25,
+    })
+    for name in ("6_final.odb", "6_final.def", "6_final.gds", "6_final.v"):
+        (results / name).write_bytes(name.encode())
+    config = workspace / "mapped_config.mk"
+    config.write_text("export CLK_PERIOD = 4.5\n", encoding="utf-8")
+    candidate = {
+        "CLK": 4.5, "UTIL": 20, "TNS_End_Percent": 100,
+        "GP_PAD": 0, "DP_PAD": 1, "DPO": 1, "PIN_ADJ": .3,
+        "UP_ADJ": .4, "LB_ADDON": .2, "HIER_SYNTH": 0,
+        "CTS_CSIZE": 10, "CTS_CDIA": 80,
+    }
+    _json(workspace / "candidate_metrics.json", {
+        "schema_version": 1, "ECP_final": 4.35,
+        "raw_final_report": {"finish__timing__setup__ws": .15},
+        "candidate_clock_units": "ns",
+    })
+    _json(workspace / "candidate_materialization.json", {
+        "kind": "orfs-agent-paper-candidate-materialization",
+        "platform": "sky130hd", "design": "aes", "candidate": candidate,
+        "or_seed": 101, "private_config": str(config),
+        "expected_report_directory": str(logs),
+        "expected_result_directory": str(results),
+    })
+    protocol = {
+        "design_bundle_sha256": "1" * 64,
+        "pdk_bundle_sha256": "2" * 64,
+        "toolchain_receipt_sha256": "3" * 64,
+    }
+    task = TaskSpec(
+        task_id="full-candidate-evaluation", project_id="paper", design_id="aes",
+        plugin_id="orfs-agent",
+        inputs={"mode": "upstream_full_candidate", "design": "aes",
+                "platform": "sky130hd", "objective": "ECP", "candidate": candidate,
+                "parameter_domain": {"protocol_sha256": "4" * 64,
+                                     "experiment_protocol": protocol}},
+        parameters={"or_seed": 101}, timeout_seconds=1,
+    )
+    manifest = PluginManifest(
+        plugin_id="orfs-agent", plugin_version="2025.1", adapter_entry=("echo",),
+        capabilities=("optimizer.l2.upstream-full-candidate",),
+        supported_arch=("test",), input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+    artifact = ORFSProtectedEvaluator().evaluate(
+        manifest=manifest, task=task, workspace=str(workspace),
+    )[0]
+    assert artifact["metadata"]["official_qor"] is True
+    assert artifact["metadata"]["fixed_sdc_fair_comparison"] is False
+    assert artifact["metadata"]["qor_semantics"] == "candidate-variable-clock-signoff"
+    assert artifact["metadata"]["canonical_metrics"]["setup_wns_ns"] == .15
+    assert "ECP_final" not in artifact["metadata"]["canonical_metrics"]
+    evaluation = json.loads((workspace / artifact["path"]).read_text())
+    assert evaluation["run_metadata"]["upstream_variable_clock_metrics"]["ECP_final"] == 4.35
+    assert evaluation["run_metadata"]["upstream_metrics_are_canonical_signoff"] is False
+    assert evaluation["identity"]["source_kind"] == "orfs-agent-upstream-variable-clock-candidate"

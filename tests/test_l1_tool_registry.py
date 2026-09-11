@@ -14,7 +14,7 @@ class _Bridge:
 def _goal():
     return DesignGoal("goal-1", "project-1", "design-1", "platform-1", "pdk-1", "toolchain-1", EvidencePointer("artifact:rtl", "b" * 64), GoalPreference.BALANCED, (QoRConstraint("wns", ">=", 0),), ("route",), ("density",), AgentBudget(1, 1, 60), tuple(sorted(TUTORIAL_L1_TOOLS, key=lambda x: x.value)))
 
-def test_registry_discovers_exactly_tutorial_twelve_tools_and_dispatches():
+def test_registry_discovers_exactly_tutorial_tools_and_dispatches():
     registry = L1RuntimeToolRegistry(_Bridge())
     assert {item.name for item in registry.contract.definitions} == TUTORIAL_L1_TOOLS
     goal = _goal(); state = DesignState("state-1", "goal-1", 0, "running", None, {}, AgentBudget(1, 1, 60))
@@ -45,6 +45,7 @@ def test_registry_dispatches_every_fixed_tool_surface():
         ToolName.QUERY_CONGESTION: {"run_id": "run-1"}, ToolName.QUERY_DRC: {"run_id": "run-1"},
         ToolName.QUERY_POWER: {"run_id": "run-1"}, ToolName.QUERY_STAGE_METRICS: {"run_id": "run-1"},
         ToolName.QUERY_ARTIFACT_EXCERPT: {"run_id": "run-1", "artifact_id": "artifact-1", "max_bytes": 1},
+        ToolName.QUERY_OPENROAD_KNOWLEDGE: {"query": "Explain DRT-0349", "purpose": "error_explanation", "top_k": 3},
         ToolName.SET_FLOW_PARAMS: {"values": {"density": 1}}, ToolName.RUN_STAGE: {"stage": "route"},
         ToolName.RUN_FULL_FLOW: {}, ToolName.COMPARE_RUNS: {"left_run_id": "run-1", "right_run_id": "run-2", "metrics": ["wns"]},
         ToolName.STOP_OR_ESCALATE: {"run_id": "run-1", "reason": "bounded stop"},

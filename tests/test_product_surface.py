@@ -23,7 +23,11 @@ def test_product_surface_allows_only_approved_identity_and_capability():
     )
     DEFAULT_PRODUCT_SURFACE.authorize(
         ProductRole.L2_OPTIMIZATION,
-        _manifest("orfs-agent", ("optimizer.l2.propose",)),
+        _manifest("a2-orfo", ("optimizer.l2.a2-orfo-feedback",)),
+    )
+    DEFAULT_PRODUCT_SURFACE.authorize(
+        ProductRole.OPENROAD_KNOWLEDGE,
+        _manifest("orassistant", ("knowledge.openroad.retrieve",)),
     )
 
 
@@ -41,7 +45,7 @@ def test_product_surface_rejects_registered_but_non_product_algorithms():
     with pytest.raises(PermissionError, match="lacks approved capability"):
         DEFAULT_PRODUCT_SURFACE.authorize(
             ProductRole.L2_OPTIMIZATION,
-            _manifest("orfs-agent", ("optimizer.l2.dataset-bridge",)),
+            _manifest("a2-orfo", ("optimizer.l2.a2-orfo-policy",)),
         )
 
 

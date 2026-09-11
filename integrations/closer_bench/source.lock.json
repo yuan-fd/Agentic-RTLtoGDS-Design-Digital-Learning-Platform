@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "project": "CLOSER-Bench",
+  "status": "source-audit-only",
+  "canonical_publication": "https://arxiv.org/abs/2607.16632v1",
+  "arxiv_id": "2607.16632v1",
+  "published_at": "2026-07-18T04:28:47Z",
+  "title": "CLOSER-Bench: Evaluating Budgeted Cross-Stage Design Closure for Hardware Agents",
+  "authors": [
+    "Peilong Zhou",
+    "Zhirong Chen",
+    "Cangyuan Li",
+    "Haoyu Gao",
+    "Kaiyan Chang",
+    "Ziming Qu",
+    "Ying Wang"
+  ],
+  "paper": {
+    "pdf_url": "https://arxiv.org/pdf/2607.16632v1",
+    "pdf_sha256": "84280d8b1a79924c5742fa1536fd1c48622cf93b7dd407d348b02c5b4750ac28",
+    "license": "arXiv.org perpetual non-exclusive license"
+  },
+  "described_toolchain": [
+    "Harbor",
+    "Verilator",
+    "Yosys",
+    "OpenSTA",
+    "OpenROAD-flow-scripts",
+    "KLayout",
+    "Sky130HD",
+    "openroad/orfs:26Q3-52-gc90beac09"
+  ],
+  "described_tasks": ["spec-to-RTL", "RTL-to-GDS", "spec-to-GDS"],
+  "required_but_unavailable": {
+    "canonical_source_repository": null,
+    "exact_source_commit": null,
+    "source_or_data_license": null,
+    "native_entrypoint": null,
+    "task_checksum_manifest": null,
+    "container_digest": null,
+    "hidden_oracle_package": null,
+    "frozen_stage_pair_release": null
+  },
+  "redistribution_conclusion": "Red-no-source-license",
+  "execution_allowed": false,
+  "plugin_registration_allowed": false,
+  "native_smoke": "unavailable",
+  "platform_smoke": "unavailable"
+}

@@ -15,7 +15,7 @@ from openroad_platform_scheduler.l1_goal_finalizer import GoalFinalizer, Trusted
 
 
 class ManagedTutorialProfile:
-    """One bounded mux/ORFS exercise; profile values are never user-writable."""
+    """One bounded managed ORFS exercise; values are never user-writable."""
 
     profile_id = "orfs_mux_baseline_v1"
     _objectives = {
@@ -38,9 +38,23 @@ class ManagedTutorialProfile:
          "Choose maximum EDA runs: 1, 2, or 3."),
     )
 
+    def __init__(
+        self, *, profile_id: str = "orfs_mux_baseline_v1",
+        design_context: str = "managed_mux_default_corner_baseline",
+        design_label: str = "managed_tutorial_mux",
+    ) -> None:
+        self.profile_id = profile_id
+        self.design_context = design_context
+        self.design_label = design_label
+
     def questions(self) -> tuple[ClarificationQuestion, ...]:
-        return tuple(ClarificationQuestion(question_id, field, prompt, True)
-                     for question_id, field, prompt in self._required)
+        return (*tuple(ClarificationQuestion(question_id, field, prompt, True)
+                       for question_id, field, prompt in self._required),
+                ClarificationQuestion(
+                    "design_context", ClarificationField.DESIGN_CONTEXT,
+                    "Confirm the managed baseline and timing corner: "
+                    f"{self.design_context}.", True,
+                ))
 
     def compile(self, draft: GoalDraft, policy: TrustedGoalPolicy, *, goal_id: str):
         draft.validate(); policy.validate()
@@ -50,7 +64,7 @@ class ManagedTutorialProfile:
         required_ids = {item[0] for item in self._required}
         if not required_ids.issubset(answers) or set(answers) - (required_ids | {"design_context"}):
             raise ValueError("tutorial Goal has missing or unexpected clarification answers")
-        if answers.get("design_context") not in {None, "managed_mux_default_corner_baseline"}:
+        if answers.get("design_context") not in {None, self.design_context}:
             raise ValueError("tutorial design context must use the managed baseline/corner")
         try:
             preference = self._objectives[answers["objective"]]
@@ -81,7 +95,7 @@ class ManagedTutorialProfile:
         return replace(goal, labels={
             **goal.labels,
             "l1_profile_id": self.profile_id,
-            "l1_profile_design_context": "managed_tutorial_mux",
+            "l1_profile_design_context": self.design_label,
             "l1_profile_toolchain": policy.toolchain_id,
             "l1_objective": answers["objective"],
             "l1_constraints": answers["constraints"],

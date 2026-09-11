@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="description" content="审计方法、16 份验收摘要、159 个产物引用复核、代码定位、原始文献和术语表。"><title>证据与参考资料 | Agentic EDA 平台报告</title><style>:root{--paper:#f5f1e8;--surface:#fffdf8;--ink:#182b32;--muted:#52646a;--line:#d6dcd4;--teal:#09675f;--blue:#245680;--amber:#93611e;--red:#a23c31;--serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong",serif;--sans:"Noto Sans CJK SC","Source Han Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"DejaVu Sans Mono",Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.9 var(--sans);background-image:linear-gradient(#09675f04 1px,transparent 1px),linear-gradient(90deg,#09675f04 1px,transparent 1px);background-size:32px 32px}a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:4px}a:hover{color:var(--blue)}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--amber);outline-offset:4px}.skip{position:absolute;left:-9999px}.skip:focus{left:12px;top:12px;background:white;padding:12px;z-index:99}.topbar{border-top:6px solid var(--teal);border-bottom:1px solid var(--line);padding:16px max(24px,calc((100vw - 1360px)/2));display:flex;justify-content:space-between;gap:24px;align-items:center;background:#fffdf8eb}.brand{font:600 16px/1.4 var(--mono);letter-spacing:.04em;text-decoration:none;color:var(--ink)}.topmeta{font:12px/1.5 var(--mono);color:var(--muted);text-align:right}.layout{max-width:1360px;margin:auto;display:grid;grid-template-columns:225px minmax(0,1fr);gap:42px;padding:36px 24px 72px}nav{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}nav .label,.eyebrow{font:600 12px/1.6 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal)}nav a{display:block;padding:10px 12px;margin:3px 0;font-size:14px;line-height:1.55;text-decoration:none;color:var(--muted);border-left:2px solid transparent}nav a small{font:11px var(--mono);margin-right:9px;color:var(--teal)}nav a.active{background:#e2ebe4;border-left-color:var(--teal);color:var(--ink);font-weight:700}.nav-note{font-size:12px;color:var(--muted);margin:22px 12px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.button,button{border:1px solid var(--teal);padding:8px 14px;border-radius:3px;background:var(--teal);color:white;font:14px var(--sans);cursor:pointer;text-decoration:none;display:inline-block}.button.secondary,button.secondary{background:transparent;color:var(--teal)}.button:hover{color:white;background:var(--blue)}main{min-width:0}.pagehead{padding:12px 0 30px;border-bottom:1px solid var(--line);margin-bottom:30px}.pagehead h1{font:700 clamp(30px,4vw,48px)/1.25 var(--serif);letter-spacing:-.035em;margin:13px 0 20px;max-width:900px}.deck{font-size:18px;line-height:1.85;color:var(--muted);max-width:850px}.readtime{font:12px var(--mono);color:var(--muted)}h2{font:700 27px/1.45 var(--serif);margin:45px 0 18px;letter-spacing:-.015em;border-top:1px solid var(--line);padding-top:26px}h3{font-size:19px;line-height:1.6;margin:26px 0 10px}h4{font-size:16px;margin-bottom:8px}p{margin:12px 0}li{margin:6px 0}ul,ol{padding-left:24px}strong{font-weight:750}blockquote{border-left:4px solid var(--teal);margin:22px 0;padding:16px 22px;background:#e6eee7;font:600 20px/1.8 var(--serif)}.callout{padding:18px 22px;border-left:4px solid var(--teal);background:#e7efe8;margin:22px 0}.callout.warn{border-color:var(--amber);background:#f4ead7}.callout.danger{border-color:var(--red);background:#f3e2dc}.callout.note{border-color:var(--blue);background:#e7edf1}.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.card{padding:22px;background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--teal);border-radius:3px;min-width:0}.card h3{margin-top:3px}.card p{font-size:15px}.stat{font:600 43px/1.3 var(--serif);color:var(--teal);display:block}.badge{display:inline-block;font:600 11px/1.65 var(--sans);padding:3px 8px;border:1px solid #abc6b8;background:#e6eee7;color:#125b47;border-radius:3px;margin:0 5px 3px 0;white-space:nowrap}.badge.partial{color:#775112;border-color:#d5bf91;background:#f4ecd8}.badge.plan{color:var(--blue);background:#e9eff5;border-color:#b4c6d6}.badge.blocked{color:#933b34;border-color:#dcb5ac;background:#f7e9e4}.badge.history{color:#586266;border-color:#cbd0cd;background:#eceeeb}.table-wrap{overflow-x:auto;border:1px solid var(--line);margin:18px 0;background:var(--surface)}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.8}th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:#e6ebe5;color:#234642;font-size:13px}tr:last-child td{border-bottom:0}tbody tr:nth-child(even){background:#f4f5ef}code{font:13px/1.7 var(--mono);background:#e9ebe4;padding:2px 4px;border-radius:2px;overflow-wrap:anywhere}pre{padding:22px;background:#183238;color:#e9f0e5;overflow-x:auto;font:13px/1.85 var(--mono);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere}pre code{background:none;padding:0;color:inherit}.ref{font:600 11px/1.5 var(--mono);padding:1px 4px;border:1px solid #a9c4ba;border-radius:2px;text-decoration:none;white-space:nowrap;margin:0 3px}.small,.caption{font-size:13px;line-height:1.8;color:var(--muted)}.caption{margin-top:8px}.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:9px;margin:24px 0}.flow .node{padding:14px 16px;background:var(--surface);border:1px solid var(--line);flex:1 1 130px;font-size:14px}.flow .node strong{display:block;font-size:16px}.flow .arrow{align-self:center;color:var(--teal);font-size:22px}.rail{border-left:2px solid #92afa0;padding-left:26px;margin:24px 0}.rail article{position:relative;margin:0 0 25px}.rail article:before{content:"";position:absolute;left:-33px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--teal);border:2px solid var(--paper)}.rail h3{margin-top:0}.hero-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:26px;align-items:center}.chip{max-width:100%;height:auto}.hero-statement{font:600 25px/1.65 var(--serif)}.matrix{border:1px solid var(--line);background:var(--surface);padding:20px;margin:22px 0}.matrix .tier{padding:13px 16px;margin:8px 0;border:1px solid #aec3b6;background:#edf2eb;line-height:1.7}.matrix .tier.core{background:#d6e5de;border:2px solid var(--teal)}.matrix .tier.plugin{background:#e7edf2;border-color:#b0c5d5}.matrix .tier.protected{background:#f2e6da;border-color:#d1b28a}.matrix .tier small{display:block;color:var(--muted)}details{border:1px solid var(--line);background:var(--surface);padding:14px 18px;margin:14px 0}summary{cursor:pointer;font-weight:700}details[open] summary{margin-bottom:12px}.evidence-card{margin:22px 0;padding:20px;background:var(--surface);border:1px solid var(--line)}.evidence-card h3{margin-top:0}.hash{display:block;font:11px/1.8 var(--mono);overflow-wrap:anywhere;color:var(--muted)}.decision{padding:22px;border:1px solid #aac5b5;background:#fafcf7;margin:24px 0}.decision .head{display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px}.decision dl{display:grid;grid-template-columns:100px 1fr;gap:8px 16px}.decision dt{font-weight:700;color:var(--teal)}.decision dd{margin:0}.toc-list{list-style:none;padding:0;counter-reset:toc}.toc-list li{border-bottom:1px solid var(--line);padding:13px 0;display:grid;grid-template-columns:30px 1fr;gap:12px}.toc-list li:before{counter-increment:toc;content:counter(toc,decimal-leading-zero);color:var(--teal);font:13px var(--mono);padding-top:6px}.toc-list a{font-weight:700;text-decoration:none}.toc-list span{display:block;color:var(--muted);font-size:14px}.pagefoot{margin-top:40px;border-top:1px solid var(--line);padding-top:20px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.all-chapter{border-top:5px solid var(--teal);padding-top:30px;margin-top:70px}.checklist li::marker{color:var(--teal)}.nowrap{white-space:nowrap}.motion{animation:appear .5s ease-out both}@keyframes appear{from{transform:translateY(5px)}to{transform:none}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.motion{animation:none}}
+@media(max-width:1000px){.layout{grid-template-columns:180px minmax(0,1fr);gap:24px}.grid.three{grid-template-columns:1fr}.hero-grid{grid-template-columns:1fr}.chip{max-height:180px}.pagehead h1{font-size:36px}}
+@media(max-width:720px){body{font-size:15px}.topbar{padding:12px 18px;gap:12px;align-items:flex-start}.brand{font-size:13px}.topmeta{font-size:10px}.layout{display:block;padding:16px 18px 45px}nav{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:22px}nav{scrollbar-width:none}nav::-webkit-scrollbar{display:none}nav a{flex:0 0 auto;max-width:160px;font-size:12px;padding:8px;border-left:0;border-bottom:2px solid transparent}nav a.active{border-bottom-color:var(--teal)}nav .label,.nav-note{display:none}.pagehead{padding-top:0}.pagehead h1{font-size:30px}.deck{font-size:16px}.grid,.grid.three{grid-template-columns:1fr}.card{padding:18px}.stat{font-size:34px}h2{font-size:24px}blockquote{font-size:18px;padding:14px 16px}.callout{padding:14px 16px}th,td{padding:9px;min-width:100px}table{font-size:13px}.decision dl{grid-template-columns:1fr;gap:3px}.decision dd{margin-bottom:12px}pre{padding:15px;font-size:11px}.hero-statement{font-size:21px}.flow .node{flex-basis:100%}.flow .arrow{transform:rotate(90deg);margin:auto}.topmeta .optional{display:none}}
+@media print{@page{size:A4;margin:16mm 14mm}body{background:white;color:#111;font-size:10pt;line-height:1.65}.topbar,nav,.actions,.skip,.pagefoot{display:none}.layout{display:block;max-width:none;padding:0}.pagehead{margin:0 0 16px;padding:0 0 12px}.pagehead h1{font-size:26pt}.deck{font-size:12pt}.eyebrow{font-size:9pt}.all-chapter{break-before:page;margin:0;padding-top:0;border-top:0}h2{font-size:17pt;margin:24px 0 10px;padding-top:14px;break-after:avoid}h3{font-size:12pt;break-after:avoid}.card,.callout,.evidence-card,.decision,blockquote{break-inside:avoid}.grid{gap:10px}.card{padding:12px}.table-wrap{overflow:visible}table{font-size:8.5pt;line-height:1.6}thead{display:table-header-group}tr{break-inside:avoid}th,td{padding:7px;min-width:0}pre{background:#f0f2ef;color:#172c32;font-size:8pt;padding:12px;break-inside:avoid}.stat{font-size:28pt}a{color:inherit}.hero-grid{grid-template-columns:1.4fr .6fr}.caption,.small{font-size:8.5pt}.ref{font-size:7pt}.motion{animation:none}details::details-content{content-visibility:visible}details{break-inside:auto}summary{display:block}.hash{font-size:7pt}.badge{font-size:7pt}}
+</style></head>
+<body><a class="skip" href="#main">跳到正文</a><header class="topbar"><a class="brand" href="index.html">OPENROAD / RESEARCH PLATFORM</a><div class="topmeta">2026.09.05<br><span class="optional">PROPOSAL → ARCHITECTURE → EVIDENCE</span></div></header><div class="layout"><nav aria-label="报告章节"><div class="label">Field Notes / 2026</div><a class="" href="index.html"><small>00</small>今天的汇报</a><a class="" href="01-proposal.html"><small>01</small>Tutorial 要做什么</a><a class="" href="02-architecture.html"><small>02</small>平台架构与工作流</a><a class="" href="03-intelligence.html"><small>03</small>算法机制与智能工作台</a><a class="" href="04-audit-roadmap.html"><small>04</small>现状锐评与行动</a><a class="" href="05-contributors.html"><small>05</small>贡献者指南</a><a class="" href="06-workshop.html"><small>06</small>汇报与 Workshop</a><a class="active" href="07-evidence.html"><small>07</small>证据与参考资料</a><p class="nav-note">绿色：有界证据<br>琥珀：部分完成<br>蓝色：建议设计<br>红色：停止 / 未满足<br><br>不以 smoke 宣称 PPA 优势。</p></nav><main id="main"><header class="pagehead motion"><div class="eyebrow">AGENTIC EDA / 证据与参考资料</div><h1>每个结论都有出处和适用范围</h1><p class="deck">审计方法、16 份验收摘要、159 个产物引用复核、代码定位、原始文献和术语表。</p><span class="readtime">REFERENCE · 2026-09-05 · 文档审计，不是新增平台功能</span></header><div class="actions"><a class="button secondary" href="完整报告.html">完整单文件 / 适合发送老师</a><button class="secondary" type="button" onclick="document.querySelectorAll('details').forEach(x=>x.open=true);window.print()">打印 / 导出 PDF</button></div><div class="callout warn"><strong>怎样使用证据：</strong>摘要中的 succeeded/accepted 说明对应验收记录的状态。由本轮重新计算的哈希说明“当前可定位文件与记录一致”；两者都不能单独证明算法优势、广泛泛化或原始实验绝无缺陷。报告只提出与证据范围相匹配的结论。</div>
+<h2 id="audit-method">核验方法与边界</h2>
+<p>本轮读取当前工作树，不把 HEAD 当作完整版本。复核 16 份现有 summary.json 的内容和 SHA-256，重新计算其中可直接定位的 159 个产物引用（159 个不同路径）的哈希，全部一致；不是重新执行这些 EDA 实验。没有直接枚举产物路径的摘要，仅核对摘要及其声明，不推断完成了全量传递依赖复核。</p>
+<p>另运行 51 项针对性测试，全部通过；静态扫描 contracts 未发现其导入 scheduler、execution、analysis、apps 或 integrations 的边。这个扫描不等于证明整个仓库完全无循环依赖。4 份摘要的治理文档未内嵌对应哈希，本轮补充计算，不能称为“与既有签名核对通过”。</p>
+<p><a href="verification/source-audit.json">机器可读源证据清单</a> · <a href="verification/focused-tests.log">本轮测试输出</a> · <a href="verification/research-sources.json">公开文献访问记录</a></p>
+<h2 id="evidence-records">现有验收证据</h2>
+<article class="evidence-card" id="E01"><span class="badge">E01 · 已核摘要</span><h3>Native RTLScout Spec-to-GDS</h3>
+<p><a href="../../var/evidence/rtlscout-native-spec-to-gds-20260905-r8/summary.json"><code>var/evidence/rtlscout-native-spec-to-gds-20260905-r8/summary.json</code></a></p>
+<span class="hash">SHA-256 602a13dc56145ab3b3e3f7c290b92c269fe4f137b54e6e14b3185f8b075f4cb0</span>
+<p class="small">摘要终态：{&quot;rtlscout&quot;: &quot;succeeded&quot;, &quot;compile_lint&quot;: &quot;succeeded&quot;, &quot;simulation&quot;: &quot;succeeded&quot;, &quot;mutation_quality&quot;: &quot;succeeded&quot;, &quot;orfs_finish&quot;: &quot;succeeded&quot;}。本轮直接产物引用复核：44 项。</p>
+<p class="small">声明边界：One real bounded SpecIR-to-native-RTLScout-to-verified-RTL-to-GDS acceptance. It proves integration and evidence continuity for this specification; it is not a general RTL correctness or PPA-superiority claim.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_044_EXECUTED_CROSS_STAGE_RTL_RECOVERY.md、docs/governance/SLICE_031_RTLSCOUT_NATIVE_SPEC_TO_GDS.md、docs/governance/SLICE_034_FOUR_DOMAIN_STAGE_DIAGNOSTICS.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;8a5c8118d30448198b094504d4d77e08&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;cf44881b08424592adee249f826b6ae3&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;95d6b57626b946faaa887235bf463b8b&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;faf8167596b84c00928b4382e4954227&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;a8c1f3dc74e14713a928cded6ebeb193&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;8a5c8118d30448198b094504d4d77e08&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;cf44881b08424592adee249f826b6ae3&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;95d6b57626b946faaa887235bf463b8b&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;faf8167596b84c00928b4382e4954227&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;statuses&quot;: {
+      &quot;rtlscout&quot;: &quot;succeeded&quot;,
+      &quot;compile_lint&quot;: &quot;succeeded&quot;,
+      &quot;simulation&quot;: &quot;succeeded&quot;,
+      &quot;mutation_quality&quot;: &quot;succeeded&quot;,
+      &quot;orfs_finish&quot;: &quot;succeeded&quot;
+    },
+    &quot;checks&quot;: {
+      &quot;native_rtlscout_runtime_succeeded&quot;: true,
+      &quot;native_entrypoint_provenance&quot;: true,
+      &quot;provider_trace_registered&quot;: true,
+      &quot;native_chat_registered&quot;: true,
+      &quot;candidate_history_registered&quot;: true,
+      &quot;compile_lint_passed&quot;: true,
+      &quot;simulation_passed&quot;: true,
+      &quot;mutation_quality_passed&quot;: true,
+      &quot;orfs_finish_succeeded&quot;: true,
+      &quot;gds_registered_nonempty&quot;: true,
+      &quot;protected_evaluation_registered&quot;: true,
+      &quot;upstream_source_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;One real bounded SpecIR-to-native-RTLScout-to-verified-RTL-to-GDS acceptance. It proves integration and evidence continuity for this specification; it is not a general RTL correctness or PPA-superiority claim.&quot;,
+    &quot;natural_language_spec&quot;: &quot;设计一个名为 native_adder8 的无时钟组合逻辑模块。输入 a、b 均为 8 位无符号数，输出 sum 为低 8 位加法结果，也就是模 256 加法。要求所有 65536 组输入都正确，通过 lint、仿真和 mutation gate 后，用 Nangate45 完整实现到 GDS。&quot;,
+    &quot;verification&quot;: {
+      &quot;testbench_sha256&quot;: &quot;8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421&quot;,
+      &quot;origin&quot;: &quot;reference_model&quot;,
+      &quot;reviewed_by&quot;: &quot;tutorial-acceptance/reference-exhaustive-adder-v1&quot;,
+      &quot;exhaustive_vectors&quot;: 65536
+    }
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E02"><span class="badge">E02 · 已核摘要</span><h3>A2 native proposal / real execution / feedback</h3>
+<p><a href="../../var/evidence/a2-orfo-single-feedback-20260905-r4/summary.json"><code>var/evidence/a2-orfo-single-feedback-20260905-r4/summary.json</code></a></p>
+<span class="hash">SHA-256 c11638e49bf345987afda2f7159856a67cb4b1f962ceb6a8520d95f6ff7f55aa</span>
+<p class="small">摘要终态：succeeded。本轮直接产物引用复核：28 项。</p>
+<p class="small">声明边界：One real policy/execution/evaluator/feedback loop; not a campaign or PPA-superiority result.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/A2_ORFO_INTAKE.md、docs/governance/SLICE_041_A2_ORFO_PRODUCT_MIGRATION.md、docs/governance/SLICE_030_A2_ORFO_SINGLE_FEEDBACK_ADMISSION.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;ae6da176d4b34bbf831bb99c1cb6b7d9&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;335167f6f3bc4c15a03796e015bb7101&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;3b66e823738e406daaa575259aa715e6&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;status&quot;: &quot;succeeded&quot;,
+    &quot;checks&quot;: {
+      &quot;all_12_dimensions_preserved&quot;: true,
+      &quot;runtime_candidate_origin_is_a2&quot;: true,
+      &quot;protected_evaluator_participated&quot;: true,
+      &quot;failure_feedback_preserved&quot;: true,
+      &quot;next_candidate_after_feedback&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;One real policy/execution/evaluator/feedback loop; not a campaign or PPA-superiority result.&quot;,
+    &quot;feedback_status&quot;: &quot;succeeded&quot;,
+    &quot;feedback_feasible&quot;: false,
+    &quot;first_candidate&quot;: {
+      &quot;UTIL&quot;: 22,
+      &quot;GP_PAD&quot;: 2,
+      &quot;DP_PAD&quot;: 2,
+      &quot;HIER_SYNTH&quot;: 1,
+      &quot;PIN_ADJ&quot;: 0.12494800693719052,
+      &quot;UP_ADJ&quot;: 0.11485421415648206,
+      &quot;TNS_End_Percent&quot;: 2,
+      &quot;LB_ADDON&quot;: 0.021069862431160286,
+      &quot;CTS_CSIZE&quot;: 10,
+      &quot;CTS_CDIA&quot;: 81,
+      &quot;DPO&quot;: 1,
+      &quot;CLK&quot;: 0.8398030390039897
+    },
+    &quot;next_candidate&quot;: {
+      &quot;UTIL&quot;: 23,
+      &quot;GP_PAD&quot;: 3,
+      &quot;DP_PAD&quot;: 2,
+      &quot;HIER_SYNTH&quot;: 1,
+      &quot;PIN_ADJ&quot;: 0.11535716741522478,
+      &quot;UP_ADJ&quot;: 0.13763719847831246,
+      &quot;TNS_End_Percent&quot;: 3,
+      &quot;LB_ADDON&quot;: 0.017671872914611062,
+      &quot;CTS_CSIZE&quot;: 11,
+      &quot;CTS_CDIA&quot;: 82,
+      &quot;DPO&quot;: 1,
+      &quot;CLK&quot;: 1.2647461671099167
+    },
+    &quot;historical_source&quot;: {
+      &quot;pipeline_id&quot;: &quot;pipeline-ef2fd9f80e8940a1b796a68de5af9916&quot;,
+      &quot;revision&quot;: 99,
+      &quot;rows_used&quot;: 5,
+      &quot;claim&quot;: &quot;historical ORFS measurements relabeled only into the new A2 protocol envelope; source protocol hashes retained&quot;
+    }
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E03"><span class="badge">E03 · 已核摘要</span><h3>Executed backend-to-RTL checkpoint recovery</h3>
+<p><a href="../../var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/summary.json"><code>var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/summary.json</code></a></p>
+<span class="hash">SHA-256 1606eb84083be453a9efe2e8b1cfa7986899089332d08059247f0250472bbf6d</span>
+<p class="small">摘要终态：{&quot;clean_checkpoint_verify&quot;: &quot;succeeded&quot;, &quot;clean_checkpoint_simulation&quot;: &quot;succeeded&quot;, &quot;fault_verify&quot;: &quot;succeeded&quot;, &quot;fault_simulation&quot;: &quot;succeeded&quot;, &quot;fault_orfs&quot;: &quot;failed&quot;, &quot;restored_verify&quot;: &quot;succeeded&quot;, &quot;restored_simulation&quot;: &quot;succeeded&quot;, &quot;restored_orfs&quot;: &quot;succeeded&quot;}。本轮直接产物引用复核：56 项。</p>
+<p class="small">声明边界：One platform-owned, bounded cross-stage recovery acceptance over the exact RTL from a pinned native RTLScout acceptance. A SYNTHESIS-only unresolved blackbox passed the unchanged functional oracle and failed real ORFS; L1 recorded a conservative no-QoR failure diagnosis and typed restore plan, then reverified the clean content-addressed checkpoint and reached a real registered GDS with protected QoR. This is not CLOSER-Bench, a repair-policy accuracy result, or evidence of general recovery capability.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_044_EXECUTED_CROSS_STAGE_RTL_RECOVERY.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;82417c559e8f4996b5d3e3c2bfe467ec&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;dfc54207f87e42d98daa1e7922c944d7&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;dfe1d8cda04d42109d3c1002c2760735&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;a05aecd1561349dcabafa8e255278c33&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;23c5ef37b4d34f76aefd458881fb7f77&quot;,
+      &quot;status&quot;: &quot;failed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;2c857c9777c9403b999cbc3d73aca2d3&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;8d5014eb0dba486799178a7f89a7a6a2&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;5181ec1c41cd48cc82d43f9e7cccd5e7&quot;,
+      &quot;status&quot;: &quot;passed&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;82417c559e8f4996b5d3e3c2bfe467ec&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;dfc54207f87e42d98daa1e7922c944d7&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;dfe1d8cda04d42109d3c1002c2760735&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;a05aecd1561349dcabafa8e255278c33&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;2c857c9777c9403b999cbc3d73aca2d3&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;8d5014eb0dba486799178a7f89a7a6a2&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;5181ec1c41cd48cc82d43f9e7cccd5e7&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;statuses&quot;: {
+      &quot;clean_checkpoint_verify&quot;: &quot;succeeded&quot;,
+      &quot;clean_checkpoint_simulation&quot;: &quot;succeeded&quot;,
+      &quot;fault_verify&quot;: &quot;succeeded&quot;,
+      &quot;fault_simulation&quot;: &quot;succeeded&quot;,
+      &quot;fault_orfs&quot;: &quot;failed&quot;,
+      &quot;restored_verify&quot;: &quot;succeeded&quot;,
+      &quot;restored_simulation&quot;: &quot;succeeded&quot;,
+      &quot;restored_orfs&quot;: &quot;succeeded&quot;
+    },
+    &quot;checks&quot;: {
+      &quot;source_acceptance_pinned&quot;: true,
+      &quot;fault_protocol_pinned&quot;: true,
+      &quot;clean_checkpoint_independently_verified&quot;: true,
+      &quot;fault_frontend_passed&quot;: true,
+      &quot;fault_backend_really_failed&quot;: true,
+      &quot;failure_artifacts_retained&quot;: true,
+      &quot;diagnosis_has_no_fake_qor&quot;: true,
+      &quot;typed_fix_decision&quot;: true,
+      &quot;restore_plan_is_durable&quot;: true,
+      &quot;restore_selects_exact_clean_hash&quot;: true,
+      &quot;restored_frontend_passed&quot;: true,
+      &quot;restored_backend_succeeded&quot;: true,
+      &quot;restored_gds_registered&quot;: true,
+      &quot;restored_protected_qor_registered&quot;: true,
+      &quot;failed_and_success_checks_both_durable&quot;: true,
+      &quot;external_sources_unchanged&quot;: true,
+      &quot;bounded_backend_budget&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;One platform-owned, bounded cross-stage recovery acceptance over the exact RTL from a pinned native RTLScout acceptance. A SYNTHESIS-only unresolved blackbox passed the unchanged functional oracle and failed real ORFS; L1 recorded a conservative no-QoR failure diagnosis and typed restore plan, then reverified the clean content-addressed checkpoint and reached a real registered GDS with protected QoR. This is not CLOSER-Bench, a repair-policy accuracy result, or evidence of general recovery capability.&quot;,
+    &quot;official_closer_bench_result&quot;: false
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E04"><span class="badge">E04 · 已核摘要</span><h3>ORAssistant native retrieval in Runtime</h3>
+<p><a href="../../var/evidence/orassistant-platform-20260905-r3/summary.json"><code>var/evidence/orassistant-platform-20260905-r3/summary.json</code></a></p>
+<span class="hash">SHA-256 615864ce23a50d97e192c5b90db73f79774a43e543aa036073b5b8e03b54e43e</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：5 项。</p>
+<p class="small">声明边界：One real read-only Runtime query with native ORAssistant BM25 and resolvable citations; no broad RAG-quality, LLM diagnosis, or EDA success claim.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_032_ORASSISTANT_CITED_RETRIEVAL.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;b8108f2064ed41a981bd38ea49099a66&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;runtime_succeeded&quot;: true,
+      &quot;all_required_artifacts_registered&quot;: true,
+      &quot;native_bm25_used&quot;: true,
+      &quot;drt_0349_evidence_returned&quot;: true,
+      &quot;citations_have_document_and_chunk_hashes&quot;: true,
+      &quot;explanation_is_evidence_scoped&quot;: true,
+      &quot;denied_surfaces_confirmed&quot;: true,
+      &quot;native_smoke_preceded_platform&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;One real read-only Runtime query with native ORAssistant BM25 and resolvable citations; no broad RAG-quality, LLM diagnosis, or EDA success claim.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E05"><span class="badge">E05 · 已核摘要</span><h3>Four-domain stage diagnostics</h3>
+<p><a href="../../var/evidence/four-domain-stage-diagnostics-20260905-r1/summary.json"><code>var/evidence/four-domain-stage-diagnostics-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 4677856456a0911471f8139f7a5d174c90a3052c3be56679bd01d0b2205ec98e</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：Deterministic normalization and threshold analysis over one real accepted Runtime view. Missing congestion remains unavailable and absent power budget remains unknown. This does not claim root-cause localization.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_034_FOUR_DOMAIN_STAGE_DIAGNOSTICS.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;four_domains&quot;: true,
+      &quot;timing_is_protected_fact&quot;: true,
+      &quot;timing_value_preserved&quot;: true,
+      &quot;timing_headroom_computed&quot;: true,
+      &quot;drc_value_preserved&quot;: true,
+      &quot;power_fact_without_fake_budget&quot;: true,
+      &quot;missing_congestion_is_explicit&quot;: true,
+      &quot;all_metric_evidence_registered&quot;: true,
+      &quot;no_unverified_root_cause&quot;: true,
+      &quot;no_blocker_on_feasible_observed_domains&quot;: true,
+      &quot;input_acceptance_pinned&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;Deterministic normalization and threshold analysis over one real accepted Runtime view. Missing congestion remains unavailable and absent power budget remains unknown. This does not claim root-cause localization.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E06"><span class="badge">E06 · 已核摘要</span><h3>Typed control-state replay</h3>
+<p><a href="../../var/evidence/l1-pdagent-control-state-20260905-r1/summary.json"><code>var/evidence/l1-pdagent-control-state-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 9360cb95377cd7c1f57e105d95776557337f300a6451a2b482702af82751d158</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：A durable role/state transition replay over one real protected ORFS measurement. It does not execute a fix, copy PDAGENT code, or validate PDAGENT-BENCH task accuracy.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_035_PDAGENT_CONTROL_STATE.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;335167f6f3bc4c15a03796e015bb7101&quot;,
+      &quot;status&quot;: &quot;completed&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;real_input_pinned&quot;: true,
+      &quot;protected_timing_preserved&quot;: true,
+      &quot;timing_blocker_detected&quot;: true,
+      &quot;planner_hub_path&quot;: true,
+      &quot;analyzer_bound_to_report&quot;: true,
+      &quot;debugger_bound_to_facts&quot;: true,
+      &quot;typed_stop_not_shell&quot;: true,
+      &quot;recovery_budget_unchanged&quot;: true,
+      &quot;durable_latest_round_trip&quot;: true,
+      &quot;no_runtime_or_artifact_mutation&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;A durable role/state transition replay over one real protected ORFS measurement. It does not execute a fix, copy PDAGENT code, or validate PDAGENT-BENCH task accuracy.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E07"><span class="badge">E07 · 已核摘要</span><h3>Artifact graph</h3>
+<p><a href="../../var/evidence/edatracer-style-artifact-graph-20260905-r1/summary.json"><code>var/evidence/edatracer-style-artifact-graph-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 df79d33949160f1efc8b018afd0f918729b1e99e0e3a008bbb0f325422e37aa4</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：A bounded typed graph over the five real Runtime runs in one accepted Spec-to-GDS flow, with Runtime-mediated excerpts and artifact/file-line citations. It is not EDATracer&#x27;s vector index, dataset scale, or benchmark result.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_036_EDATRACER_STYLE_ARTIFACT_GRAPH.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;source_pinned&quot;: true,
+      &quot;all_runtime_runs_indexed&quot;: true,
+      &quot;required_entities&quot;: true,
+      &quot;stage_artifact_edges&quot;: true,
+      &quot;metric_source_edges&quot;: true,
+      &quot;cross_run_content_edges&quot;: true,
+      &quot;file_line_locations&quot;: true,
+      &quot;no_absolute_document_names&quot;: true,
+      &quot;registered_hash_evidence&quot;: true,
+      &quot;runtime_database_unchanged&quot;: true,
+      &quot;raw_workspace_hidden&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;A bounded typed graph over the five real Runtime runs in one accepted Spec-to-GDS flow, with Runtime-mediated excerpts and artifact/file-line citations. It is not EDATracer&#x27;s vector index, dataset scale, or benchmark result.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E08"><span class="badge">E08 · 已核摘要</span><h3>Convergence classification</h3>
+<p><a href="../../var/evidence/evidence-backed-convergence-20260905-r1/summary.json"><code>var/evidence/evidence-backed-convergence-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 a1ebfb85c691b5827c130ab7604e0000c9c7bd74448c57d2826a50341bb32d2f</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：This is deterministic trend classification over pinned, protected-evaluator-attested measurements. Stable independent confirmations demonstrate repeated metric equality, not optimizer convergence or PPA superiority; the mixed search trajectory remains unknown, and failed measurements remain visible.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">未找到同时包含该路径与本次 SHA-256 的治理文档；本轮仅补充记录。</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;source_campaign_completed&quot;: true,
+      &quot;full_budget_retained&quot;: true,
+      &quot;independent_confirmations_retained&quot;: true,
+      &quot;mixed_search_not_overclaimed&quot;: true,
+      &quot;replicated_metric_is_stable&quot;: true,
+      &quot;failure_tail_not_hidden&quot;: true,
+      &quot;same_protocol_only&quot;: true,
+      &quot;all_success_points_protected&quot;: true,
+      &quot;source_databases_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;This is deterministic trend classification over pinned, protected-evaluator-attested measurements. Stable independent confirmations demonstrate repeated metric equality, not optimizer convergence or PPA superiority; the mixed search trajectory remains unknown, and failed measurements remain visible.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E09"><span class="badge">E09 · 已核摘要</span><h3>Typed recovery policy</h3>
+<p><a href="../../var/evidence/l1-typed-recovery-policy-20260905-r1/summary.json"><code>var/evidence/l1-typed-recovery-policy-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 cfaeb05bff8c98356b4704d1a77849cc9fb3b83531cfd89e865a10fe4216781e</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：Typed, durable policy decisions replayed from real protected evidence. No retry, fix, rollback, L2 handoff, EDA run, or artifact mutation is executed. A2 escalation remains denied until a new durable authorization is verified and consumed by the handoff service.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">未找到同时包含该路径与本次 SHA-256 的治理文档；本轮仅补充记录。</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;real_stalled_evidence_preserved&quot;: true,
+      &quot;stalled_without_new_authorization_fails_closed&quot;: true,
+      &quot;real_blocker_requests_typed_fix&quot;: true,
+      &quot;real_regression_tail_detected&quot;: true,
+      &quot;divergence_selects_evidence_checkpoint&quot;: true,
+      &quot;all_decisions_durable&quot;: true,
+      &quot;no_shell_or_parameter_payload&quot;: true,
+      &quot;source_evidence_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;Typed, durable policy decisions replayed from real protected evidence. No retry, fix, rollback, L2 handoff, EDA run, or artifact mutation is executed. A2 escalation remains denied until a new durable authorization is verified and consumed by the handoff service.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E10"><span class="badge">E10 · 已核摘要</span><h3>A2 configured 151-run campaign; no execution</h3>
+<p><a href="../../var/evidence/a2-orfo-product-migration-20260905-r3/summary.json"><code>var/evidence/a2-orfo-product-migration-20260905-r3/summary.json</code></a></p>
+<span class="hash">SHA-256 86aefcc9c9b7f08199e080d6c4f1da70e7eed6c5052a97d7e49cfc991d656b3c</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：This acceptance proves product routing, complete native-sized campaign configuration, durable persistence and API/worker execution separation. It submits none of the 151 EDA measurements; native A2-&gt;real ORFS-&gt;protected evaluator-&gt;A2 feedback is evidenced separately by Slice 030.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_041_A2_ORFO_PRODUCT_MIGRATION.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;product_role_is_a2_feedback&quot;: true,
+      &quot;old_orfs_optimizer_rejected&quot;: true,
+      &quot;pinned_upstream_head&quot;: true,
+      &quot;native_launcher_budget&quot;: true,
+      &quot;full_151_measurement_budget&quot;: true,
+      &quot;full_12d_shared_domain&quot;: true,
+      &quot;variable_clock_retained&quot;: true,
+      &quot;configured_without_execution&quot;: true,
+      &quot;durable_checkpoint_reopened&quot;: true,
+      &quot;http_forces_scheduling_only&quot;: true,
+      &quot;os_worker_owns_execution&quot;: true,
+      &quot;prior_real_feedback_evidence_intact&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;This acceptance proves product routing, complete native-sized campaign configuration, durable persistence and API/worker execution separation. It submits none of the 151 EDA measurements; native A2-&gt;real ORFS-&gt;protected evaluator-&gt;A2 feedback is evidenced separately by Slice 030.&quot;,
+    &quot;required_eda_runs&quot;: 151,
+    &quot;budget&quot;: {
+      &quot;initial_samples&quot;: 26,
+      &quot;feedback_steps&quot;: 5,
+      &quot;suggestions_per_step&quot;: 25,
+      &quot;confirmations&quot;: 0
+    }
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E11"><span class="badge">E11 · 已核摘要</span><h3>PostEDA derived diagnostic evaluation</h3>
+<p><a href="../../var/evidence/posteda-platform-diagnostic-20260905-r1/summary.json"><code>var/evidence/posteda-platform-diagnostic-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 1684cbea302c22100ad08bfa0efe50a283b42fe758d617c44281c299b1d04a3b</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：1 项。</p>
+<p class="small">声明边界：One admitted PostEDA-Bench DRC q1 public artifact was normalized into the platform four-domain diagnosis and a typed inspect-before-repair decision, then privately checked against upstream hidden metadata. The 1.0 value is a derived integration diagnostic score, not official PostEDA-Bench SR/ERR/VRR, repair success, or broad diagnostic accuracy.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/POSTEDA_BENCH_INTAKE.md、docs/governance/SLICE_042_POSTEDA_DIAGNOSTIC_EVALUATION.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;native_smoke_preceded_platform&quot;: true,
+      &quot;public_runtime_succeeded&quot;: true,
+      &quot;public_artifacts_registered&quot;: true,
+      &quot;native_upstream_parser_used&quot;: true,
+      &quot;hidden_label_firewall&quot;: true,
+      &quot;four_domain_diagnosis&quot;: true,
+      &quot;drc_fact_and_headroom&quot;: true,
+      &quot;drc_blocker_found&quot;: true,
+      &quot;typed_safe_decision&quot;: true,
+      &quot;prediction_sealed_before_scoring&quot;: true,
+      &quot;score_runtime_succeeded&quot;: true,
+      &quot;score_artifacts_registered&quot;: true,
+      &quot;private_exact_score&quot;: true,
+      &quot;derived_not_official&quot;: true,
+      &quot;hidden_values_not_exported&quot;: true,
+      &quot;source_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;One admitted PostEDA-Bench DRC q1 public artifact was normalized into the platform four-domain diagnosis and a typed inspect-before-repair decision, then privately checked against upstream hidden metadata. The 1.0 value is a derived integration diagnostic score, not official PostEDA-Bench SR/ERR/VRR, repair success, or broad diagnostic accuracy.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E12"><span class="badge">E12 · 已核摘要</span><h3>CLOSER paper alignment; not official benchmark</h3>
+<p><a href="../../var/evidence/closer-protocol-alignment-20260905-r2/summary.json"><code>var/evidence/closer-protocol-alignment-20260905-r2/summary.json</code></a></p>
+<span class="hash">SHA-256 f3acd9b1f40fa4a9c1311f90495a207269c431b62f25b8a59b9335d019e8873b</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：Evidence-backed alignment audit against the public CLOSER-Bench paper only. No CLOSER source, task, hidden oracle or scorer was available or executed, so this is not a benchmark result. One separately frozen platform-owned fault now supplies bounded executed recovery evidence; the official stage-paired tasks, hidden oracle and repeated trials remain unavailable.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_045_CLOSER_ALIGNMENT_REFRESH.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;paper_is_version_locked&quot;: true,
+      &quot;missing_source_blocks_execution&quot;: true,
+      &quot;real_spec_to_gds_is_counted&quot;: true,
+      &quot;typed_recovery_is_counted&quot;: true,
+      &quot;executed_recovery_is_counted_without_official_claim&quot;: true,
+      &quot;no_official_claim&quot;: true,
+      &quot;source_evidence_pinned&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;Evidence-backed alignment audit against the public CLOSER-Bench paper only. No CLOSER source, task, hidden oracle or scorer was available or executed, so this is not a benchmark result. One separately frozen platform-owned fault now supplies bounded executed recovery evidence; the official stage-paired tasks, hidden oracle and repeated trials remain unavailable.&quot;,
+    &quot;alignment_counts&quot;: {
+      &quot;met&quot;: 5,
+      &quot;partial&quot;: 2,
+      &quot;missing&quot;: 3
+    }
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E13"><span class="badge">E13 · 已核摘要</span><h3>Managed L1 reference</h3>
+<p><a href="../../var/evidence/l1-managed-aes-reference-20260904-r5/summary.json"><code>var/evidence/l1-managed-aes-reference-20260904-r5/summary.json</code></a></p>
+<span class="hash">SHA-256 636f595490036abfdc5fc585a766de5a3610b703cbce3256f27a3b6273a62cc9</span>
+<p class="small">摘要终态：accepted=未统一声明。本轮直接产物引用复核：25 项。</p>
+<p class="small">声明边界：One real managed L1 reference baseline through finish. It proves typed Goal/Policy/Runtime/feedback and GDS connectivity; it is not an ORFS-Agent campaign or a PPA-superiority claim.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_022_L1_MANAGED_AES_REFERENCE.md</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;4934a4baebe74ac0bb5943a37a24942a&quot;,
+      &quot;status&quot;: &quot;submitted&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;4934a4baebe74ac0bb5943a37a24942a&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;claim_boundary&quot;: &quot;One real managed L1 reference baseline through finish. It proves typed Goal/Policy/Runtime/feedback and GDS connectivity; it is not an ORFS-Agent campaign or a PPA-superiority claim.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E14"><span class="badge">E14 · 已核摘要</span><h3>Typed natural-language tool calls</h3>
+<p><a href="../../var/evidence/l1-codex-tool-call-20260904-r1/summary.json"><code>var/evidence/l1-codex-tool-call-20260904-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 e0b2b89ea662e03632314b826fe13a2649b6f01437ec9a8c026492c5c781a5c6</span>
+<p class="small">摘要终态：accepted=未统一声明。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：A real managed Codex invocation selected one typed read-only L1 tool, cited a hash-validated Runtime artifact, passed platform Policy, and received a tool receipt. It did not execute EDA, prove QoR improvement, or grant the model a shell/path/credential capability.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">docs/governance/SLICE_029_REAL_CODEX_L1_TOOL_CALL.md</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;claim_boundary&quot;: &quot;A real managed Codex invocation selected one typed read-only L1 tool, cited a hash-validated Runtime artifact, passed platform Policy, and received a tool receipt. It did not execute EDA, prove QoR improvement, or grant the model a shell/path/credential capability.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E15"><span class="badge">E15 · 已核摘要</span><h3>Native A2 initializer</h3>
+<p><a href="../../var/evidence/a2-orfo-native-initializer-20260905-r1/summary.json"><code>var/evidence/a2-orfo-native-initializer-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 3dd98e03032091716a6e55eb8f584f5f86d393392140699339d2ab5f7c78e7e3</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：A native A2-ORFO 12-D bootstrap generation Runtime smoke. It generates initial candidates but does not execute ORFS or claim measured QoR. The durable controller executes each point before policy fitting.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">未找到同时包含该路径与本次 SHA-256 的治理文档；本轮仅补充记录。</p><pre>{
+  &quot;runs&quot;: [],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;runtime_succeeded&quot;: true,
+      &quot;native_upstream_entrypoint&quot;: true,
+      &quot;four_bootstrap_candidates&quot;: true,
+      &quot;all_12_dimensions&quot;: true,
+      &quot;variable_clock_retained&quot;: true,
+      &quot;no_model_call_for_random_initializer&quot;: true,
+      &quot;registered_candidate_hash_valid&quot;: true,
+      &quot;source_lock_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;A native A2-ORFO 12-D bootstrap generation Runtime smoke. It generates initial candidates but does not execute ORFS or claim measured QoR. The durable controller executes each point before policy fitting.&quot;
+  }
+}</pre></details></article>
+<article class="evidence-card" id="E16"><span class="badge">E16 · 已核摘要</span><h3>Durable A2 controller</h3>
+<p><a href="../../var/evidence/a2-orfo-durable-controller-20260905-r1/summary.json"><code>var/evidence/a2-orfo-durable-controller-20260905-r1/summary.json</code></a></p>
+<span class="hash">SHA-256 f8e2a9952b45d7a522ea7e067cf6742335989b3c93b3415d50e13e87f9d94d20</span>
+<p class="small">摘要终态：accepted=True。本轮直接产物引用复核：0 项。</p>
+<p class="small">声明边界：A durable controller replay over the already executed real A2 policy -&gt; ORFS -&gt; protected evaluator -&gt; A2 feedback loop. It validates restart and evidence consumption without rerunning EDA. The source single-loop smoke remains the execution proof; neither artifact is a full campaign or PPA claim.</p>
+<details><summary>运行编号、对应文档与关键事实</summary><p class="small">未找到同时包含该路径与本次 SHA-256 的治理文档；本轮仅补充记录。</p><pre>{
+  &quot;runs&quot;: [
+    {
+      &quot;run_id&quot;: &quot;e81649a20d2a4ad5aaf9879346abe4da&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;c4d1336a75554efaa2ea4f923449efb0&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;39037c84844e4f628089c3bfd0eb6923&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;f225bd9a24ad4698adaf63b6061568d1&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;87672ea3d0d44b2da16548bfd261999b&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    },
+    {
+      &quot;run_id&quot;: &quot;335167f6f3bc4c15a03796e015bb7101&quot;,
+      &quot;status&quot;: &quot;succeeded&quot;
+    }
+  ],
+  &quot;facts&quot;: {
+    &quot;accepted&quot;: true,
+    &quot;checks&quot;: {
+      &quot;controller_completed&quot;: true,
+      &quot;one_real_feedback_step&quot;: true,
+      &quot;full_12d_preserved&quot;: true,
+      &quot;real_policy_candidate_preserved&quot;: true,
+      &quot;protected_feedback_preserved&quot;: true,
+      &quot;real_next_candidate_preserved&quot;: true,
+      &quot;policy_then_feedback_capability&quot;: true,
+      &quot;candidate_delegated_to_orfs_agent&quot;: true,
+      &quot;durable_restart_progress&quot;: true,
+      &quot;source_runtime_unchanged&quot;: true,
+      &quot;source_summary_unchanged&quot;: true
+    },
+    &quot;claim_boundary&quot;: &quot;A durable controller replay over the already executed real A2 policy -&gt; ORFS -&gt; protected evaluator -&gt; A2 feedback loop. It validates restart and evidence consumption without rerunning EDA. The source single-loop smoke remains the execution proof; neither artifact is a full campaign or PPA claim.&quot;
+  }
+}</pre></details></article>
+<h2 id="code-records">代码定位：当前工作树，不只 HEAD</h2>
+<p class="small">点击本地路径需保留报告在仓库内。把单文件发送给老师后，正文仍可离线阅读；源代码与原始运行产物不随报告打包。</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>路径 / 入口</th><th>本次文件哈希</th></tr></thead><tbody>
+<tr id="C01"><td>C01</td><td><a href="../../packages/contracts/src/openroad_platform_contracts/platform.py"><code>packages/contracts/src/openroad_platform_contracts/platform.py:85</code></a><br>class TaskSpec</td><td><span class="hash">972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f</span></td></tr>
+<tr id="C02"><td>C02</td><td><a href="../../packages/contracts/src/openroad_platform_contracts/platform.py"><code>packages/contracts/src/openroad_platform_contracts/platform.py:139</code></a><br>class PluginManifest</td><td><span class="hash">972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f</span></td></tr>
+<tr id="C03"><td>C03</td><td><a href="../../packages/contracts/src/openroad_platform_contracts/platform.py"><code>packages/contracts/src/openroad_platform_contracts/platform.py:195</code></a><br>class PluginResult</td><td><span class="hash">972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f</span></td></tr>
+<tr id="C04"><td>C04</td><td><a href="../../packages/contracts/src/openroad_platform_contracts/agent_control.py"><code>packages/contracts/src/openroad_platform_contracts/agent_control.py:30</code></a><br>class ToolName</td><td><span class="hash">3f5912c1aee3ec25bdc2355198e4f18419580baa7314c4bafc2ff01d29f1ba0c</span></td></tr>
+<tr id="C05"><td>C05</td><td><a href="../../packages/contracts/src/openroad_platform_contracts/product_surface.py"><code>packages/contracts/src/openroad_platform_contracts/product_surface.py:77</code></a><br>DEFAULT_PRODUCT_SURFACE =</td><td><span class="hash">54105ca2038d4360876625d3e8e49476452cc20f703ed02b2ab77763e5d5b4e5</span></td></tr>
+<tr id="C06"><td>C06</td><td><a href="../../packages/execution/src/openroad_platform_execution/adapter.py"><code>packages/execution/src/openroad_platform_execution/adapter.py:36</code></a><br>class ProcessAdapter</td><td><span class="hash">04ceda9775b9547945b15ade16d9d61be26e573c97dc4c8a412894666c930fa6</span></td></tr>
+<tr id="C07"><td>C07</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/runtime.py"><code>packages/scheduler/src/openroad_platform_scheduler/runtime.py:22</code></a><br>class WorkflowRuntime</td><td><span class="hash">bd3093eeb61afabb64cd10e17f2c0bdaa9a78fc36952cb9eb60657f92173aa82</span></td></tr>
+<tr id="C08"><td>C08</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/l1_tool_registry.py"><code>packages/scheduler/src/openroad_platform_scheduler/l1_tool_registry.py:48</code></a><br>class L1RuntimeToolRegistry</td><td><span class="hash">779b044f793c9498794cc880e9a80d32ac5b1830ce21b8d60a8820285cbbcec7</span></td></tr>
+<tr id="C09"><td>C09</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/l1_runtime_bridge.py"><code>packages/scheduler/src/openroad_platform_scheduler/l1_runtime_bridge.py:28</code></a><br>class L1RuntimeBridge</td><td><span class="hash">5bf5d75ff4260d9cda641be1e7151df5dea1e497f42ce7141343889c0013cb67</span></td></tr>
+<tr id="C10"><td>C10</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/a2_orfo_campaign.py"><code>packages/scheduler/src/openroad_platform_scheduler/a2_orfo_campaign.py:27</code></a><br>class A2ORFOCampaignService</td><td><span class="hash">959639c96f58feedcd712a7c9ac69a16628eb474046017fc8204864b2286c9da</span></td></tr>
+<tr id="C11"><td>C11</td><td><a href="../../integrations/a2_orfo/a2_orfo_adapter.py"><code>integrations/a2_orfo/a2_orfo_adapter.py:386</code></a><br>workflow = upstream.OptimizationWorkflow</td><td><span class="hash">8dad6fcf507830d87d12f2f643861d0baa2e225eaa9e1828b43e13e3b8f571c7</span></td></tr>
+<tr id="C12"><td>C12</td><td><a href="../../packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py"><code>packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py:195</code></a><br>def _headroom</td><td><span class="hash">37d48a29b1fb5eff3c403adfd7a7fa379142da7ba42acf47e17edcebc67f09bf</span></td></tr>
+<tr id="C13"><td>C13</td><td><a href="../../packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py"><code>packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py:251</code></a><br>def diagnose_runtime</td><td><span class="hash">37d48a29b1fb5eff3c403adfd7a7fa379142da7ba42acf47e17edcebc67f09bf</span></td></tr>
+<tr id="C14"><td>C14</td><td><a href="../../packages/analysis/src/openroad_platform_analysis/orfs_protected_evaluator.py"><code>packages/analysis/src/openroad_platform_analysis/orfs_protected_evaluator.py:84</code></a><br>def _evaluate_full_candidate</td><td><span class="hash">a147f41e88252707d5146a9e2d92e0404ea9eaa9409d9aba33c95965051be1b3</span></td></tr>
+<tr id="C15"><td>C15</td><td><a href="../../apps/l1_workbench/service.py"><code>apps/l1_workbench/service.py:628</code></a><br>request = OptimizationRequest(</td><td><span class="hash">6d35be985aa378c398ec49f859fadd611c17ca3cc9dc018d15a6860befbfe358</span></td></tr>
+<tr id="C16"><td>C16</td><td><a href="../../apps/web/index.html"><code>apps/web/index.html:273</code></a><br>唯一 BO/GP</td><td><span class="hash">f4db7e27541ab6d8d1d3e7963dd0eda425f4855e6887a4dd7c3ae3c4a9a8625e</span></td></tr>
+<tr id="C17"><td>C17</td><td><a href="../../CONTRIBUTING.md"><code>CONTRIBUTING.md:81</code></a><br>项目当前缺少顶层 LICENSE</td><td><span class="hash">e9c424a2bd9378d13c972aaeda63d41b5089b18446ad6550a6a7a59423d0b8a3</span></td></tr>
+<tr id="C18"><td>C18</td><td><a href="../../LICENSE"><code>LICENSE:1</code></a><br>MIT License</td><td><span class="hash">166cbabec71b303acf93427f29db4517f04a29c44ab04a810203b6ba88e7e172</span></td></tr>
+<tr id="C19"><td>C19</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/l1_control_state_machine.py"><code>packages/scheduler/src/openroad_platform_scheduler/l1_control_state_machine.py:33</code></a><br>class </td><td><span class="hash">4aaad873d81dac307250c5fd52e43b269b3bca441d0c36420a8ba48f163e41b6</span></td></tr>
+<tr id="C20"><td>C20</td><td><a href="../../packages/analysis/src/openroad_platform_analysis/convergence.py"><code>packages/analysis/src/openroad_platform_analysis/convergence.py:13</code></a><br>def </td><td><span class="hash">aab73a2e345c248739ac3ae2cdc1894fa33ca007206f36608d0c1a0eccf6a4bf</span></td></tr>
+<tr id="C21"><td>C21</td><td><a href="../../packages/analysis/src/openroad_platform_analysis/artifact_graph.py"><code>packages/analysis/src/openroad_platform_analysis/artifact_graph.py:19</code></a><br>def </td><td><span class="hash">56ed751d741391579015619861684a977f0d53a4f9fc69acdcb57a7e5c9af3ca</span></td></tr>
+<tr id="C22"><td>C22</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/rtl_checkpoint_restore.py"><code>packages/scheduler/src/openroad_platform_scheduler/rtl_checkpoint_restore.py:14</code></a><br>def </td><td><span class="hash">8d56923fd2ed5e0cd09b0e7a5f13e2e379073099910e6a3d96ecdd1110cd9aca</span></td></tr>
+<tr id="C23"><td>C23</td><td><a href="../../apps/l1_workbench/a2_campaign_worker.py"><code>apps/l1_workbench/a2_campaign_worker.py:43</code></a><br>def </td><td><span class="hash">fd32f03ab3f959ec3352944ed8ee0c4c3606a1da218584257ecd43b932d039e4</span></td></tr>
+<tr id="C24"><td>C24</td><td><a href="../../apps/l1_workbench/terminal_dashboard.py"><code>apps/l1_workbench/terminal_dashboard.py:23</code></a><br>def </td><td><span class="hash">bb35dad2365295194f0ab4c44d11ef5125b644776d1577a65ff9a85aee1160fb</span></td></tr>
+<tr id="C25"><td>C25</td><td><a href="../../packages/scheduler/src/openroad_platform_scheduler/l1_model_boundary.py"><code>packages/scheduler/src/openroad_platform_scheduler/l1_model_boundary.py:21</code></a><br>class </td><td><span class="hash">5cc89f5388b6952c74f3a89255bb6f9958d2f2540fd1812e9c6f2962d4d15023</span></td></tr>
+<tr id="C26"><td>C26</td><td><a href="../../packages/execution/src/openroad_platform_execution/rtlscout_native_driver.py"><code>packages/execution/src/openroad_platform_execution/rtlscout_native_driver.py:21</code></a><br>def </td><td><span class="hash">2c57e656e9fa564677f35343dc12b6ce8e3c72f8b3cbad42408b7c3a2ecd6926</span></td></tr>
+</tbody></table></div>
+<h2 id="research-records">原始论文和作者项目</h2>
+<p>截至 2026-09-05 检查公开页面的标题与内容，保存页面哈希和访问状态。论文主张仅用于解释研究方向，不作为本平台能力验收。预印本不写成已正式发表；作者仓库页面可访问，不等于已完成 commit、许可和原生 smoke 的接入审查。外部链接仅在主动点击时联网。</p>
+<div class="table-wrap"><table><thead><tr><th>ID / 项目</th><th>原始来源</th><th>采用范围</th></tr></thead><tbody>
+<tr id="R01"><td>R01<br><strong>ChatEDA</strong></td><td><a href="https://arxiv.org/abs/2308.10204">[2308.10204] ChatEDA: A Large Language Model Powered Autonomous Agent for EDA</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>自然语言任务规划与工具使用；不直接搬入自由脚本执行路径。</td></tr>
+<tr id="R02"><td>R02<br><strong>EDAid</strong></td><td><a href="https://aclanthology.org/2025.naacl-long.83/">Divergent Thoughts toward One Goal: LLM-based Multi-Agent Collaboration System for Electronic Design Automation - ACL Anthology</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>NAACL 2025：多候选协作与决策选择；不是通用物理诊断保证。</td></tr>
+<tr id="R03"><td>R03<br><strong>RTLScout</strong></td><td><a href="https://github.com/huawei-csl/RTLScout">GitHub - huawei-csl/rtlscout: RTLScout is a agentic RTL optimization framework · GitHub</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>作者 RTL 生成/优化实现；支持范围需另行适配与验证。</td></tr>
+<tr id="R04"><td>R04<br><strong>A2-ORFO</strong></td><td><a href="https://github.com/CODA-Team/TaiWei-flow-Agent">GitHub - CODA-Team/TaiWei-flow-Agent · GitHub</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>原生 A2 搜索策略；平台不是它的本地等价实现。</td></tr>
+<tr id="R05"><td>R05<br><strong>ResizerAgent</strong></td><td><a href="https://github.com/ASU-VDA-Lab/ResizerAgent">GitHub - ASU-VDA-Lab/ResizerAgent · GitHub</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>有限动作的时序优化研究；候选接入对象，未宣称本平台已接入。</td></tr>
+<tr id="R06"><td>R06<br><strong>GoalEvolve</strong></td><td><a href="https://arxiv.org/abs/2608.16733">[2608.16733] GoalEvolve: From Handcrafted Algorithm Priors to Goal-Driven Evolution of Physical Design Algorithms</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>2026 年 8 月预印本：目标差距驱动源码演化；本轮未核实可执行发布与许可。</td></tr>
+<tr id="R07"><td>R07<br><strong>CLOSER-Bench</strong></td><td><a href="https://arxiv.org/abs/2607.16632">[2607.16632] CLOSER-Bench: Evaluating Budgeted Cross-Stage Design Closure for Hardware Agents</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>跨阶段评价协议；本平台当前为 Red/source-audit-only。</td></tr>
+<tr id="R08"><td>R08<br><strong>PostEDA-Bench</strong></td><td><a href="https://arxiv.org/abs/2605.06936">[2605.06936] Bridging the Last Mile of Circuit Design: PostEDA-Bench, a Hierarchical Benchmark for PPA Convergence and DRC Fixing</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>DRC/PPA 评价研究；本平台单题派生诊断分不等于官方指标。</td></tr>
+<tr id="R09"><td>R09<br><strong>ORAssistant</strong></td><td><a href="https://arxiv.org/abs/2410.03845">[2410.03845] ORAssistant: A Custom RAG-based Conversational Assistant for OpenROAD</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>OpenROAD 文档 RAG；不等于 run-aware 根因定位。</td></tr>
+<tr id="R10"><td>R10<br><strong>OpenROAD Resizer</strong></td><td><a href="https://openroad.readthedocs.io/en/latest/main/src/rsz/README.html">Gate Resizer — OpenROAD  documentation</a><br><span class="small">访问状态 200 · 2026-09-05</span></td><td>OpenROAD 原生修复能力说明；在线文档版本不是本平台 toolchain 版本。</td></tr>
+</tbody></table></div>
+<h2 id="attachment-records">用户材料与版本</h2>
+<p><strong>ASPDAC27-AgenticEDA-Tutorial-zhiangwang-submitted.pdf</strong><br><span class="hash">/share/home/yuanwenjie/.codex/attachments/de9c7ece-edf7-41fa-a00c-bd1c12daff47/ASPDAC27-AgenticEDA-Tutorial-zhiangwang-submitted.pdf<br>SHA-256 6ce1f5f5f65dc5e2a1dcaa8c8d23ffd595031f7c7688bd0ded6ba106583e6e72</span></p>
+<p><strong>平台状况总结.docx</strong><br><span class="hash">/share/home/yuanwenjie/.codex/attachments/200ebc64-f378-4d88-8b6d-d5eeac34ba9c/平台状况总结.docx<br>SHA-256 aaabb649c4997334f5cbfdbcd8802df09ba1ce18774793ba2f39bfbbefb957d5</span></p>
+<p class="small">仓库 HEAD：<code>8dd4c061b2023620774730ef65634e500a892b61</code>。开始审计时工作树有 193 条状态记录（87 个已跟踪修改、106 个未跟踪项）；提交哈希不能单独复现本次看到的状态。此前已有的 930 个非忽略文件哈希另存于本地核验清单。本报告没有修改其中的业务代码。</p>
+<h2 id="section-1">给初学者的术语表</h2>
+<div class="table-wrap"><table><thead><tr><th>术语</th><th>在本报告里的含义</th><th>容易混淆的地方</th></tr></thead><tbody>
+<tr><td>Spec / SpecIR</td><td>需求及其结构化表达，说明功能、接口、时序行为与验收条件。</td><td>结构化了不代表需求已经完整或正确。</td></tr>
+<tr><td>RTL</td><td>用于描述数字电路行为与结构的设计输入。</td><td>能编译不等于符合需求。</td></tr>
+<tr><td>PDK / 工具链</td><td>实现所需工艺资料与具体工具版本、环境。</td><td>换版本或工艺会改变实验条件，不能忽略。</td></tr>
+<tr><td>SDC / timing target</td><td>时钟等时序约束与目标。</td><td>修改约束可能改变评价问题，不是无害“调参”。</td></tr>
+<tr><td>QoR / PPA</td><td>实现结果质量；常讨论功耗、性能和面积。</td><td>预测 QoR 与实测 QoR 不同；一个指标改善不保证全部目标合格。</td></tr>
+<tr><td>WNS / TNS</td><td>最差负时序余量与负时序余量总和；具体单位、阶段、检查类型须读评价定义。</td><td>不能跨不同约束或角点直接比较，也不宜把名词当作充分诊断。</td></tr>
+<tr><td>DRC</td><td>设计规则检查及其违例。</td><td>报告没有解析出数据不等于违例为零；某一种 DRC 通过也不是所有签核通过。</td></tr>
+<tr><td>Baseline / candidate</td><td>基线与待比较候选；需说明设计和协议是否一致。</td><td>任意旧运行不自动成为可比 baseline。</td></tr>
+<tr><td>Tool call</td><td>具有明确输入/输出和权限的操作请求。</td><td>不是让自然语言直接生成任意 shell。</td></tr>
+<tr><td>PluginManifest</td><td>插件身份、版本、能力、架构、执行入口与产物规则。</td><td>注册能力不等于成为默认产品入口。</td></tr>
+<tr><td>Task / run / attempt</td><td>任务定义、Runtime 运行记录、具体尝试。</td><td>重试产生新尝试，不应覆盖失败历史。</td></tr>
+<tr><td>Artifact / provenance</td><td>产物及其来源、版本、哈希、运行和父子关系。</td><td>LLM 总结是索引，不是原始证据的替代品。</td></tr>
+<tr><td>Checkpoint</td><td>带准确输入、状态、版本和证据的恢复点。</td><td>任意文件夹不自动满足下一个工具的装载条件。</td></tr>
+<tr><td>Policy</td><td>按目标、权限、状态和预算决定允许、拒绝或需澄清。</td><td>与上游负责候选搜索的“策略算法”不是同一职责。</td></tr>
+<tr><td>BO / surrogate</td><td>通过数据模型指导昂贵黑盒搜索的技术及其代理预测。</td><td>代理预测不能由插件自行登记成实测成绩。</td></tr>
+<tr><td>Headroom</td><td>本代码当前主要指测量相对阈值的余量。</td><td>不等于还能优化多少的可靠估计。</td></tr>
+<tr><td>Smoke / campaign</td><td>有限的集成检查 / 多轮有预算的实验过程。</td><td>一个 smoke 不证明长期稳定或统计优势。</td></tr>
+<tr><td>GDS</td><td>物理实现的版图交付格式。</td><td>文件产生不等于功能、时序和全部签核已通过。</td></tr>
+</tbody></table></div>
+<h2 id="section-2">声明分级</h2>
+<p><span class="badge">有界证据</span>已有明确范围内的记录和产物；<span class="badge partial">部分完成</span>存在实现或局部验收，但缺关键适用范围或长程证据；<span class="badge plan">建议设计</span>本报告提出的后续方案；<span class="badge blocked">停止 / 未准入</span>缺许可、版本、协议或真实入口；<span class="badge history">历史</span>保留旧证据但不视作当前产品路径。</p>
+<p>本报告不使用一个总“完成百分比”。一个小任务的真实闭环、一个通用接口和一个未运行的长 campaign 不能相加成有意义的百分数。</p>
+<footer class="pagefoot"><span>编制基线：用户 proposal + 当前工作树 + 原始运行证据。</span><span>结论、研究主张、设计建议分别标注。</span></footer></main></div></body></html>

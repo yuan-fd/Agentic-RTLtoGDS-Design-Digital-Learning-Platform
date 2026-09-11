@@ -9,14 +9,22 @@
 - 官方仓库：`huawei-csl/rtlscout`
 - 固定 commit：`87a00edf6b9208f657dd9ffdda170004024c08ae`
 - 许可证：BSD-3-Clause-Clear。
-- 主入口：`run_benchmark.py`；离线 smoke 使用 `simple_adder` 和 fake model。
+- 主入口：`run_benchmark.py`；平台托管 Codex 只适配上游 `LLMClient`，候选
+  create/edit/evaluate/feedback/best-design/stop 均由原生 `core.agent.RTLAgent`
+  的 Python ReAct backend 执行。
 - 输出真相源：每次运行的 `result.json` 与 `best_design/`。
 - Python：`pyproject.toml` 要求 `>=3.10`，高于主机系统 Python 3.9.9。
 - 依赖：LLM SDK、Amaranth，以及 `tech_eval`、`spire-hdl` 等项目依赖；`spire-hdl` 是固定 commit 的 Git submodule。
-- 已有验证：补充报告记录 x86_64 容器 fake smoke 成功，官方预构建镜像在 ARM64 失败。
+- 已有验证：ARM64 源码环境完成真实 SpecIR→原生 Agent→独立 lint/simulation/
+  mutation→ORFS finish/GDS 验收；canonical evidence 为
+  `var/evidence/rtlscout-native-spec-to-gds-20260905-r8/summary.json`。fake smoke
+  仅保留为测试，不代表产品能力。
 - P3 增量核验：建立独立 Python 环境，初始化固定 submodule，验证源码级 ARM 安装；不得把镜像架构失败等同于源码不兼容。
 
-接入结论：首版采用黑箱 CLI Adapter，保留其内部 ReAct 和 correctness/cost gate。平台 Runtime 负责外层进程、超时、取消、状态与产物登记。
+接入结论：采用 provider-only thin adapter 调用固定 `run_benchmark.py`，保留
+其内部 ReAct 和 correctness/cost gate。平台 Runtime 负责外层进程、超时、
+取消、状态、独立验证、后端交付与产物登记。旧的平台自写候选循环不是原生
+RTLScout，已退出 active path。
 
 ## AgenticPD
 
@@ -28,7 +36,10 @@
 - 证据模型：Trial、StageResult、CheckpointRef、ExecutionResolution、decision trace、optimization tree。
 - 风险：仓库当前没有 LICENSE/COPYING 声明。许可证澄清前只做内部审计和适配验证，不复制、修改后再分发其源码。
 
-接入结论：保持 Judge/StageAgent/Doomed/GWTW 的智能调度含义。平台生产边界使用 `ExperimentPlan`/`ActionProposal`；进程和最终状态仍由 Runtime 权威管理。黑箱复现只作为兼容性基线，不成为第二平台 scheduler。
+接入结论：仅保留 Judge/StageAgent/Doomed/GWTW 的 source-audit 记录和历史
+`ExperimentPlan`/`ActionProposal` 转换证据。Python manifest factory 与静态
+manifest 均 fail closed；获得并审查许可证或作者许可之前，不得注册、执行、
+复制、修改或再分发该项目。
 
 ## TaiWei-Pin-3D
 
@@ -72,6 +83,69 @@ P8 状态：`taiwei-pin-3d@1.0.0` 协议接入完成；固定 3D 工具链因 Gi
   选择实测训练子集，上游 `scikit-optimize` GP/EI 产生数值候选。真实 OpenROAD
   baseline → candidate → repeated evaluation 已作为 smoke 跑通；这证明链路，
   不构成跨设计 PPA 优势声明。
+
+## A2-ORFO
+
+- 官方仓库：`CODA-Team/TaiWei-flow-Agent`，固定 commit
+  `8b20a3c1f22934a39c7ba51ed0ec6dffe730da2d`，BSD-3-Clause。
+- A2-ORFO 扩展了 ORFS-Agent，原生 `OptimizationWorkflow.run_iteration()`
+  包含 RAG、inspection/model/selection、ReAct GPR feedback、supervisor 与
+  TextGrad prompt update。
+- 原生 shell/SSH/`eval` launcher 不被接纳；平台只接入 policy 边界，候选仍由
+  Runtime 调用受控 ORFS 并由 protected evaluator 产生 QoR。
+- 12-D 正式域取自同 commit 的 `constraints.json`；不会采用
+  `optimize.py` 中与之冲突的旧硬编码范围，也不会事后夹断候选。
+- RAG 模型固定为 `mixedbread-ai/mxbai-embed-large-v1` commit
+  `b33106f585b9ce46904ad7443a3b52b7a63e231c`，Apache-2.0。
+- 已完成一个真实 proposal→ORFS→evaluator→feedback→next proposal 闭环；候选
+  signoff 不可行的事实仍被保留。该 smoke 不构成完整 campaign 或 PPA 优势声明。
+- 当前产品角色是唯一 L2 optimizer
+  `optimizer.l2.a2-orfo-feedback`；ORFS-Agent 仅作为其完整 12-D、variable-clock
+  EDA executor。默认原生预算为 26 个 bootstrap 加 5 轮各 25 个 feedback
+  candidate，共 151 次 EDA measurement。完整 campaign 已配置但未启动。
+
+## ORAssistant
+
+- 官方仓库：`The-OpenROAD-Project/ORAssistant`，固定 commit
+  `a5df2dfe54869fd929d966a4ce335b9d0892f676`，GPL-3.0-only（Yellow：独立进程
+  使用；不把上游源码链接或复制进平台核心）。
+- 当前只接入 `knowledge.openroad.retrieve`：上游原生 `process_md`、
+  `BM25RetrieverChain` 和 `format_docs`；不接入 MCP、数据库、前端、云模型或
+  ORFS 执行。
+- 官方 Hugging Face RAG Dataset 在 intake 时无法取得可核验 commit/license，
+  因此未下载。首个 corpus 是独立固定的 OpenROAD commit `63ed2e0f...`，每个
+  返回 chunk 同时带源文件 URL、document SHA-256 和 chunk SHA-256。
+- Python 3.13.7 retrieval-only 环境使用上游 `uv.lock` 的固定版本。未调用的
+  Google/Vertex/Ollama/HuggingFace provider 以 fail-closed import shim 隔离；
+  Runtime audit hook 拒绝网络与新 subprocess。
+- native smoke 与静态 manifest 的 Runtime smoke 均通过；canonical evidence：
+  `var/evidence/orassistant-platform-20260905-r3/summary.json`。这只证明检索与引用
+  连续性，不代表完整 hybrid/reranker、广域问答正确率或对用户 run 的根因诊断。
+
+## PostEDA-Bench
+
+- 官方仓库：`pengjas/posteda-bench`，固定 commit
+  `51884e5f20e6e199219cec87c1c779a3dfab95bc`，CC BY 4.0。
+- 接入边界只有 `benchmark.posteda.public-case` 与
+  `benchmark.posteda.evaluate-diagnosis` 两个隔离 Runtime capability；不进入默认
+  产品表面，也不接入参考 agent 或自动修复。
+- 第一阶段仅读取公开 prompt/DRC report，拒绝 `info.json`；平台封存
+  `DiagnosisReport` 和 typed decision 后，第二个 scorer 进程才读取隐藏标签。
+- native KLayout smoke 与平台两阶段 acceptance 均通过；canonical evidence 为
+  `var/evidence/posteda-platform-diagnostic-20260905-r1/summary.json`。派生分数不是
+  官方 SR/ERR/VRR，也不证明修复成功或广泛诊断准确率。
+
+## CLOSER-Bench
+
+- 可核验公开资产仅有 arXiv `2607.16632v1`；论文 PDF SHA-256 为
+  `84280d8b1a79924c5742fa1536fd1c48622cf93b7dd407d348b02c5b4750ac28`。
+- 未发现可验证的官方源码/数据仓库、commit、源码许可证、冻结 A/B/C task、
+  container digest、hidden oracle 或 native entrypoint，故 intake 为 Red，禁止
+  注册或执行，平台没有 CLOSER-Bench plugin。
+- 当前只做非官方 paper-protocol alignment。加入一次独立冻结的平台自有真实
+  backend→RTL checkpoint recovery 后为 5 met / 2 partial / 3 missing；canonical
+  evidence 为 `var/evidence/closer-protocol-alignment-20260905-r2/summary.json`。
+  这不是官方 benchmark result。
 
 ## Seeded Random Control
 

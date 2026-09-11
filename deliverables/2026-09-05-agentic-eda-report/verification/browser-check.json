@@ -1,0 +1,39 @@
+{
+  "browser": "Mozilla Firefox 102.15.0esr",
+  "method": "Existing installed browser; headless screenshots using isolated temporary profiles. No platform server or EDA worker started.",
+  "screenshots": [
+    {
+      "file": "desktop-home.png",
+      "page": "index.html",
+      "viewport": [
+        1440,
+        1050
+      ]
+    },
+    {
+      "file": "mobile-home.png",
+      "page": "index.html",
+      "viewport": [
+        390,
+        844
+      ]
+    },
+    {
+      "file": "desktop-architecture.png",
+      "page": "02-architecture.html",
+      "viewport": [
+        1440,
+        1050
+      ]
+    },
+    {
+      "file": "mobile-complete.png",
+      "page": "完整报告.html",
+      "viewport": [
+        390,
+        844
+      ]
+    }
+  ],
+  "visual_review": "Screenshots inspected. Desktop/mobile headings, navigation, architecture blocks and body text render. No full interactive or accessibility certification."
+}

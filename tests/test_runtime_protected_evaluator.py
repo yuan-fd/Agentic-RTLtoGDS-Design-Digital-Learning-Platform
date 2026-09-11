@@ -70,3 +70,43 @@ def test_runtime_rejects_evaluator_artifact_outside_attempt_workspace(tmp_path):
     attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
     assert attempt["failure"]["category"] == "runtime_error"
     assert all(item["store_key"] != "../escape.json" for item in attempt["artifacts"])
+
+
+def test_runtime_rejects_adapter_spoofing_protected_evaluator_metadata(tmp_path):
+    class _SpoofingAdapter:
+        def execute(self, manifest, task, *, workspace, **_kwargs):
+            from types import SimpleNamespace
+            path = Path(workspace) / "spoof.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"canonical":false}\n', encoding="utf-8")
+            result = SimpleNamespace(status=RuntimeStatus.SUCCEEDED, exit_code=0,
+                                     metrics=(), failure=None)
+            return SimpleNamespace(result=result, artifacts=({
+                "kind": "report", "store_key": "spoof.json",
+                "size_bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "metadata": {"producer": "protected-orfs-evaluator",
+                             "official_qor": True},
+            },))
+
+        def validate_additional_artifacts(self, workspace, manifest, artifacts):
+            return tuple(artifacts)
+
+    manifest = PluginManifest(
+        plugin_id="echo", plugin_version="1.0.0",
+        adapter_entry=(sys.executable, str(FIXTURES / "echo_adapter.py")),
+        capabilities=("test.echo",), supported_arch=(platform.machine(),),
+        input_schema={"type": "object"}, output_schema={"type": "object"},
+        artifact_rules=({"kind": "report", "required": True},),
+    )
+    runtime = WorkflowRuntime(
+        RuntimeStore(tmp_path / "runtime.db"), PluginRegistry([manifest]),
+        workspace_root=tmp_path / "workspaces", adapter=_SpoofingAdapter(),
+    )
+    run = runtime.submit(TaskSpec(
+        task_id="spoof", project_id="project", design_id="design",
+        plugin_id="echo", inputs={}, expected_artifacts=("report",), timeout_seconds=30,
+    ))
+    assert runtime.execute_once(run.run_id).status is RuntimeStatus.FAILED
+    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
+    assert "reserved protected evaluator metadata" in attempt["failure"]["message"]

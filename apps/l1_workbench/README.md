@@ -5,11 +5,33 @@ dashboard. It composes `L1SessionService`, `L1TraceService`,
 `L1DurableLoop`, `L1RuntimeBridge`, and `WorkflowRuntime`; the HTTP handler
 only transports requests and renders stored facts.
 
-## Real EDA tutorial profile
+## Real EDA profiles
 
 The default `smoke` backend exists only for API tests.  To run the managed
-local ORFS/OpenROAD toolchain through the very same L1 Session, use the frozen
-`p2_mux_2to1.v` tutorial RTL and an empty state root:
+AES/Sky130HD reference that can legitimately hand off to the full ORFS-Agent
+L2, select the operator-owned paper profile and an empty state root:
+
+```bash
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:packages/analysis/src:. \
+  .tools/venvs/orfs-agent/bin/python apps/l1_workbench/server.py \
+  --state-root /tmp/openroad-l1-aes-workbench \
+  --port 8766 \
+  --backend orfs \
+  --managed-reference orfs-agent-paper-aes-sky130hd \
+  --orfs-agent-paper-orfs /absolute/orfs-ce8d36a-clean \
+  --orfs-agent-openroad-bin /absolute/paper/OpenROAD/bin/openroad \
+  --orfs-agent-yosys-bin /absolute/paper/yosys/bin/yosys \
+  --orfs-agent-paper-environment /absolute/reviewed-paper-environment.json
+```
+
+This profile freezes the complete seven-file AES RTL bundle, the byte-identical
+paper 4.5 ns SDC, Sky130HD, paper ORFS commit `ce8d36a7`, toolchain identity,
+20% utilization, 0.60 placement density, `finish`, and the protected evaluator.
+`--managed-reference` is mutually exclusive with `--rtl`; none of these inputs
+come from the model, browser, or natural-language request.
+
+The older mux teaching fixture remains available as an explicitly supplied
+single-file L1 exercise, but it is not compatible with the AES L2 handoff:
 
 ```bash
 PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:. \
@@ -23,16 +45,17 @@ PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:
   --clock-period-ns 10
 ```
 
-This startup selection is operator-owned, not an LLM or browser field.  It
-uses the admitted `orfs` plugin and local managed toolchain.  The Session
-freezes `tutorial_mux/mux_2to1`, the RTL hash, `nangate45`, 10 ns, `finish`,
-and the bounded baseline parameter allowlist before it can submit a task.
+This startup selection is also operator-owned. It freezes
+`tutorial_mux/mux_2to1`, the RTL hash, `nangate45`, 10 ns, `finish`, and the
+bounded baseline parameter allowlist before it can submit a task. The L2 gate
+must reject it when the configured campaign is AES/Sky130HD.
 
 ## Language front-end (`--goal-provider`)
 
 The operator chooses the natural-language front-end at server start:
 
-- `tutorial` (default): the deterministic mux parser — inspectable, offline.
+- `tutorial` (default): the deterministic managed-profile parser — inspectable,
+  offline; it renders the operator-selected mux or AES design context.
 - `codex`: the managed Codex CLI (`gpt-5.6-terra`, read-only sandbox, env
   allowlist) acting as a structured `GoalDraft` provider.  The model may only
   return typed language facts: it is decoded against the `L1ModelBoundary`
@@ -66,8 +89,21 @@ Runtime boundary):
 - `POST /api/l1/sessions/{session_id}/l2-escalate` for the visible L1→L2 authorization gate
   (requires two measured Runtime observations; records `escalate` and freezes an
   `OptimizationRequest` — it never submits ORFS-Agent execution)
+- `POST /api/l1/sessions/{session_id}/l2-configure` freezes the admitted full
+  12-D domain, ECP/DWL/COMBO objective set, design/PDK/toolchain receipts,
+  full campaign budget, and independent seeds on that authorization
+- `POST /api/l1/sessions/{session_id}/l2-advance` performs a scheduling-only
+  checkpoint transition; the handler always forces `execute=false` and never
+  runs an EDA process in the HTTP request
+- `GET /api/l1/sessions/{session_id}/l2-campaigns` and
+  `GET /api/l1/sessions/{session_id}/l2-campaigns/{pipeline_id}` expose only
+  Session-bound durable campaign state, Runtime IDs, observations, history,
+  and evidence references for live monitoring
 - `GET /api/l1/sessions/{session_id}/teaching` for a read-only per-event teaching replay
 - `POST /api/l1/sessions/{session_id}/queries` for a typed timing/congestion/DRC/power/metrics read
+- `POST /api/l1/sessions/{session_id}/knowledge` for a typed, Policy-gated
+  ORAssistant query with `query`, `purpose=knowledge|error_explanation`, and
+  `top_k`; Runtime citations are returned without consuming an EDA-run budget
 - `POST /api/l1/sessions/{session_id}/artifacts` for an allowlisted excerpt
 - `POST /api/l1/sessions/{session_id}/stages` for a permitted Runtime stage
 - `GET /api/l1/sessions/{session_id}/events?after={sequence}`
@@ -89,6 +125,66 @@ ORFS-Agent remains an external L2 capability and is intentionally outside this
 L1 workbench.
 Cancellation uses Runtime's controlled cancel port; recovery resumes only the
 durable session/plan records and never emits a duplicate Runtime submission.
+
+## Diagnosis and cross-stage recovery boundary
+
+L1 normalizes artifact-backed timing, congestion, DRC and power facts into
+`StageAnalysis`/`DiagnosisReport`. Missing parser output remains unavailable;
+an absent target remains unknown. A terminal Runtime failure before protected
+QoR is represented by four unavailable domains plus the cited failure/artifact
+evidence, never by invented metric values.
+
+Recovery is also typed. A checkpoint restore must bind the durable recovery
+decision, a previously verified direct-ancestor candidate and its exact RTL
+SHA-256. The plan carries no source text, patch, parameter or shell command;
+after selection, compile/lint, functional verification and ORFS are new Runtime
+submissions. One real bounded backend-failure→RTL-checkpoint→GDS trajectory is
+accepted at:
+
+```text
+var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/summary.json
+SHA-256 1606eb84083be453a9efe2e8b1cfa7986899089332d08059247f0250472bbf6d
+```
+
+This is a platform integration acceptance, not CLOSER-Bench and not a general
+autonomous RTL-repair claim.
+
+## Full A2-ORFO product campaign worker
+
+After the API has returned an authorized `pipeline_id` and `l2-configure` has
+frozen it, start the trusted worker against the same state root.  The worker is
+the only Workbench composition that calls the full campaign controller with
+`execute=true`; it does not depend on a Session, UI, mux profile, or L1 RTL.
+
+```bash
+PYTHONPATH=packages/contracts/src:packages/scheduler/src:packages/execution/src:packages/analysis/src:. \
+  .tools/venvs/orfs-agent/bin/python apps/l1_workbench/a2_campaign_worker.py \
+  --state-root /absolute/workbench-state \
+  --a2-orfo-source /absolute/a2-orfo-8b20a3c-clean \
+  --a2-orfo-model /absolute/mxbai-embed-large-v1-b33106f \
+  --a2-orfo-python /absolute/a2-orfo-venv/bin/python \
+  --a2-orfo-codex /absolute/platform-managed/codex \
+  --orfs-agent-source /absolute/orfs-agent-730f1fa-clean \
+  --orfs-agent-paper-orfs /absolute/orfs-ce8d36a-clean \
+  --orfs-agent-openroad-bin /absolute/paper/OpenROAD/bin/openroad \
+  --orfs-agent-yosys-bin /absolute/paper/yosys/bin/yosys \
+  --orfs-agent-paper-environment /absolute/reviewed-paper-environment.json \
+  --orfs-agent-python /absolute/orfs-agent-venv/bin/python \
+  --pipeline-id pipeline-... \
+  --max-parallel 4
+```
+
+The environment file is an operator-reviewed JSON string map containing only
+the admitted library-path keys.  Omitting `--pipeline-id` scans all configured
+nonterminal `a2-orfo-campaign-v1` checkpoints. `--once` advances at
+most one transition; the default loop exits for a targeted pipeline only at
+`completed`, `failed`, or `diagnosis_required`. Candidate failures and their
+raw registered artifacts remain in campaign history and feed the next native
+A2 step; only protected-evaluator artifact-backed objective rows are measured
+QoR. The default protocol preserves 26 initial measurements and five rounds of
+25 measurements (151 total) over all 12 parameters including variable `CLK`.
+The older `l2_campaign_worker.py` serves only historical
+`orfs-agent-full-campaign-v1` checkpoints and is not the product optimizer.
 
 ## Terminal dashboard
 

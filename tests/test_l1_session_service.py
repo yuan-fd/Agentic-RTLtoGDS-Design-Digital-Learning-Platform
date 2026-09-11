@@ -2,7 +2,9 @@ from pathlib import Path
 import hashlib
 import pytest
 from openroad_platform_contracts.agent_control import AgentBudget, GoalPreference, QoRConstraint, ToolName
-from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField
+from openroad_platform_contracts.l1_goal_draft import (
+    ClarificationAnswer, ClarificationField, ClarificationQuestion,
+)
 from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_contracts.l1_session import L1SessionStatus
 from openroad_platform_scheduler.l1_goal_finalizer import TrustedGoalPolicy
@@ -28,7 +30,10 @@ def test_l1_session_persists_clarification_goal_and_cursor_events(tmp_path: Path
     ])
     trace = L1TraceService(L1TraceStore(tmp_path / "trace.sqlite"))
     service = L1SessionService(L1SessionStore(tmp_path / "sessions.sqlite"), trace)
-    created = service.start(request, provider, _policy())
+    created = service.start(
+        request, provider, _policy(),
+        required_questions=(ClarificationQuestion.from_dict(question),),
+    )
     assert created.status is L1SessionStatus.CLARIFICATION_REQUIRED
     finalized = service.answer(created.session_id, provider, (ClarificationAnswer("q-1", ClarificationField.CONSTRAINTS, "WNS at least zero"),))
     assert finalized.status is L1SessionStatus.GOAL_FINALIZED and finalized.goal_id
@@ -85,7 +90,11 @@ def test_l1_session_requires_all_prior_blocking_questions_across_turns(tmp_path:
         {"request_text": request, "intent": "diagnose", "questions": [q1, q2], "answers": [answer1, answer2], "schema_version": 1},
     ])
     service = L1SessionService(L1SessionStore(tmp_path / "sessions.sqlite"), L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")))
-    session = service.start(request, provider, _policy())
+    session = service.start(
+        request, provider, _policy(), required_questions=tuple(
+            ClarificationQuestion.from_dict(item) for item in (q1, q2)
+        ),
+    )
     session = service.answer(session.session_id, provider, (ClarificationAnswer("q-1", ClarificationField.CONSTRAINTS, "WNS >= 0"),))
     assert session.status is L1SessionStatus.CLARIFICATION_REQUIRED
     session = service.answer(session.session_id, provider, (ClarificationAnswer("q-2", ClarificationField.BUDGET, "one run"),))
@@ -105,6 +114,10 @@ def test_l1_session_rejects_provider_removing_or_weakening_prior_question(tmp_pa
         {"request_text": request, "intent": "diagnose", "questions": revision["questions"], "answers": [a1], "schema_version": 1},
     ])
     service = L1SessionService(L1SessionStore(tmp_path / "sessions.sqlite"), L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")))
-    session = service.start(request, provider, _policy())
-    with pytest.raises(ValueError, match="remove or weaken"):
+    session = service.start(
+        request, provider, _policy(), required_questions=tuple(
+            ClarificationQuestion.from_dict(item) for item in (q1, q2)
+        ),
+    )
+    with pytest.raises(ValueError, match="operator-owned question schema"):
         service.answer(session.session_id, provider, (ClarificationAnswer("q-1", ClarificationField.CONSTRAINTS, "WNS >= 0"),))

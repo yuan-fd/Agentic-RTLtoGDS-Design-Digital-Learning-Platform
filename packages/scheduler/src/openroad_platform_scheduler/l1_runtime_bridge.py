@@ -14,7 +14,7 @@ from openroad_platform_contracts.agent_control import DesignGoal, DesignState, S
 from openroad_platform_contracts.l1_observation import RuntimeObservation
 from openroad_platform_contracts.learning import EvidencePointer
 from openroad_platform_contracts.platform import TaskSpec
-from openroad_platform_contracts.task_factory import RTLToGDSFactory
+from openroad_platform_contracts.task_factory import KnowledgeQueryRequest, KnowledgeTaskFactory, RTLToGDSFactory
 from .l1_semantic_policy import L1SemanticToolPolicy
 from .l1_state_reducer import L1StateReducer
 from .l1_trace_service import L1TraceService
@@ -27,10 +27,12 @@ def _evidence(ref: str, value: object) -> EvidencePointer:
 
 class L1RuntimeBridge:
     """Translate typed calls to Runtime facts and immutable capability tasks."""
-    def __init__(self, runtime: Any, base_task: TaskSpec, factory: RTLToGDSFactory, *, cancel_port=None) -> None:
+    def __init__(self, runtime: Any, base_task: TaskSpec, factory: RTLToGDSFactory, *,
+                 cancel_port=None, knowledge_factory: KnowledgeTaskFactory | None = None) -> None:
         base_task.validate(); factory.validate_task(base_task)
         self._runtime, self._base_task, self._factory = runtime, base_task, factory
         self._cancel_port = cancel_port
+        self._knowledge_factory = knowledge_factory
 
     def _binding(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> None:
         L1SemanticToolPolicy.validate(goal, state, call)
@@ -43,7 +45,8 @@ class L1RuntimeBridge:
         return frozenset({ToolName.GET_DESIGN_SUMMARY, ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
                           ToolName.QUERY_DRC, ToolName.QUERY_POWER, ToolName.QUERY_STAGE_METRICS,
                           ToolName.QUERY_ARTIFACT_EXCERPT, ToolName.SET_FLOW_PARAMS, ToolName.RUN_STAGE,
-                          ToolName.RUN_FULL_FLOW, ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE})
+                          ToolName.QUERY_OPENROAD_KNOWLEDGE, ToolName.RUN_FULL_FLOW,
+                          ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE})
 
     def submit(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         self._binding(goal, state, call)
@@ -72,7 +75,7 @@ class L1RuntimeBridge:
                            (_evidence(f"run:{run_id}", {"goal_id": goal.goal_id, "call_id": call.call_id}),), None)
 
     def execute(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
-        """Dispatch only the tutorial's 12 typed tools; no generic executor exists."""
+        """Dispatch only the tutorial's typed tools; no generic executor exists."""
         if call.tool in {ToolName.RUN_STAGE, ToolName.RUN_FULL_FLOW}:
             return self.submit(goal, state, call)
         if call.tool is ToolName.SET_FLOW_PARAMS:
@@ -81,7 +84,126 @@ class L1RuntimeBridge:
             return self.stop_or_escalate(goal, state, call)
         if call.tool is ToolName.GET_DESIGN_SUMMARY:
             return self.design_summary(goal, state, call)
+        if call.tool is ToolName.QUERY_OPENROAD_KNOWLEDGE:
+            return self.query_openroad_knowledge(goal, state, call)
         return self.query(goal, state, call)
+
+    def query_openroad_knowledge(self, goal: DesignGoal, state: DesignState,
+                                 call: SemanticToolCall) -> ToolReceipt:
+        """Run one admitted read-only ORAssistant task and return cited facts.
+
+        This deliberately does not enter ``RuntimeObservation`` or the QoR
+        reducer: it is a knowledge run, not an EDA measurement. Runtime still
+        owns its process lifecycle, terminal status, and registered artifacts.
+        """
+        self._binding(goal, state, call)
+        if call.tool is not ToolName.QUERY_OPENROAD_KNOWLEDGE:
+            raise ValueError("knowledge query requires query_openroad_knowledge")
+        if self._knowledge_factory is None:
+            raise ValueError("no admitted OpenROAD knowledge capability is configured")
+        request = KnowledgeQueryRequest(
+            project_id=goal.project_id, design_id=goal.design_id,
+            query=call.arguments["query"],
+            purpose=call.arguments.get("purpose", "knowledge"),
+            top_k=call.arguments.get("top_k", 5),
+            task_id=f"l1-knowledge-{call.call_id}",
+            labels={"l1_goal_id": goal.goal_id, "l1_call_id": call.call_id,
+                    "surface": "l1-workbench"},
+        )
+        task = self._knowledge_factory.build(request)
+        self._knowledge_factory.validate_task(task)
+        run = self._runtime.submit(task, capability=self._knowledge_factory.capability)
+        run_id = getattr(run, "run_id", None)
+        if not isinstance(run_id, str) or not run_id:
+            raise RuntimeError("Runtime knowledge submission returned no run_id")
+        self._runtime.execute_once(run_id)
+        view = self._runtime.describe(run_id)
+        self._require_owned_run(goal, view)
+        terminal = self._terminal_status(view)
+        if terminal != "succeeded":
+            return ToolReceipt(
+                call.call_id, goal.goal_id, state.state_id, call.tool, "failed",
+                {"run_id": run_id, "capability": self._knowledge_factory.capability,
+                 "terminal_status": terminal},
+                (_evidence(f"run:{run_id}", view),),
+            )
+        artifacts = {
+            item.get("kind"): item
+            for stage in view.get("stages", ())
+            for attempt in stage.get("attempts", ())
+            for item in attempt.get("artifacts", ())
+            if isinstance(item.get("kind"), str)
+        }
+        required = {"knowledge_retrieval", "knowledge_explanation",
+                    "knowledge_provenance"}
+        if not required.issubset(artifacts):
+            raise ValueError("Runtime knowledge run lacks required registered artifacts")
+        retrieval = self._registered_json(run_id, artifacts["knowledge_retrieval"])
+        explanation = self._registered_json(run_id, artifacts["knowledge_explanation"])
+        provenance = self._registered_json(run_id, artifacts["knowledge_provenance"])
+        retrieval_evidence = self._artifact_evidence(artifacts["knowledge_retrieval"])
+        evidence = tuple(self._artifact_evidence(artifacts[kind]) for kind in sorted(required))
+        citations = []
+        for row in retrieval.get("results", ())[:request.top_k]:
+            if not isinstance(row, Mapping):
+                raise ValueError("knowledge retrieval result is malformed")
+            text = " ".join(str(row.get("text", "")).split())
+            citations.append({
+                "citation_id": row.get("citation_id"), "rank": row.get("rank"),
+                "source_document": row.get("source_path"),
+                "source_reference": row.get("source_url"),
+                "document_sha256": row.get("document_sha256"),
+                "chunk_sha256": row.get("chunk_sha256"),
+                "excerpt": text[:1600], "evidence": retrieval_evidence.to_dict(),
+            })
+        if not citations:
+            raise ValueError("knowledge retrieval returned no cited evidence")
+        facts = []
+        for item in explanation.get("facts") or ():
+            if not isinstance(item, Mapping):
+                raise ValueError("knowledge explanation fact is malformed")
+            facts.append({
+                "citation_id": item.get("citation_id"),
+                "quote": item.get("quote"),
+                "source_document": item.get("source_path"),
+            })
+        result = {
+            "run_id": run_id, "capability": self._knowledge_factory.capability,
+            "purpose": request.purpose, "query": request.query.strip(),
+            "method": retrieval.get("method"), "citations": citations,
+            "facts": facts,
+            "hypotheses": list(explanation.get("hypotheses") or ()),
+            "counter_evidence": list(explanation.get("counter_evidence") or ()),
+            "unknowns": list(explanation.get("unknowns") or ()),
+            "diagnostic_claim": explanation.get("diagnostic_claim"),
+            "claim_scope": provenance.get("claim_scope"),
+        }
+        return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool,
+                           "completed", result, evidence)
+
+    def _registered_json(self, run_id: str, artifact: Mapping[str, Any]) -> Mapping[str, Any]:
+        artifact_id = artifact.get("artifact_id")
+        if not isinstance(artifact_id, str) or not artifact_id:
+            raise ValueError("registered knowledge artifact lacks identity")
+        reader = getattr(self._runtime, "read_artifact_excerpt", None)
+        if not callable(reader):
+            raise ValueError("Runtime does not expose controlled artifact reads")
+        excerpt = reader(run_id, artifact_id, offset=0, max_bytes=64 * 1024)
+        try:
+            value = json.loads(str(excerpt["text"]))
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("registered knowledge artifact is not bounded JSON") from exc
+        if not isinstance(value, Mapping):
+            raise ValueError("registered knowledge artifact must contain an object")
+        return value
+
+    @staticmethod
+    def _artifact_evidence(artifact: Mapping[str, Any]) -> EvidencePointer:
+        artifact_id, sha256 = artifact.get("artifact_id"), artifact.get("sha256")
+        if (not isinstance(artifact_id, str) or not artifact_id
+                or not isinstance(sha256, str) or len(sha256) != 64):
+            raise ValueError("registered knowledge artifact lacks hash provenance")
+        return EvidencePointer(f"artifact:runtime-{artifact_id}", sha256)
 
     def set_flow_params(self, goal: DesignGoal, state: DesignState, call: SemanticToolCall) -> ToolReceipt:
         self._binding(goal, state, call)
@@ -158,21 +280,16 @@ class L1RuntimeBridge:
         if len(candidates) != 1:
             raise ValueError("Runtime run has no attempt observation")
         stage_view, attempt = candidates[0]
-        native_metrics = {
-            item["name"]: float(item["value"])
-            for item in attempt.get("metrics", ())
-            if isinstance(item.get("value"), (int, float)) and not isinstance(item.get("value"), bool)
-        }
-        # Runtime has already verified the report artifact and parser identity.
-        # L1 maps only the fixed M1 Goal vocabulary, so Goal contracts do not
-        # depend on an ORFS report-key spelling.
-        aliases = {
-            "finish__timing__setup__ws": "setup_wns_ns",
-            "finish__design__instance__area": "area_um2",
-            "detailedroute__route__drc_errors": "drc_errors",
-        }
-        metrics = {aliases.get(name, name): value for name, value in native_metrics.items()}
-        evidence = tuple(_evidence(f"artifact:runtime-{item['artifact_id']}", item) for item in attempt.get("artifacts", ()))
+        metrics, official_artifact = self._canonical_qor(attempt)
+        evidence = tuple(
+            EvidencePointer(f"artifact:runtime-{item['artifact_id']}", item["sha256"])
+            if isinstance(item.get("sha256"), str) and len(item["sha256"]) == 64
+            else _evidence(f"artifact:runtime-{item['artifact_id']}", item)
+            for item in attempt.get("artifacts", ())
+        )
+        if official_artifact is not None:
+            official_ref = f"artifact:runtime-{official_artifact['artifact_id']}"
+            evidence = tuple(sorted(evidence, key=lambda item: item.ref != official_ref))
         if not evidence:
             evidence = (_evidence(f"run:{run_id}", view),)
         terminal_status = run.get("terminal_reason") if run.get("terminal_reason") in {"timed_out", "lost"} else run["status"]
@@ -180,6 +297,36 @@ class L1RuntimeBridge:
         if stage not in {"synth", "floorplan", "place", "cts", "route", "finish"}:
             stage = None
         return RuntimeObservation(run_id, attempt["attempt_id"], stage, terminal_status, metrics, evidence)
+
+    @staticmethod
+    def _canonical_qor(attempt: Mapping[str, Any]) -> tuple[dict[str, float], Mapping[str, Any] | None]:
+        """Read only Runtime-attested protected-evaluator metadata as state QoR."""
+        official = [
+            item for item in attempt.get("artifacts", ())
+            if item.get("metadata", {}).get("runtime_authority") == "protected_evaluator"
+            and item.get("metadata", {}).get("producer") == "protected-orfs-evaluator"
+            and item.get("metadata", {}).get("official_qor") is True
+            and item.get("metadata", {}).get("outcome") == "completed"
+        ]
+        if not official:
+            return {}, None
+        if len(official) != 1:
+            raise ValueError("Runtime attempt has ambiguous protected evaluator artifacts")
+        artifact = official[0]
+        metadata = artifact.get("metadata", {})
+        values = metadata.get("canonical_metrics")
+        if (not isinstance(values, Mapping)
+                or not isinstance(metadata.get("evaluation_id"), str)
+                or not isinstance(artifact.get("sha256"), str)
+                or len(artifact["sha256"]) != 64):
+            raise ValueError("protected evaluator artifact lacks canonical metric provenance")
+        metrics: dict[str, float] = {}
+        for name, value in values.items():
+            if (not isinstance(name, str) or not name
+                    or isinstance(value, bool) or not isinstance(value, (int, float))):
+                raise ValueError("protected evaluator canonical metrics are invalid")
+            metrics[name] = float(value)
+        return metrics, artifact
 
     def reduce_and_trace(self, trace: L1TraceService, trace_id: str, state: DesignState,
                          *, run_id: str, next_state_id: str, consume_eda_run: bool = False) -> DesignState:

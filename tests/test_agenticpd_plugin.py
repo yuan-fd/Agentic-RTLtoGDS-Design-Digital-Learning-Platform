@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-from openroad_platform_contracts import ExperimentPlan, RuntimeStatus
+import pytest
+
+from openroad_platform_contracts import ExperimentPlan, PluginManifest
 from openroad_platform_execution import agenticpd_plugin_manifest, build_agenticpd_task
 from openroad_platform_execution.agenticpd_adapter import _candidate
 from openroad_platform_execution.registry import PluginRegistry
-from openroad_platform_scheduler import RuntimeStore, WorkflowRuntime
 
 
 def test_agenticpd_task_never_persists_credential():
@@ -39,22 +38,22 @@ def test_candidate_only_activates_unambiguous_orfs_parameter():
     assert ExperimentPlan.from_dict(plan.to_dict()) == plan
 
 
-def test_real_mode_without_credential_fails_closed(tmp_path):
-    source = tmp_path / "agenticpd"
-    source.mkdir()
-    (source / "main.py").write_text("raise SystemExit('must not run')\n", encoding="utf-8")
-    subprocess.run(["git", "init", "-q", str(source)], check=True)
-    subprocess.run(["git", "-C", str(source), "add", "."], check=True)
-    subprocess.run(["git", "-C", str(source), "-c", "user.name=Test", "-c",
-                    "user.email=test@example.invalid", "commit", "-qm", "fixture"], check=True)
-    commit = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
-    manifest = agenticpd_plugin_manifest(source, python_executable=sys.executable,
-                                         expected_commit=commit, default_timeout_seconds=10)
-    runtime = WorkflowRuntime(RuntimeStore(tmp_path / "runtime.db"),
-                              PluginRegistry([manifest]), workspace_root=tmp_path / "runs")
-    run = runtime.submit(build_agenticpd_task(project_id="p5", design_id="adder",
-                                               mode="real", timeout_seconds=10))
-    completed = runtime.execute_once(run.run_id)
-    attempt = runtime.describe(run.run_id)["stages"][0]["attempts"][0]
-    assert completed.status is RuntimeStatus.FAILED
-    assert attempt["failure"]["category"] == "credential_unavailable"
+def test_agenticpd_executable_manifest_fails_before_source_or_credential_access(tmp_path):
+    missing_source = tmp_path / "must-not-be-read"
+    with pytest.raises(PermissionError, match="source-audit-only"):
+        agenticpd_plugin_manifest(
+            missing_source, python_executable=tmp_path / "must-not-be-read-python",
+            credential="must-not-be-persisted",
+        )
+    assert not missing_source.exists()
+
+
+def test_agenticpd_static_record_is_not_an_executable_plugin_manifest():
+    root = Path(__file__).resolve().parents[1] / "integrations" / "agenticpd"
+    payload = json.loads((root / "agenticpd.plugin.json").read_text())
+    assert payload["execution_class"] == "source-audit-only"
+    assert payload["license"] is None
+    with pytest.raises(ValueError, match="Unknown PluginManifest fields"):
+        PluginManifest.from_dict(payload)
+    with pytest.raises(ValueError, match="Unknown PluginManifest fields"):
+        PluginRegistry.from_directory(root)

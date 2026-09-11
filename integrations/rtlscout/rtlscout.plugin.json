@@ -18,6 +18,11 @@
   "artifact_rules": [
     {"kind": "rtl", "required": true},
     {"kind": "rtlscout_result", "required": true},
+    {"kind": "rtl_candidate_history", "required": false},
+    {"kind": "rtl_candidate", "required": false},
+    {"kind": "agent_trace", "required": false},
+    {"kind": "model_trace", "required": false},
+    {"kind": "provenance", "required": false},
     {"kind": "report", "required": true},
     {"kind": "log", "required": false}
   ],

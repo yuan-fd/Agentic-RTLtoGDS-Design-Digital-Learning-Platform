@@ -181,30 +181,18 @@ def test_product_l2_fails_closed_for_forged_or_invalid_runtime_evidence(tmp_path
                                            owner_id="owner", include_legacy=False)
 
 
-def test_l2_loop_derives_and_records_frozen_spec_constraints(tmp_path, monkeypatch):
+def test_legacy_l2_loop_writes_fail_before_resolution_or_runtime(tmp_path, monkeypatch):
     state, _ = _state(tmp_path)
-    class _Registry:
-        def resolve(self, *_args, **_kwargs): return object()
-    state.runtime.registry = _Registry()
     captured = {}
-    monkeypatch.setattr(api_app.DEFAULT_PRODUCT_SURFACE, "authorize", lambda *_args: None)
-    monkeypatch.setattr(api_app, "orfs_optimization_profile", lambda _platform: {
-        "baseline": {"core_utilization_pct": 20.0}, "frozen_constraints": ["spec-owned"],
-    })
-    monkeypatch.setattr(api_app, "build_orfs_agent_initial_warmup_recipes", lambda **_kwargs: [])
-    monkeypatch.setattr(api_app, "build_orfs_task", lambda *args, **kwargs: (
-        captured.update(kwargs) or SimpleNamespace(to_dict=lambda: {"frozen": kwargs})))
+    state._resolve_verified_rtl_for_l2 = lambda *_args, **_kwargs: captured.update(
+        resolved=True)
     state._external_l2_service = lambda: SimpleNamespace(create=lambda **kwargs: (
         captured.update(checkpoint=kwargs) or {"pipeline_id": "loop-1"}))
-    state.auth = SimpleNamespace(bind_resource=lambda *_args: None)
-    result = state.start_external_optimizer_loop({"spec_id": "spec-1", "candidate_id": "candidate-1"},
-                                                 owner_id="owner")
-    assert result["pipeline_id"] == "loop-1"
-    assert captured["platform_name"] == "nangate45"
-    assert captured["clock"] == "clk"
-    assert captured["clock_period_ns"] == 7.5
-    initial = captured["checkpoint"]["initial_state"]
-    assert initial["frozen_spec_constraints"]["clock_period_ns"] == 7.5
-    assert initial["verified_rtl"]["rtl_sha256"] == state.runtime.sha256
-    with pytest.raises(ValueError, match="manual search controls: clock_period_ns"):
-        state.start_external_optimizer_loop({"spec_id": "spec-1", "clock_period_ns": 1})
+    with pytest.raises(ValueError, match="complete 12-D variable-clock"):
+        state.start_external_optimizer_loop(
+            {"spec_id": "spec-1", "candidate_id": "candidate-1"},
+            owner_id="owner",
+        )
+    with pytest.raises(ValueError, match="historical checkpoints are read-only"):
+        state.advance_external_optimizer_loop("loop-1", owner_id="owner")
+    assert captured == {}

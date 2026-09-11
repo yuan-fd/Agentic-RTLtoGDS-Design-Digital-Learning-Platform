@@ -90,6 +90,7 @@ def write_design_files(
     synth_hdl_frontend: str | None = None,
     design_options: dict | None = None,
     sdc_path: Path | None = None,
+    fast_route_tcl_path: Path | None = None,
 ) -> Path:
     from .orfs_parameters import orfs_parameter_config_lines, validate_orfs_parameters
     from .orfs_design_options import orfs_design_option_config_lines
@@ -182,6 +183,17 @@ def write_design_files(
                 f"export DIE_AREA = 0 0 {size:g} {size:g}",
                 f"export CORE_AREA = {margin:g} {margin:g} {size-margin:g} {size-margin:g}",
             ))
+
+    if fast_route_tcl_path is not None:
+        source_fast_route = fast_route_tcl_path.expanduser().resolve()
+        if not source_fast_route.is_file() or source_fast_route.stat().st_size == 0:
+            raise FileNotFoundError(source_fast_route)
+        staged_fast_route = config_dir / "fastroute.tcl"
+        shutil.copyfile(source_fast_route, staged_fast_route)
+        lines.append(
+            "export FASTROUTE_TCL = "
+            f"$(DESIGN_HOME)/{platform}/$(DESIGN_NAME)/fastroute.tcl"
+        )
 
     extra_tuning = {name: value for name, value in tuning.items()
                     if name not in {"core_utilization_pct", "place_density"}}

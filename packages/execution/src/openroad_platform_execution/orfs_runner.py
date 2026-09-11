@@ -33,13 +33,43 @@ from .process_guardian import ProcessGuardian
 from .toolchain import ToolchainConfig
 
 
-STAGE_ARTIFACT = {
-    RunStage.SYNTH: "1_synth.odb",
-    RunStage.FLOORPLAN: "2_floorplan.odb",
-    RunStage.PLACE: "3_place.odb",
-    RunStage.CTS: "4_cts.odb",
-    RunStage.ROUTE: "5_route.odb",
-    RunStage.FINISH: "6_final.odb",
+STAGE_ARTIFACTS = {
+    # Older admitted ORFS revisions end ``make synth`` at the mapped netlist;
+    # newer revisions may also materialize an ODB.  Both are authoritative
+    # synthesis products.  Requiring an ODB unconditionally falsely rejects
+    # the paper ce8d36a7 flow before floorplan.
+    RunStage.SYNTH: ("1_synth.odb", "1_synth.v"),
+    RunStage.FLOORPLAN: ("2_floorplan.odb",),
+    RunStage.PLACE: ("3_place.odb",),
+    RunStage.CTS: ("4_cts.odb",),
+    RunStage.ROUTE: ("5_route.odb",),
+    RunStage.FINISH: ("6_final.odb",),
+}
+
+
+# The paper-pinned ORFS/OpenROAD pair predates two coordinated upstream fixes.
+# ORFS #3050 replaced the ``save_image`` proxy with the OpenROAD compile flag,
+# while OpenROAD 4630b597 fixed that flag (it had always been defined).  The
+# pinned OpenROAD therefore reports GUI support despite exposing no
+# ``gui::show`` command.  Preserve the upstream predicate and additionally
+# discover the exact command before invoking the optional visualization.  The
+# adaptation applies only to the byte-identical admitted flow source and is
+# recorded in per-attempt evidence; implementation/evaluation stays unchanged.
+_HEADLESS_FINISH_BACKPORT = {
+    "upstream_url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts",
+    "upstream_commit": "e7a0725758c0abde2b69e2cdba783435238748ef",
+    "upstream_subject": "Correctly check for OR compiled w/o the GUI enabled.",
+    "issue": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/issues/3050",
+    "paired_openroad_commit": "4630b597e7da45019e0e17f19bc58f9128bdbc03",
+    "paired_openroad_subject": "ord: correct the setting of BUILD_PYTHON & BUILD_GUI",
+    "path": "scripts/final_report.tcl",
+    "source_sha256": "431bbf48065fa534369e78fb846390e8b32226800311c2c927afe27e63f8e7b2",
+    "patched_sha256": "19e52ae48ac8116a4c451973561e3103b537a330f4e7a5cc14c40d2278708204",
+    "old": "if {[expr [llength [info procs save_image]] > 0]} {",
+    "new": (
+        "if {[ord::openroad_gui_compiled] && "
+        "[llength [info commands gui::show]] > 0} {"
+    ),
 }
 
 
@@ -92,6 +122,9 @@ class ORFSRunner:
         # Makefile/script writes are contained by Runtime's workspace.
         staged_flow = workdir / "orfs-flow"
         shutil.copytree(self.flow_home, staged_flow, symlinks=True)
+        flow_compatibility = self._apply_admitted_compatibility_backports(
+            staged_flow, workdir,
+        )
         canonical_parameters = validate_orfs_parameters(
             request.flow_parameters, platform=request.platform,
         )
@@ -116,6 +149,8 @@ class ORFSRunner:
             design_options=request.design_options,
             sdc_path=(Path(request.sdc_path).expanduser().resolve()
                       if request.sdc_path else None),
+            fast_route_tcl_path=(Path(request.fast_route_tcl_path).expanduser().resolve()
+                                 if request.fast_route_tcl_path else None),
         )
         staged_root = workdir / "designs" / "src" / design
         staged_sources = []
@@ -157,6 +192,7 @@ class ORFSRunner:
             "workdir": plan.workdir,
             "flow_home": plan.flow_home,
             "source_flow_home": str(self.flow_home),
+            "flow_compatibility": flow_compatibility,
             "config_path": plan.config_path,
             "stages": [stage.value for stage in plan.stages],
             "request": request.to_dict(),
@@ -309,6 +345,9 @@ class ORFSRunner:
                 "klayout": self._file_record(self.toolchain.klayout_bin),
                 "platform_config": self._file_record(platform_config),
                 "generated_config": self._file_record(generated_config),
+                "flow_compatibility_receipt": self._file_record(
+                    Path(plan.workdir) / "flow_compatibility.json"
+                ),
                 "rtl": self._file_record(rtl),
                 "rtl_bundle": [self._file_record(Path(item).expanduser().resolve())
                                for item in plan.request.rtl_files],
@@ -329,6 +368,9 @@ class ORFSRunner:
                 "sdc": self._file_record(
                     Path(plan.request.sdc_path).expanduser().resolve()
                     if plan.request.sdc_path else None),
+                "fast_route_tcl": self._file_record(
+                    Path(plan.request.fast_route_tcl_path).expanduser().resolve()
+                    if plan.request.fast_route_tcl_path else None),
                 "or_seed": plan.request.or_seed,
                 "minimum_die_size_um": plan.request.minimum_die_size_um,
                 "stage_timeout_seconds": plan.request.stage_timeout_seconds,
@@ -377,10 +419,15 @@ class ORFSRunner:
 
     def _stage_gate(self, plan: ExecutionPlan, stage: RunStage) -> str | None:
         results = self._results_dir(plan)
-        required = [results / STAGE_ARTIFACT[stage]]
+        alternatives = [results / name for name in STAGE_ARTIFACTS[stage]]
+        missing = [] if any(path.is_file() and path.stat().st_size > 0
+                            for path in alternatives) else [
+                                "one of " + ", ".join(str(path) for path in alternatives)
+                            ]
         if stage == RunStage.FINISH:
-            required.extend(results / name for name in ("6_final.def", "6_final.v", "6_final.gds"))
-        missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
+            required = [results / name for name in ("6_final.def", "6_final.v", "6_final.gds")]
+            missing.extend(str(path) for path in required
+                           if not path.is_file() or path.stat().st_size == 0)
         return f"Required artifacts missing or empty: {', '.join(missing)}" if missing else None
 
     def _can_export_gds(self, plan: ExecutionPlan) -> bool:
@@ -440,15 +487,17 @@ class ORFSRunner:
             workdir / "design_input_manifest.json",
             workdir / "toolchain_snapshot.json",
             workdir / "parameter_contract.json",
+            workdir / "flow_compatibility.json",
             workdir / "logs/flow.log",
             workdir / "analysis/flow_error.log",
             Path(plan.config_path),
             Path(plan.config_path).with_name("constraint.sdc"),
+            Path(plan.config_path).with_name("fastroute.tcl"),
             Path(plan.config_path).with_name("pdn.tcl"),
         ]
         results = self._results_dir(plan)
         candidates.extend(results / name for name in (
-            "1_synth.odb", "2_floorplan.odb", "3_place.odb", "4_cts.odb",
+            "1_synth.odb", "1_synth.v", "2_floorplan.odb", "3_place.odb", "4_cts.odb",
             "5_route.odb", "6_final.odb", "6_final.def", "6_final.v", "6_final.gds",
         ))
         reports = (workdir / "reports" / plan.request.platform /
@@ -486,6 +535,58 @@ class ORFSRunner:
                 sha256=self._sha256(path),
             ))
         return artifacts
+
+    @classmethod
+    def _apply_admitted_compatibility_backports(
+        cls, staged_flow: Path, workdir: Path,
+    ) -> list[dict[str, object]]:
+        """Backport reviewed upstream fixes into only the isolated flow copy."""
+        patch = _HEADLESS_FINISH_BACKPORT
+        relative = Path(str(patch["path"]))
+        target = staged_flow / relative
+        records: list[dict[str, object]] = []
+        if target.is_file() and cls._sha256(target) == patch["source_sha256"]:
+            original = target.read_text(encoding="utf-8")
+            old = str(patch["old"])
+            if original.count(old) != 1:
+                raise ValueError(
+                    "Admitted ORFS headless finish backport source is ambiguous"
+                )
+            target.write_text(
+                original.replace(old, str(patch["new"])), encoding="utf-8"
+            )
+            actual = cls._sha256(target)
+            if actual != patch["patched_sha256"]:
+                raise ValueError(
+                    "Admitted ORFS headless finish backport digest mismatch"
+                )
+            records.append({
+                "kind": "upstream_backport",
+                "scope": "optional_headless_finish_visualization_guard",
+                "path": str(relative),
+                "source_sha256": patch["source_sha256"],
+                "patched_sha256": actual,
+                "upstream_url": patch["upstream_url"],
+                "upstream_commit": patch["upstream_commit"],
+                "upstream_subject": patch["upstream_subject"],
+                "issue": patch["issue"],
+                "paired_openroad_commit": patch["paired_openroad_commit"],
+                "paired_openroad_subject": patch["paired_openroad_subject"],
+                "capability_probe": "info commands gui::show",
+                "protected_inputs_changed": False,
+            })
+        receipt = {
+            "schema_version": 1,
+            "kind": "orfs-flow-compatibility",
+            "changes": records,
+            "claim_boundary": (
+                "Reviewed upstream compatibility backports applied only to the "
+                "Runtime-owned attempt copy; RTL, PDK, SDC, evaluator, metrics, "
+                "and optimizer semantics are unchanged."
+            ),
+        }
+        cls._write_json(workdir / "flow_compatibility.json", receipt)
+        return records
 
     @staticmethod
     def _write_flow_error(workdir: Path, stage: RunStage, message: str) -> None:

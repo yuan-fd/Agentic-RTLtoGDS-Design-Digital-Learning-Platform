@@ -1,13 +1,47 @@
 # Current status
 
-updated_at: 2026-08-30
-phase: v2 engineering acceptance and report freeze
+updated_at: 2026-09-05
+phase: L1/L2 tutorial architecture recovery
+
+Unified proposal audit and current claim boundary:
+`docs/governance/L1_L2_TUTORIAL_PROPOSAL_ACCEPTANCE.md`.
+
+## 2026-09-05 governed recovery status
+
+- Product L2 is now A2-ORFO (`optimizer.l2.a2-orfo-feedback`). ORFS-Agent is
+  retained as A2's complete 12-D variable-clock EDA executor, not as a second
+  product optimizer.
+- The durable product protocol is frozen at 26 native bootstrap measurements
+  plus five rounds of 25 A2 feedback candidates: 151 EDA measurements, zero
+  non-native confirmation runs. This full campaign is configured but has not
+  been started.
+- A real bounded A2 policy -> ORFS -> protected evaluator -> feedback -> next
+  A2 candidate loop has passed. Product migration/restart separation has a
+  separate no-execution acceptance; see Slice 041.
+- Native RTLScout Spec->RTL->GDS, typed ORAssistant knowledge/error retrieval,
+  four-domain StageAnalysis/DiagnosisReport, PDAgent-style control state,
+  EDATracer-style artifact graph, convergence classification and typed
+  recovery policy have bounded accepted evidence in Slices 031-040.
+- PostEDA-Bench intake and one real public-case -> four-domain diagnosis ->
+  sealed prediction -> private hidden-label scoring path passed in Slice 042.
+  The derived 1.0 score is an integration diagnostic, not official SR/ERR/VRR.
+- CLOSER-Bench remains Red/source-audit-only because no verifiable source/data
+  release, license, frozen A/B/C tasks or hidden oracle is available. The
+  platform completed a non-official paper-protocol audit in Slices 043/045.
+- One platform-owned real backend-to-RTL recovery passed in Slice 044: a
+  functionally correct, synthesis-only blackbox fault failed real ORFS; L1
+  persisted a no-fake-QoR DiagnosisReport, typed restore plan and clean RTLScout
+  checkpoint selection, then reverified it and reached GDS/protected QoR.
 
 ## Product boundary
 
-- The v2 2D product exposes one execution path:
-  `POST /api/v2/external-optimizer-loops`.  Its controller owns baseline,
-  pinned external optimiser execution, candidate replay and checkpointing.
+- The former `POST /api/v2/external-optimizer-loops` create/advance path is
+  retired because it represents a reduced-domain, fixed-clock ORFS-Agent
+  protocol. Its owner-scoped GET routes remain only for historical evidence.
+- The supported L1/L2 path is `apps/l1_workbench`: operator-owned GoalDraft,
+  typed Policy and Runtime feedback, measured L1 baseline/candidate/reflection,
+  durable L2 authorization, then A2-ORFO policy over the complete upstream
+  12-D variable-clock ORFS-Agent executor with ECP/DWL/COMBO.
 - Baseline is round 0 inside that loop. Sequential scan, grid/manual tuning,
   standalone baseline, recommendation approval, and manual campaign modes are
   not product routes. Seed, repetition count, search bounds, transition count,
@@ -24,14 +58,20 @@ phase: v2 engineering acceptance and report freeze
 
 `natural language -> SpecIR -> independent Verification Agent -> frozen
 testbench -> RTLScout candidate iteration -> lint/simulation/mutation -> ORFS
-baseline -> repeated ORFS-Agent GP/EI candidate evaluation -> three-stall diagnosis ->
-evidence/hypothesis/holdout memory`
+baseline -> A2-ORFO policy -> complete 12-D variable-clock ORFS-Agent execution
+-> protected QoR feedback -> next native A2 proposal`
 
 Workflow Runtime is the sole process and artifact authority. Models propose
 structured specifications, tests, RTL candidates, diagnoses, or hypotheses;
 they cannot register their own PPA numbers or bypass the Runtime.
 
 ## Real evidence snapshot
+
+- Current governed product acceptance: native RTLScout Spec->RTL->GDS,
+  A2-ORFO single feedback, PostEDA two-stage diagnostic scoring and executed
+  backend-to-RTL checkpoint recovery all have immutable Runtime evidence under
+  `var/evidence/`; see Slices 030-045. The configured 151-run A2 campaign has
+  not been started and no campaign-level PPA claim is made.
 
 - RTL fixed suite: four natural-language designs (gcd, FIFO, UART TX and the
   small `ibex_alu` block), one generation seed each, all reached registered GDS.

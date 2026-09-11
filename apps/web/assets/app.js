@@ -82,7 +82,7 @@ const ZH = {
   "backend.objective": "优化目标", "backend.objective.balanced": "综合平衡", "backend.objective.timing": "时序优先",
   "backend.objective.area": "面积优先", "backend.objective.power": "功耗优先", "backend.mode": "流程模式",
   "backend.run.title": "运行自主 BO/GP 闭环并监控阶段", "backend.run.subtitle": "查看重复 baseline、候选实验、恢复状态、指标和生成文件。",
-  "backend.run.select": "设计任务", "backend.run.action": "开始 Agent 自主 BO/GP 优化", "backend.run.compare": "比较该设计的历史任务",
+  "backend.run.select": "设计任务", "backend.run.action": "查看历史 L2 记录", "backend.run.compare": "比较该设计的历史任务",
   "backend.run.empty": "尚未选择任务", "backend.run.empty.help": "排队、运行和已完成的记录会显示在这里。",
   "backend.evidence.title": "版图、QoR 与实现证据", "backend.evidence.subtitle": "查看版图、时序、面积、功耗、DRC、报告和下载产物。",
   "backend.evidence.empty": "设计结果将在这里显示。", "backend.evidence.empty.help": "选择当前设计已完成的任务以读取版图和报告。",
@@ -262,7 +262,7 @@ async function loadAuthenticatedWorkspace() {
   await Promise.all([loadRtlscoutStatus(), loadExamples()]);
   await loadDesigns();
   await loadRuns();
-  await restoreActiveClosedLoop();
+  await restoreHistoricalExternalLoop();
   state.workspaceLoaded = true;
   // Stage 3.4: prefill the Spec (LLM) agent dashboard with the most recent spec-to-rtl agent trace.
   loadRecentAgentTraces("#agentTraceSpec", "spec-to-rtl");
@@ -1219,74 +1219,44 @@ function stopClosedLoopPolling() {
   state.closedLoopPoll = null;
 }
 
-async function pollClosedLoop(pipelineId) {
+async function showHistoricalExternalLoop(pipelineId) {
   stopClosedLoopPolling();
   try {
     const checkpoint = await api(`/api/v2/external-optimizer-loops/${encodeURIComponent(pipelineId)}`);
     const loop = checkpoint.state || {};
     renderOptimizationDashboard(loop);
-    const terminal = ["completed", "diagnosis_required", "failed"].includes(loop.status);
-    const best = Number(loop.best_objective);
-    message("#flowMessage", terminal
-      ? ui(`Campaign stopped at ${loop.status}; ${loop.candidate_count || 0} candidate configurations were repeatedly measured. Best published-optimizer objective: ${Number.isFinite(best) ? best.toFixed(4) : "—"}.`, `实验停于 ${loop.status}；${loop.candidate_count || 0} 个候选配置已完成重复测量。最优上游优化器目标值：${Number.isFinite(best) ? best.toFixed(4) : "—"}。`)
-      : ui(`Campaign ${loop.status || "queued"}: ${loop.candidate_count || 0}/${loop.max_candidates || "?"} candidate configurations. You may leave this page; the durable controller continues.`, `实验 ${loop.status || "排队中"}：${loop.candidate_count || 0}/${loop.max_candidates || "?"} 个候选配置。可以离开页面，持久控制器会继续运行。`));
-    $("#submitFlow").disabled = !terminal;
-    if (!terminal) state.closedLoopPoll = setTimeout(() => pollClosedLoop(pipelineId), 5000);
-    else await loadRuns(null);
+    message("#flowMessage", ui(
+      `Read-only historical checkpoint (${loop.status || "unknown"}). This legacy reduced-domain controller cannot be created, advanced, or resumed.`,
+      `只读历史检查点（${loop.status || "未知"}）。旧的缩减维度控制器不能创建、推进或恢复。`));
   } catch (error) {
     message("#flowMessage", error.message, true);
-    state.closedLoopPoll = setTimeout(() => pollClosedLoop(pipelineId), 10000);
   }
 }
 
-async function restoreActiveClosedLoop() {
+async function restoreHistoricalExternalLoop() {
   try {
     const records = (await api("/api/v2/external-optimizer-loops")).external_optimizer_loops || [];
-    const terminal = new Set(["completed", "diagnosis_required", "failed"]);
-    const active = records.find(item => !terminal.has(item.state?.status));
-    if (!active) return;
-    const designId = active.state?.design_id;
+    const historical = records[0];
+    if (!historical) {
+      message("#flowMessage", ui(
+        "No historical legacy-L2 checkpoints. Complete ORFS-Agent campaigns are launched only after an L1 Workbench authorization.",
+        "没有旧 L2 历史检查点。完整 ORFS-Agent campaign 只能在 L1 Workbench 授权后启动。"));
+      return;
+    }
+    const designId = historical.state?.design_id;
     if (designId && state.designs.some(item => item.id === designId)
         && state.selectedDesign?.id !== designId) {
       await selectDesign(designId);
     }
-    state.activeClosedLoop = active.pipeline_id;
-    renderOptimizationDashboard(active.state || {});
-    $("#submitFlow").disabled = true;
-    message("#flowMessage", ui(
-      "Recovered an active durable campaign after page reload; execution never depended on this browser tab.",
-      "页面重载后已恢复正在运行的持久实验；执行从不依赖当前浏览器标签页。"));
-    await pollClosedLoop(active.pipeline_id);
+    state.activeClosedLoop = historical.pipeline_id;
+    await showHistoricalExternalLoop(historical.pipeline_id);
   } catch (error) {
-    message("#flowMessage", `${ui("Could not restore the active campaign", "无法恢复正在运行的实验")}: ${error.message}`, true);
+    message("#flowMessage", `${ui("Could not read historical L2 evidence", "无法读取 L2 历史证据")}: ${error.message}`, true);
   }
 }
 
 async function submitFlow() {
-  const id = $("#backendDesign").value;
-  if (!id) return message("#flowMessage", ui("Select a registered design first.", "请先选择已登记设计。"), true);
-  const button = $("#submitFlow");
-  button.disabled = true;
-  const objective = $('input[name="flowObjective"]:checked')?.value || "balanced";
-  message("#flowMessage", ui("Starting the autonomous loop: three baseline measurements, then pinned ORFS-Agent GP/EI candidate experiments…", "正在启动自主闭环：先重复测量三次 baseline，再由固定版本 ORFS-Agent 的 GP/EI 产生候选实验……"));
-  try {
-    const base = {
-      design_id: id, clock: $("#flowClock").value.trim() || null,
-      platform: $("#flowPdk").value,
-      objective_profile: objective,
-    };
-    const created = await post("/api/v2/external-optimizer-loops", base);
-    state.activeClosedLoop = created.pipeline_id;
-    renderOptimizationDashboard(created.state || {});
-    message("#flowMessage", ui(
-      "Campaign accepted. The durable controller is running it in the background; this page now polls evidence without holding an HTTP request open.",
-      "实验已受理。持久控制器在后台运行；页面只轮询证据，不会长时间占住 HTTP 请求。"));
-    await pollClosedLoop(created.pipeline_id);
-  } catch (error) {
-    message("#flowMessage", error.message, true);
-  } finally {
-    if (!state.activeClosedLoop) button.disabled = false;
-  }
+  await restoreHistoricalExternalLoop();
 }
 
 function backendMode(mode) {

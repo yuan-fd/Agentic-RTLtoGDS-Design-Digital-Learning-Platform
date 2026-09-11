@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
+from uuid import uuid4
 
 from openroad_platform_contracts.agent_control import DesignGoal, DesignState, SemanticToolCall
-from openroad_platform_contracts.l1_goal_draft import GoalDraft
+from openroad_platform_contracts.l1_goal_draft import ClarificationQuestion, GoalDraft
 from openroad_platform_contracts.l1_tool_contract import reject_forbidden_field_tree
 from openroad_platform_contracts.learning import EvidencePointer
 
@@ -71,14 +72,30 @@ class L1ModelBoundary:
         return raw
 
     @classmethod
-    def compile_draft(cls, provider: L1StructuredProvider, request_text: str, *, draft_id: str) -> GoalDraft:
-        raw = cls._output(provider, {"kind": "goal_draft", "request_text": request_text})
+    def compile_draft(
+        cls, provider: L1StructuredProvider, request_text: str, *, draft_id: str,
+        required_questions: tuple[ClarificationQuestion, ...] = (),
+    ) -> GoalDraft:
+        if not isinstance(required_questions, tuple):
+            raise ValueError("operator GoalDraft questions must be a tuple")
+        for question in required_questions:
+            if not isinstance(question, ClarificationQuestion):
+                raise ValueError("operator GoalDraft schema must contain typed questions")
+            question.validate()
+        if len({item.question_id for item in required_questions}) != len(required_questions):
+            raise ValueError("operator GoalDraft question ids must be unique")
+        raw = cls._output(provider, {
+            "kind": "goal_draft", "request_text": request_text,
+            "required_questions": [item.to_dict() for item in required_questions],
+        })
         allowed = {"request_text", "intent", "questions", "answers", "interpretation", "field_sources", "schema_version"}
         if set(raw) - allowed:
             raise ValueError("goal provider returned unsupported fields")
         draft = GoalDraft.from_dict({"draft_id": draft_id, "parser_id": provider.provider_id, **raw})
         if draft.request_text != request_text:
             raise ValueError("goal provider changed the user request")
+        if draft.questions != required_questions:
+            raise ValueError("goal provider changed the operator-owned question schema")
         return draft
 
     @staticmethod
@@ -96,18 +113,24 @@ class L1ModelBoundary:
 
     @classmethod
     def propose_tool(cls, provider: L1StructuredProvider, goal: DesignGoal, state: DesignState,
-                     hits: tuple[L1KnowledgeHit, ...]) -> L1ToolProposal:
+                     hits: tuple[L1KnowledgeHit, ...], *, call_id: str | None = None) -> L1ToolProposal:
         for hit in hits:
             hit.validate()
+        expected_call_id = call_id or f"call-{uuid4().hex}"
         raw = cls._output(provider, {"kind": "tool_proposal", "goal": goal.to_dict(),
                                      "state": state.to_dict(), "knowledge": [
-                                         {"excerpt": hit.excerpt, "evidence": hit.evidence.to_dict()} for hit in hits]})
+                                         {"excerpt": hit.excerpt, "evidence": hit.evidence.to_dict()} for hit in hits],
+                                     "call_id": expected_call_id,
+                                     "provider_id": provider.provider_id})
         if set(raw) != {"call", "decision_summary", "citations"}:
             raise ValueError("tool provider output must contain only call, summary, and citations")
         call = SemanticToolCall.from_dict(raw["call"])
         citations = tuple(EvidencePointer.from_dict(item) for item in raw["citations"])
         proposal = L1ToolProposal(call, raw["decision_summary"], citations)
         proposal.validate()
+        if call_id is not None and (call.call_id != expected_call_id
+                                    or call.producer != provider.provider_id):
+            raise ValueError("tool provider changed its Runtime-assigned call identity")
         if set(citations) - {item.evidence for item in hits}:
             raise ValueError("tool proposal cites evidence not returned by retrieval")
         L1SemanticToolPolicy.validate(goal, state, call)

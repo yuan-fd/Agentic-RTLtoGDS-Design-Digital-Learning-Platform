@@ -57,6 +57,7 @@ class RunRequest:
     synth_hdl_frontend: str | None = None
     design_options: dict[str, Any] = field(default_factory=dict)
     sdc_path: str | None = None
+    fast_route_tcl_path: str | None = None
     top: str | None = None
     clock: str | None = None
     clock_period_ns: float = 10.0
@@ -111,6 +112,12 @@ class RunRequest:
             sdc = Path(self.sdc_path).expanduser()
             if require_rtl and (not sdc.is_file() or sdc.stat().st_size == 0):
                 raise ValueError(f"SDC file does not exist or is empty: {sdc}")
+        if self.fast_route_tcl_path is not None:
+            fast_route = Path(self.fast_route_tcl_path).expanduser()
+            if require_rtl and (not fast_route.is_file()
+                                or fast_route.stat().st_size == 0):
+                raise ValueError(
+                    f"FastRoute Tcl file does not exist or is empty: {fast_route}")
         if self.top is not None and not re.fullmatch(r"[A-Za-z_]\w*", self.top):
             raise ValueError(f"Invalid top module: {self.top}")
         if self.clock is not None and not re.fullmatch(r"[A-Za-z_]\w*", self.clock):

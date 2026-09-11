@@ -60,6 +60,86 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _json_digest(value: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(
+        dict(value), sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+
+
+def _tree_sha256(root: Path, *, ignored_names: frozenset[str] = frozenset()) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if relative.parts and relative.parts[0] in ignored_names:
+            continue
+        if path.is_symlink():
+            digest.update(f"L\0{relative}\0{os.readlink(path)}\n".encode())
+        elif path.is_file():
+            digest.update(f"F\0{relative}\0{path.stat().st_size}\0".encode())
+            digest.update(_sha256(path).encode()); digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _validate_protocol_receipts(
+    *, domain: Mapping[str, Any], source: Path, paper_orfs: Path,
+    openroad: Path, yosys: Path, design: str, platform: str,
+) -> dict[str, Any]:
+    raw = os.environ.get("ORFS_AGENT_PAPER_RECEIPTS_JSON")
+    if not raw:
+        raise ValueError("full candidate requires admitted paper input/toolchain receipts")
+    receipts = json.loads(raw)
+    if not isinstance(receipts, Mapping):
+        raise ValueError("paper receipt envelope is invalid")
+    protocol = domain.get("experiment_protocol")
+    if not isinstance(protocol, Mapping):
+        raise ValueError("full candidate protocol is absent")
+    if (protocol.get("orfs_agent_commit") != os.environ.get("ORFS_AGENT_EXPECTED_COMMIT")
+            or protocol.get("orfs_commit") != os.environ.get("ORFS_AGENT_PAPER_ORFS_COMMIT")):
+        raise ValueError("full candidate protocol source commits do not match admission")
+    toolchain = receipts.get("toolchain")
+    yosys_share = yosys.parent.parent / "share"
+    yosys_datdir = yosys_share / "yosys"
+    if (not isinstance(toolchain, Mapping)
+            or receipts.get("toolchain_receipt_sha256") != _json_digest(toolchain)
+            or protocol.get("toolchain_receipt_sha256") != receipts.get("toolchain_receipt_sha256")
+            or toolchain.get("openroad_sha256") != _sha256(openroad)
+            or toolchain.get("yosys_sha256") != _sha256(yosys)
+            or not yosys_datdir.is_dir() or yosys_datdir.resolve() != yosys_share.resolve()
+            or toolchain.get("yosys_datdir_sha256") != _tree_sha256(
+                yosys_share, ignored_names=frozenset({"yosys"}))):
+        raise ValueError("full candidate toolchain receipt does not match executable bytes")
+    selected = (receipts.get("inputs") or {}).get(f"{platform}/{design}")
+    if not isinstance(selected, Mapping):
+        raise ValueError("full candidate design/PDK receipt is absent")
+    design_receipt, pdk_receipt = selected.get("design"), selected.get("pdk")
+    if not isinstance(design_receipt, Mapping) or not isinstance(pdk_receipt, Mapping):
+        raise ValueError("full candidate design/PDK receipt is malformed")
+    if (selected.get("design_bundle_sha256") != _json_digest(design_receipt)
+            or selected.get("pdk_bundle_sha256") != _json_digest(pdk_receipt)
+            or protocol.get("design_bundle_sha256") != selected.get("design_bundle_sha256")
+            or protocol.get("pdk_bundle_sha256") != selected.get("pdk_bundle_sha256")):
+        raise ValueError("full candidate design/PDK protocol hashes do not match admission")
+    configs = source / "AutoTuner-integration/AutoTuner/autotune_configs"
+    sdc_name = {"aes": "aes_cipher_top.sdc", "ibex": "ibex_core.sdc",
+                "jpeg": "jpeg_encoder.sdc"}[design]
+    if (design_receipt.get("autotuner_config_sha256") != _sha256(configs / f"{design}_{platform}.mk")
+            or design_receipt.get("autotuner_sdc_sha256") != _sha256(configs / sdc_name)
+            or design_receipt.get("autotuner_fastroute_sha256") != _sha256(configs / f"fastroute_{platform}.tcl")):
+        raise ValueError("full candidate AutoTuner design bundle bytes changed")
+    actual_design_tree = subprocess.check_output(
+        ("git", "-C", str(paper_orfs), "rev-parse", f"HEAD:flow/designs/src/{design}"),
+        text=True,
+    ).strip()
+    actual_pdk_tree = subprocess.check_output(
+        ("git", "-C", str(paper_orfs), "rev-parse", f"HEAD:flow/platforms/{platform}"),
+        text=True,
+    ).strip()
+    if (design_receipt.get("paper_design_tree_git_oid") != actual_design_tree
+            or pdk_receipt.get("paper_platform_tree_git_oid") != actual_pdk_tree):
+        raise ValueError("full candidate paper design/PDK Git trees changed")
+    return {"toolchain": dict(toolchain), "input_bundle": dict(selected)}
+
+
 def _required_path(variable: str) -> Path:
     raw = os.environ.get(variable)
     if not raw:
@@ -160,6 +240,25 @@ def _upstream_job_name(*, design: str, platform: str,
         "__CTS_CSIZE_{CTS_CLUSTER_SIZE}__CTS_CDIA_{CTS_CLUSTER_DIAMETER}"
         "__PIN_ADJ_{PIN_LAYER_ADJUST}__UP_ADJ_{UP_LAYER_ADJUST}"
     ).format(**values)
+
+
+def _upstream_execution_candidate(
+    candidate: Mapping[str, int | float],
+) -> dict[str, int | float]:
+    """Apply the pinned upstream ``run_or`` execution mapping.
+
+    ORFS-Agent keeps the optimizer's original row for feedback, but rounds
+    CLK, UTIL, LB_ADDON, PIN_ADJ, and UP_ADJ to three decimal places before
+    passing them to ``run_job``.  Reproducing that boundary is materially
+    different from platform-side projection: every one of the 12 dimensions
+    remains variable and the unmodified candidate remains the optimizer row.
+    """
+    value = dict(candidate)
+    for name in ("CLK", "UTIL", "LB_ADDON", "PIN_ADJ", "UP_ADJ"):
+        value[name] = round(value[name], 3)
+    for name in ("TNS_End_Percent", "HIER_SYNTH", "GP_PAD", "DP_PAD", "DPO"):
+        value[name] = int(value[name])
+    return value
 
 
 def _preserve_recursive_makeflags(flow: Path) -> list[dict[str, str]]:
@@ -307,7 +406,8 @@ def _preserve_recursive_makeflags(flow: Path) -> list[dict[str, str]]:
 
 
 def _materialize(root: Path, *, source: Path, paper_orfs: Path,
-                 platform: str, design: str, candidate: Mapping[str, int | float]) -> dict[str, Any]:
+                 platform: str, design: str, candidate: Mapping[str, int | float],
+                 or_seed: int = 0) -> dict[str, Any]:
     """Create the exact upstream run_or_job input shape within one attempt."""
     flow_source = paper_orfs / "flow"
     private_source = source / "AutoTuner-integration" / "AutoTuner" / "autotune_configs"
@@ -326,28 +426,30 @@ def _materialize(root: Path, *, source: Path, paper_orfs: Path,
         if not path.is_file():
             raise FileNotFoundError(f"upstream material required for candidate is absent: {path}")
     work_home = root / "work"
-    variant = _upstream_job_name(design=design, platform=platform, candidate=candidate)
+    execution_candidate = _upstream_execution_candidate(candidate)
+    variant = _upstream_job_name(
+        design=design, platform=platform, candidate=execution_candidate)
     # This mapping is a direct transcription of upstream run_or_job.sh.  The
     # values deliberately remain environment variables (rather than a new
     # generated optimizer config) so ORFS evaluates exactly its native knobs.
     environment = {
-        "CLK_PERIOD": str(candidate["CLK"]),
-        "ABC_CLOCK_PERIOD_IN_PS": str(candidate["CLK"]),
-        "CORE_UTILIZATION": str(candidate["UTIL"]),
+        "CLK_PERIOD": str(execution_candidate["CLK"]),
+        "ABC_CLOCK_PERIOD_IN_PS": str(execution_candidate["CLK"]),
+        "CORE_UTILIZATION": str(execution_candidate["UTIL"]),
         "CORE_ASPECT_RATIO": "1",
-        "PLACE_DENSITY_LB_ADDON": str(candidate["LB_ADDON"]),
-        "TNS_END_PERCENT": str(candidate["TNS_End_Percent"]),
+        "PLACE_DENSITY_LB_ADDON": str(execution_candidate["LB_ADDON"]),
+        "TNS_END_PERCENT": str(execution_candidate["TNS_End_Percent"]),
         "RECOVER_POWER": "0",
-        "SYNTH_HIERARCHICAL": str(candidate["HIER_SYNTH"]),
-        "CELL_PAD_IN_SITES_GLOBAL_PLACEMENT": str(candidate["GP_PAD"]),
-        "CELL_PAD_IN_SITES_DETAIL_PLACEMENT": str(candidate["DP_PAD"]),
-        "ENABLE_DPO": str(candidate["DPO"]),
+        "SYNTH_HIERARCHICAL": str(execution_candidate["HIER_SYNTH"]),
+        "CELL_PAD_IN_SITES_GLOBAL_PLACEMENT": str(execution_candidate["GP_PAD"]),
+        "CELL_PAD_IN_SITES_DETAIL_PLACEMENT": str(execution_candidate["DP_PAD"]),
+        "ENABLE_DPO": str(execution_candidate["DPO"]),
         "GPL_TIMING_DRIVEN": "1",
         "GPL_ROUTABILITY_DRIVEN": "1",
-        "CTS_CLUSTER_SIZE": str(candidate["CTS_CSIZE"]),
-        "CTS_CLUSTER_DIAMETER": str(candidate["CTS_CDIA"]),
-        "PIN_LAYER_ADJUST": str(candidate["PIN_ADJ"]),
-        "UP_LAYER_ADJUST": str(candidate["UP_ADJ"]),
+        "CTS_CLUSTER_SIZE": str(execution_candidate["CTS_CSIZE"]),
+        "CTS_CLUSTER_DIAMETER": str(execution_candidate["CTS_CDIA"]),
+        "PIN_LAYER_ADJUST": str(execution_candidate["PIN_ADJ"]),
+        "UP_LAYER_ADJUST": str(execution_candidate["UP_ADJ"]),
         "FASTROUTE_TCL": str(route),
         # Exact platform selection from upstream run_or_job.sh.
         **({"IO_PLACER_H": "M4 M6", "IO_PLACER_V": "M5 M7"}
@@ -363,11 +465,15 @@ def _materialize(root: Path, *, source: Path, paper_orfs: Path,
         "NUM_CORES": "4",
         "OMP_NUM_THREADS": "4",
         "MKL_NUM_THREADS": "4",
+        # Runtime owns stochastic replay.  The upstream launcher leaves this
+        # unset; making it explicit preserves the optimizer's 12-D coordinate
+        # while giving every measurement a reproducible execution seed.
+        "OR_SEED": str(or_seed),
     }
     environment["CTS_ARGS"] = (
         "-sink_clustering_enable -balance_levels "
-        f"-sink_clustering_size {candidate['CTS_CSIZE']} "
-        f"-sink_clustering_max_diameter {candidate['CTS_CDIA']}"
+        f"-sink_clustering_size {execution_candidate['CTS_CSIZE']} "
+        f"-sink_clustering_max_diameter {execution_candidate['CTS_CDIA']}"
     )
     # The copied upstream config contains only a subset of the 12 knobs.
     # Materialize a candidate-specific config with exported assignments so
@@ -376,7 +482,10 @@ def _materialize(root: Path, *, source: Path, paper_orfs: Path,
     mapped_config = root / "mapped_config.mk"
     mapped_config.write_text(
         config.read_text(encoding="utf-8") + "\n# Runtime materialized upstream candidate\n"
-        + "".join(f"export {name} = {environment[name]}\n" for name in CANDIDATE_ENVIRONMENT_VARIABLES),
+        + "".join(
+            f"export {name} = {environment[name]}\n"
+            for name in (*CANDIDATE_ENVIRONMENT_VARIABLES, "OR_SEED")
+        ),
         encoding="utf-8",
     )
     receipt = {
@@ -385,6 +494,13 @@ def _materialize(root: Path, *, source: Path, paper_orfs: Path,
         "platform": platform,
         "design": design,
         "candidate": dict(candidate),
+        "native_execution_candidate": execution_candidate,
+        "execution_mapping": {
+            "owner": "upstream ORFS-Agent",
+            "entrypoint": "ORFS-with-AutoTuner/orfs_agent.py:run_or",
+            "rule": "round CLK, UTIL, LB_ADDON, PIN_ADJ, UP_ADJ to 3 decimals; cast discrete controls exactly as upstream",
+        },
+        "or_seed": or_seed,
         "upstream_wrapper": "AutoTuner-integration/ORFS-with-AutoTuner/run_or_job.sh",
         "native_environment_mapping": environment,
         "flow": str(flow),
@@ -410,17 +526,89 @@ def _copy_report(root: Path, materialization: Mapping[str, Any]) -> dict[str, An
     final_metrics = json.loads(final.read_text(encoding="utf-8"))
     cts_metrics = (json.loads(cts.read_text(encoding="utf-8")) if cts.is_file() else {})
     candidate = materialization["candidate"]
+    numeric_stage_metrics = {
+        key: value for key, value in {**cts_metrics, **final_metrics}.items()
+        if isinstance(key, str) and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    }
     metrics = {
         "schema_version": 1,
         "raw_final_report": final_metrics,
         "raw_cts_report": cts_metrics,
+        **numeric_stage_metrics,
         "ECP_final": float(candidate["CLK"]) - float(final_metrics["finish__timing__setup__ws"]),
         "ECP_cts": (float(candidate["CLK"]) - float(cts_metrics["cts__timing__setup__ws"])
                     if "cts__timing__setup__ws" in cts_metrics else None),
         "candidate_clock_units": "ps" if materialization["platform"] == "asap7" else "ns",
     }
+    wirelength = numeric_stage_metrics.get("detailedroute__route__wirelength")
+    if isinstance(wirelength, (int, float)):
+        # Reuse the upstream-policy adapter's admitted paper normalization;
+        # this is an observed objective value, not a candidate generator.
+        from orfs_agent_paper_policy_adapter import BASELINES
+        base_wl, base_ecp = BASELINES[(materialization["design"], materialization["platform"])]
+        metrics["Fractional_Loss_final"] = (
+            float(wirelength) / base_wl + float(metrics["ECP_final"]) / base_ecp
+        )
     _write(root / "candidate_metrics.json", metrics)
     return metrics
+
+
+def _write_measurement_index(root: Path, *, candidate: Mapping[str, Any],
+                             objective: str, metrics: Mapping[str, Any]) -> Path:
+    """Give the adapter report a store key distinct from its metric dataset.
+
+    Runtime gives one workspace-relative store key one artifact identity.  The
+    canonical QoR report remains a third, separately emitted protected-
+    evaluator artifact.
+    """
+    metrics_path = root / "candidate_metrics.json"
+    if not metrics_path.is_file():
+        raise FileNotFoundError("candidate metric artifact is missing")
+    report_path = root / "candidate_execution_report.json"
+    _write(report_path, {
+        "schema_version": 1,
+        "kind": "orfs-agent-candidate-measurement-index",
+        "authority": "adapter-index-not-canonical-qor",
+        "candidate": dict(candidate),
+        "objective": objective,
+        "metrics_artifact": {
+            "path": metrics_path.name,
+            "sha256": _sha256(metrics_path),
+        },
+        "available_numeric_metrics": sorted(
+            key for key, value in metrics.items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)),
+    })
+    return report_path
+
+
+def _final_physical_artifacts(root: Path, materialization: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Register the physical outputs produced by upstream ``tunereport``.
+
+    The upstream entrypoint ends at final report and does not invoke ORFS'
+    separate ``generate_abstract`` GDS target.  We preserve that native
+    boundary while retaining every final physical file it does produce.
+    """
+    result_dir = Path(str(materialization["expected_result_directory"])).resolve()
+    try:
+        result_dir.relative_to(root.resolve())
+    except ValueError as exc:
+        raise ValueError("candidate result directory escapes the Runtime workspace") from exc
+    expected = (
+        ("odb", "6_final.odb"),
+        ("def", "6_final.def"),
+        ("netlist", "6_final.v"),
+        ("sdc", "6_final.sdc"),
+        ("spef", "6_final.spef"),
+    )
+    artifacts = []
+    for kind, name in expected:
+        path = result_dir / name
+        if not path.is_file() or path.stat().st_size == 0:
+            raise FileNotFoundError(f"upstream tunereport did not emit {name}")
+        artifacts.append({"kind": kind, "path": str(path.relative_to(root))})
+    return artifacts
 
 
 def _result(*, status: str, code: int, started: str, artifacts: list[dict[str, str]],
@@ -439,11 +627,16 @@ def main() -> int:
     try:
         request = json.loads(args.request.read_text(encoding="utf-8"))
         task = request["task"]
-        if request.get("plugin", {}).get("plugin_id") != "orfs-agent-paper-reproduction":
-            raise ValueError("request is not for orfs-agent-paper-reproduction")
+        plugin_id = request.get("plugin", {}).get("plugin_id")
+        if plugin_id not in {"orfs-agent", "orfs-agent-paper-reproduction"}:
+            raise ValueError("request is not for an admitted ORFS-Agent candidate executor")
         inputs = task.get("inputs")
         if not isinstance(inputs, Mapping):
             raise ValueError("task inputs must be an object")
+        expected_mode = ("upstream_full_candidate" if plugin_id == "orfs-agent"
+                         else "run_candidate")
+        if task.get("plugin_id") != plugin_id or inputs.get("mode") != expected_mode:
+            raise ValueError("ORFS-Agent candidate mode does not match its plugin identity")
         platform, design = str(inputs.get("platform", "")), str(inputs.get("design", ""))
         if platform not in SUPPORTED_PLATFORMS or design not in SUPPORTED_DESIGNS:
             raise ValueError("paper reproduction supports {aes,ibex,jpeg} on {asap7,sky130hd}")
@@ -451,15 +644,39 @@ def main() -> int:
         if not isinstance(raw_candidate, Mapping):
             raise ValueError("task inputs require a 12-field candidate object")
         candidate = validate_candidate(raw_candidate, platform=platform)
+        or_seed = task.get("parameters", {}).get("or_seed", 0)
+        if isinstance(or_seed, bool) or not isinstance(or_seed, int) or or_seed < 0:
+            raise ValueError("full candidate requires a non-negative Runtime OR_SEED")
+        if plugin_id == "orfs-agent" and "or_seed" not in task.get("parameters", {}):
+            raise ValueError("full candidate requires an explicit Runtime OR_SEED")
         source = _required_path("ORFS_AGENT_SOURCE")
         paper_orfs = _required_path("ORFS_AGENT_PAPER_ORFS_ROOT")
         openroad = _required_path("OPENROAD_BIN")
         yosys = _required_path("YOSYS_BIN")
         source_receipt = _check_clean_git(source, os.environ["ORFS_AGENT_EXPECTED_COMMIT"], "ORFS-Agent")
         flow_receipt = _check_clean_git(paper_orfs, os.environ["ORFS_AGENT_PAPER_ORFS_COMMIT"], "paper ORFS")
+        if plugin_id == "orfs-agent":
+            from orfs_agent_adapter import _load_protocol_receipt
+            from orfs_agent_paper_policy_adapter import _validate_domain
+            domain = inputs.get("parameter_domain")
+            if not isinstance(domain, Mapping):
+                raise ValueError("full candidate requires a typed parameter_domain")
+            _validate_domain(
+                domain, source=source, design=design, platform=platform,
+                objective=str(inputs.get("objective", "")), observations=[],
+            )
+            if dict(_load_protocol_receipt(args.result.parent)) != dict(domain["experiment_protocol"]):
+                raise ValueError("candidate protocol does not match Runtime receipt")
+            admitted_receipts = _validate_protocol_receipts(
+                domain=domain, source=source, paper_orfs=paper_orfs,
+                openroad=openroad, yosys=yosys, design=design, platform=platform,
+            )
+        else:
+            admitted_receipts = {}
         root = args.result.parent.resolve()
         materialization = _materialize(root, source=source, paper_orfs=paper_orfs,
-                                       platform=platform, design=design, candidate=candidate)
+                                       platform=platform, design=design, candidate=candidate,
+                                       or_seed=or_seed)
         environment = dict(os.environ)
         environment.update(materialization["native_environment_mapping"])
         environment.update({
@@ -490,7 +707,8 @@ def main() -> int:
             f"OBJECTS_DIR={materialization['expected_object_directory']}",
             f"REPORTS_DIR={materialization['expected_metrics_directory']}",
             "NUM_CORES=4", "OMP_NUM_THREADS=4", "MKL_NUM_THREADS=4",
-            *(f"{name}={native[name]}" for name in CANDIDATE_ENVIRONMENT_VARIABLES),
+            *(f"{name}={native[name]}"
+              for name in (*CANDIDATE_ENVIRONMENT_VARIABLES, "OR_SEED")),
         )
         completed = subprocess.run(command, cwd=materialization["flow"], env=environment,
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
@@ -498,10 +716,16 @@ def main() -> int:
         if completed.returncode != 0:
             raise RuntimeError(f"upstream-style make tunereport exited {completed.returncode}")
         metrics = _copy_report(root, materialization)
+        measurement_report = _write_measurement_index(
+            root, candidate=candidate, objective=str(inputs.get("objective", "")),
+            metrics=metrics)
+        physical_artifacts = _final_physical_artifacts(root, materialization)
         provenance = {"adapter": "orfs-agent-paper-reproduction-executor",
                       "source": source_receipt, "paper_orfs": flow_receipt,
                       "openroad": str(openroad), "yosys": str(yosys),
                       "full_upstream_domain": list(PARAMETERS),
+                      "or_seed": or_seed,
+                      "admitted_receipts": admitted_receipts,
                       "note": "candidate-specific CLK is original ORFS-Agent reproduction semantics, not fair fixed-SDC PPA"}
         _write(root / "reproduction_provenance.json", provenance)
         artifacts = [
@@ -509,7 +733,8 @@ def main() -> int:
             {"kind": "optimizer_dataset", "path": "candidate_metrics.json"},
             {"kind": "upstream_source_lock", "path": "reproduction_provenance.json"},
             {"kind": "log", "path": "orfs_agent_native_make.log"},
-            {"kind": "report", "path": "candidate_metrics.json"},
+            {"kind": "report", "path": measurement_report.name},
+            *physical_artifacts,
         ]
         args.result.write_text(json.dumps(_result(status="succeeded", code=0, started=started,
             artifacts=artifacts, provenance=provenance), indent=2), encoding="utf-8")

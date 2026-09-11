@@ -1,4 +1,4 @@
-"""The sole Tutorial L1 twelve-tool dispatcher.
+"""The sole Tutorial L1 typed-tool dispatcher.
 
 This is intentionally distinct from the historical ``semantic_tools`` module:
 it has no experiment object, optimizer policy, or local EDA handler.
@@ -23,10 +23,22 @@ def tutorial_l1_registry_contract() -> SemanticToolRegistryContract:
     """Capability discovery only; argument authority is L1SemanticToolPolicy."""
     definitions = tuple(SemanticToolDefinition(
         name=tool, version="v1", description=f"Typed L1 {tool.value} operation.",
-        capability="eda.l1", input_schema={"type": "object"}, output_schema={"type": "object"},
+        capability=("knowledge.openroad.retrieve"
+                    if tool is ToolName.QUERY_OPENROAD_KNOWLEDGE else "eda.l1"),
+        input_schema=({
+            "type": "object", "additionalProperties": False,
+            "required": ["query"],
+            "properties": {"query": {"type": "string", "maxLength": 16384},
+                           "purpose": {"enum": ["knowledge", "error_explanation"]},
+                           "top_k": {"type": "integer", "minimum": 1, "maximum": 10}},
+        } if tool is ToolName.QUERY_OPENROAD_KNOWLEDGE else {"type": "object"}),
+        output_schema={"type": "object"},
         preconditions=("typed_goal", "current_state", "policy_allowlist"),
         postconditions=("durable_receipt",), side_effect=tool in _SIDE_EFFECTS,
-        evidence_kinds=("runtime_evidence",), permissions=("l1_policy",),
+        evidence_kinds=(("knowledge_retrieval", "knowledge_explanation")
+                        if tool is ToolName.QUERY_OPENROAD_KNOWLEDGE
+                        else ("runtime_evidence",)),
+        permissions=("l1_policy",),
     ) for tool in sorted(TUTORIAL_L1_TOOLS, key=lambda item: item.value))
     contract = SemanticToolRegistryContract("l1-tutorial-v1", definitions)
     contract.validate()

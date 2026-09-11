@@ -8,6 +8,8 @@
     "commit": "730f1fa11f9c17c0aaac332412af2b2538f42e9b",
     "checkout_path": ".external-src/orfs-agent-admission-20260830-vNWf4x/ORFS-Agent",
     "checkout_path_status": "source-audit cache only; native and Runtime smoke evidence use an explicit clean detached checkout",
+    "execution_checkout": "var/external-sources/orfs-agent-730f1fa-clean-20260901",
+    "execution_checkout_requirements": "exact commit, detached HEAD, clean including untracked files, and upstream BSD-3-Clause LICENSE",
     "license": {
       "spdx": "BSD-3-Clause",
       "license_sha256": "243601633b171278cd98f9ea495cbfc74aad9d7fc062c6e7c81e20d1fc44a22f"
@@ -26,7 +28,8 @@
     },
     "algorithm_files": {
       "AutoTuner-integration/ORFS-with-AutoTuner/orfs_agent.py": "ad1213b93eb668315cec2e1a607503110ec833e57c3d800ec5026f8102a33e5c",
-      "AutoTuner-integration/ORFS-with-AutoTuner/analyst_agent_workbench.py": "be44cdc27ab106ded5b2a0661c283da06a5a7908f4ee2296dd36e1669e840738"
+      "AutoTuner-integration/ORFS-with-AutoTuner/analyst_agent_workbench.py": "be44cdc27ab106ded5b2a0661c283da06a5a7908f4ee2296dd36e1669e840738",
+      "AutoTuner-integration/ORFS-with-AutoTuner/constraints.json": "9de2da8058266f8287b153a06ecafbc3698281b24ea226f9e72e458336dcf7ad"
     }
   },
   "python_environment": {
@@ -52,6 +55,8 @@
     "current_status": "not-paper-identical; the checkout has pre-existing local changes and generated design directories, so it may run an adapted platform campaign but may not support an exact upstream-paper PPA claim"
   },
   "reproduction_boundary": {
+    "primary_product_capability": "orfs-agent/upstream_full_policy: exact 12-dimensional upstream constraints, variable clock, ECP/DWL/COMBO, and upstream scikit-optimize GP/EI",
+    "historical_shared_domain_capability": "materialize_dataset remains decodable; native_agent is a legacy fixed-clock eight-field profile and must fail closed when it cannot satisfy upstream constraints",
     "native_algorithm_core": "eligible after same-input/same-seed parity evidence",
     "platform_runtime_loop": "eligible after repeated feasible baseline, warm-up, GP/EI candidates, and independent confirmation",
     "upstream_full_launcher": "blocked: its scripts assume named SSH hosts, remote paths, and an Anthropic credentialed analyst",

@@ -103,6 +103,16 @@ def test_process_adapter_rejects_undeclared_artifact_kind(tmp_path):
     assert "not allowed" in execution.result.failure["message"]
 
 
+def test_process_adapter_rejects_duplicate_artifact_store_key(tmp_path):
+    execution = ProcessAdapter().execute(
+        manifest("duplicate_artifact_adapter.py"), task(),
+        workspace=tmp_path / "duplicate-store-key",
+    )
+    assert execution.result.status is RuntimeStatus.FAILED
+    assert execution.result.failure["category"] == "protocol_error"
+    assert "declared more than once" in execution.result.failure["message"]
+
+
 def test_repository_echo_manifest_and_adapter_are_conformant(tmp_path):
     example = PluginRegistry.from_directory(EXAMPLES).resolve("echo")
 

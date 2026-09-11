@@ -128,8 +128,11 @@ def test_runtime_registers_infeasible_orfs_qor_instead_of_claiming_success(tmp_p
     evidence = next(item for item in attempt["artifacts"]
                     if item["store_key"].endswith("common_evaluation.json"))
     assert evidence["metadata"]["producer"] == "protected-orfs-evaluator"
+    assert evidence["metadata"]["runtime_authority"] == "protected_evaluator"
     assert evidence["metadata"]["official_qor"] is True
     assert evidence["metadata"]["feasible"] is False
+    assert set(evidence["metadata"]["canonical_metrics"]) == {"runtime_seconds"}
+    assert evidence["metadata"]["canonical_metrics"]["runtime_seconds"] >= 0
     evaluation = json.loads((Path(attempt["workspace"]) / evidence["store_key"]).read_text())
     assert evaluation["gate"]["status"] == "failed"
     assert "missing_required_metrics" in evaluation["gate"]["reasons"]

@@ -15,7 +15,7 @@ python scripts/run_platform_demo.py \
 该入口依次执行：
 
 1. 固定 RTLScout 离线 Agent → Verilator/Yosys gate → 固定 2D ORFS → GDS；
-2. 固定 AgenticPD proposal → 两成员有界 Campaign → 两次真实 ORFS → QoR；
+2. 历史 AgenticPD proposal/Campaign 仅作只读证据；无许可证，禁止重新执行；
 3. 固定 TaiWei/ORFS-Research/OpenROAD → gcd 3D → GDS/via/指标；
 4. timeout、失败、官方 detached child cancel；
 5. loopback HTTP API/Web、artifact SHA、Campaign 和数据库恢复验收。
@@ -39,28 +39,18 @@ curl -fsS http://127.0.0.1:8000/api/runtime/runs
 curl -fsS http://127.0.0.1:8000/api/optimization/studies
 ```
 
-v2 只有一个平台模型入口和一个 2D 实现入口：
+当前 L1/L2 产品入口是独立的 `apps/l1_workbench/server.py`。旧 API 的
+external-optimizer checkpoints 仅保留只读查询：
 
 ```bash
-curl -fsS -X POST http://127.0.0.1:8000/api/spec/sessions \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"..."}'
-
-curl -fsS -X POST http://127.0.0.1:8000/api/v2/external-optimizer-loops \
-  -H 'Content-Type: application/json' \
-  -d '{"design_id":"...","objective_profile":"balanced"}'
+curl -fsS http://127.0.0.1:8000/api/v2/external-optimizer-loops
 ```
 
-使用返回的 `pipeline_id` 运行或恢复持久闭环：
-
-```bash
-curl -fsS -X POST http://127.0.0.1:8000/api/v2/external-optimizer-loops/<pipeline_id>/advance \
-  -H 'Content-Type: application/json' -d '{}'
-```
-
-该接口只记录下一项受控工作；控制器会自动执行重复 baseline、ORFS-Agent GP/EI
-候选、重复测量和停滞检测。遇到 `diagnosis_required` 就停止并返回完整历史，
-不会自动修改 RTL 或调用未批准的修复工具。
+旧 `POST /api/v2/external-optimizer-loops` 及其 `/advance` 路由一律拒绝，
+不得用它们创建或恢复历史 8-D/fixed-clock campaign。完整 L2 必须由 L1
+Workbench 在已有 baseline、candidate、reflection 和 authorization 后创建
+12-D variable-clock ORFS-Agent durable controller；具体受审计启动参数见
+`apps/l1_workbench/README.md`。
 
 Spec session 的 `/turn` 用于补齐规格，`/materialize-spec` 冻结 SpecIR；随后唯一的
 `/api/rtl/specs/<id>/run-to-baseline` 自动完成独立 Testbench、RTLScout、lint、仿真、

@@ -75,7 +75,8 @@ openroad-platform/  ← 工厂大门
 | /api/auth/* | 登录、注册、退出（工厂大门登记） | 所有人 |
 | /api/spec/sessions → /api/rtl/specs/<id>/run-to-baseline | 自然语言规格经独立验证 Agent 与 RTLScout 自动产出 RTL | Frontend 唯一生成入口 |
 | /api/designs/* | 查看设计证据，或明确导入已有 RTL | Frontend 页 |
-| /api/v2/external-optimizer-loops | 自动重复 baseline、固定 ORFS-Agent GP/EI 候选、停滞诊断和证据学习 | Backend 唯一优化入口 |
+| GET /api/v2/external-optimizer-loops | 只读查看旧 8-D/fixed-clock checkpoint | 历史证据页；POST/advance 已关闭 |
+| apps/l1_workbench | 自然语言、实时 Runtime 证据、L1 实测迭代、授权完整 12-D variable-clock ORFS-Agent | 当前 L1/L2 产品入口 |
 | /api/runtime/runs/* | 查看/取消闭环内部子任务 | Backend 证据页 |
 | /api/extensions/taiwei/run | 提交 3D 任务（选工艺库/参数） | Backend 页 3D 面板 |
 | /api/extensions/edacraft/* | 跑专业小工具（TCAD/SPICE 等） | Extensions 页 |

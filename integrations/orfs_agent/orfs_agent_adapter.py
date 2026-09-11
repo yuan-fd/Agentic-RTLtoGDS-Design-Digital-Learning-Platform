@@ -230,6 +230,15 @@ def main() -> int:
         inputs = task.get("inputs")
         if not isinstance(inputs, Mapping):
             raise ValueError("task inputs must be an object")
+        if inputs.get("mode") == "upstream_full_policy":
+            from orfs_agent_paper_policy_adapter import main as full_policy_main
+            return full_policy_main()
+        if inputs.get("mode") == "upstream_full_initialize":
+            from orfs_agent_full_initializer_adapter import main as full_initializer_main
+            return full_initializer_main()
+        if inputs.get("mode") == "upstream_full_candidate":
+            from orfs_agent_reproduction_adapter import main as full_candidate_main
+            return full_candidate_main()
         design, platform, objective = (str(inputs.get(name) or "") for name in ("design", "platform", "objective"))
         observations = inputs.get("observations")
         parameter_domain = inputs.get("parameter_domain")

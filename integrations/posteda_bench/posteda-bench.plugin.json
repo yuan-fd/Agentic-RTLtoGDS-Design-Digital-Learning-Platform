@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "plugin_id": "posteda-bench",
+  "plugin_version": "51884e5f",
+  "adapter_entry": ["python3", "./posteda_bench_launcher.py"],
+  "capabilities": [
+    "benchmark.posteda.public-case",
+    "benchmark.posteda.evaluate-diagnosis"
+  ],
+  "supported_arch": ["aarch64"],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["mode", "benchmark_id", "task_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["status", "artifacts", "provenance"]
+  },
+  "required_tools": ["git", "klayout"],
+  "default_timeout_seconds": 180,
+  "artifact_rules": [
+    {"kind": "benchmark_public_case", "required": false},
+    {"kind": "benchmark_native_trace", "required": false},
+    {"kind": "benchmark_diagnosis_score", "required": false},
+    {"kind": "benchmark_evaluation_trace", "required": false}
+  ],
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "NO_PROXY": "*",
+    "no_proxy": "*",
+    "PATH": "/usr/bin:/bin"
+  }
+}

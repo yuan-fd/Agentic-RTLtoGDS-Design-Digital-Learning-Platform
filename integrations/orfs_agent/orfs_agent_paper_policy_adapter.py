@@ -29,6 +29,11 @@ PARAMETERS = (
     "CLK", "UTIL", "TNS_End_Percent", "GP_PAD", "DP_PAD", "DPO",
     "PIN_ADJ", "UP_ADJ", "LB_ADDON", "HIER_SYNTH", "CTS_CSIZE", "CTS_CDIA",
 )
+DOMAIN_KEYS = {
+    "schema_version", "kind", "design", "platform", "parameter_names",
+    "constraints", "upstream_constraints_sha256", "experiment_protocol",
+    "protocol_sha256", "variable_clock_semantics", "domain_sha256",
+}
 TARGETS = {"ECP": "ECP_final", "DWL": "detailedroute__route__wirelength", "COMBO": "Fractional_Loss_final"}
 BASELINES = {
     ("aes", "asap7"): (75438.0, 459.921), ("aes", "sky130hd"): (589825.0, 4.721),
@@ -49,6 +54,10 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _digest(value: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
@@ -64,7 +73,56 @@ def _source() -> tuple[Path, dict[str, str]]:
     actual = subprocess.check_output(("git", "-C", str(root), "rev-parse", "HEAD"), text=True).strip()
     if actual != expected:
         raise ValueError(f"ORFS-Agent source commit mismatch: {actual} != {expected}")
-    return root, {"source": str(root), "commit": actual}
+    if subprocess.run(("git", "-C", str(root), "symbolic-ref", "-q", "HEAD"),
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                      check=False).returncode == 0:
+        raise ValueError("ORFS-Agent execution source must be detached")
+    dirty = subprocess.check_output(
+        ("git", "-C", str(root), "status", "--porcelain", "--untracked-files=all"),
+        text=True,
+    )
+    if dirty:
+        raise ValueError("ORFS-Agent execution source must be clean")
+    license_path = root / "LICENSE"
+    if (not license_path.is_file()
+            or "BSD 3-Clause License" not in license_path.read_text(encoding="utf-8")):
+        raise ValueError("ORFS-Agent BSD-3-Clause license check failed")
+    return root, {"source": str(root), "commit": actual, "license": "BSD-3-Clause",
+                  "license_sha256": _sha256(license_path)}
+
+
+def _validate_domain(domain: Mapping[str, Any], *, source: Path, design: str,
+                     platform: str, objective: str,
+                     observations: list[Mapping[str, Any]]) -> None:
+    """Recheck the full typed contract inside the adapter process."""
+    if (set(domain) != DOMAIN_KEYS or domain.get("schema_version") != 2
+            or domain.get("kind") != "upstream-full-12d"
+            or domain.get("parameter_names") != list(PARAMETERS)
+            or domain.get("variable_clock_semantics") is not True):
+        raise ValueError("full ORFS-Agent policy requires the complete typed 12-D domain")
+    canonical = {name: value for name, value in domain.items() if name != "domain_sha256"}
+    if domain.get("domain_sha256") != _digest(canonical):
+        raise ValueError("full ORFS-Agent domain hash is invalid")
+    protocol = domain.get("experiment_protocol")
+    if not isinstance(protocol, Mapping) or domain.get("protocol_sha256") != _digest(protocol):
+        raise ValueError("full ORFS-Agent protocol hash is invalid")
+    if (protocol.get("design") != design or protocol.get("platform") != platform
+            or protocol.get("objective_set") != ["ECP", "DWL", "COMBO"]
+            or objective not in protocol.get("objective_set", ())):
+        raise ValueError("full ORFS-Agent protocol identity/objectives are invalid")
+    constraints_path = source / "AutoTuner-integration/ORFS-with-AutoTuner/constraints.json"
+    if domain.get("upstream_constraints_sha256") != _sha256(constraints_path):
+        raise ValueError("full ORFS-Agent domain is not bound to upstream constraints.json")
+    constraints = domain.get("constraints")
+    if not isinstance(constraints, Mapping) or tuple(constraints) != PARAMETERS:
+        raise ValueError("full ORFS-Agent domain reduced or reordered upstream parameters")
+    for observation in observations:
+        if observation.get("protocol_sha256") != domain["protocol_sha256"]:
+            raise ValueError("full ORFS-Agent observation belongs to another protocol")
+        candidate = observation.get("candidate")
+        if not isinstance(candidate, Mapping):
+            raise ValueError("full ORFS-Agent observation lacks a 12-D candidate")
+        _candidate(candidate, platform=platform)
 
 
 def _candidate(value: Mapping[str, Any], *, platform: str) -> dict[str, int | float]:
@@ -163,20 +221,29 @@ def main() -> int:
     args = parser.parse_args(); started = _now()
     try:
         request = json.loads(args.request.read_text(encoding="utf-8")); task = request["task"]
-        if request.get("plugin", {}).get("plugin_id") != "orfs-agent-paper-policy":
-            raise ValueError("request is not for orfs-agent-paper-policy")
+        if (request.get("plugin", {}).get("plugin_id") != "orfs-agent"
+                or task.get("plugin_id") != "orfs-agent"):
+            raise ValueError("request is not for the admitted ORFS-Agent plugin")
         inputs = task.get("inputs")
         if not isinstance(inputs, Mapping): raise ValueError("task inputs must be an object")
+        if inputs.get("mode") != "upstream_full_policy":
+            raise ValueError("request is not for the full upstream ORFS-Agent policy")
         design, platform, objective = (str(inputs.get(key, "")) for key in ("design", "platform", "objective"))
         if (design, platform) not in BASELINES or objective not in TARGETS:
             raise ValueError("unsupported paper design/platform/objective")
         observations = inputs.get("observations")
         if not isinstance(observations, list) or len(observations) < 2:
             raise ValueError("at least two measured observations are required")
+        source, receipt = _source()
+        domain = inputs.get("parameter_domain")
+        if not isinstance(domain, Mapping):
+            raise ValueError("full ORFS-Agent policy requires a typed parameter_domain")
+        _validate_domain(domain, source=source, design=design, platform=platform,
+                         objective=objective, observations=observations)
         target = TARGETS[objective]
         rows = [_row(item, design=design, platform=platform, target=target) for item in observations if isinstance(item, Mapping)]
         if len(rows) != len(observations): raise ValueError("observations must be objects")
-        source, receipt = _source(); root = args.result.parent.resolve()
+        root = args.result.parent.resolve()
         _write(root / "paper_observations.json", rows)
         candidates, trace = _upstream_candidates(rows, source=source, design=design, platform=platform,
                                                  target=target, suggestions=int(inputs.get("n_suggestions", 5)),

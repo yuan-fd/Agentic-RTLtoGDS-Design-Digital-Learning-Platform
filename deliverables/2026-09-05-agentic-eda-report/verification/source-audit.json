@@ -1,0 +1,2144 @@
+{
+  "audit_date": "2026-09-05",
+  "head": "8dd4c061b2023620774730ef65634e500a892b61",
+  "method": "Read existing summaries, recompute referenced artifact hashes, inspect source anchors; no EDA rerun.",
+  "evidence": [
+    {
+      "id": "E01",
+      "title": "Native RTLScout Spec-to-GDS",
+      "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/summary.json",
+      "sha256": "602a13dc56145ab3b3e3f7c290b92c269fe4f137b54e6e14b3185f8b075f4cb0",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_044_EXECUTED_CROSS_STAGE_RTL_RECOVERY.md",
+        "docs/governance/SLICE_031_RTLSCOUT_NATIVE_SPEC_TO_GDS.md",
+        "docs/governance/SLICE_034_FOUR_DOMAIN_STAGE_DIAGNOSTICS.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "statuses": {
+          "rtlscout": "succeeded",
+          "compile_lint": "succeeded",
+          "simulation": "succeeded",
+          "mutation_quality": "succeeded",
+          "orfs_finish": "succeeded"
+        },
+        "checks": {
+          "native_rtlscout_runtime_succeeded": true,
+          "native_entrypoint_provenance": true,
+          "provider_trace_registered": true,
+          "native_chat_registered": true,
+          "candidate_history_registered": true,
+          "compile_lint_passed": true,
+          "simulation_passed": true,
+          "mutation_quality_passed": true,
+          "orfs_finish_succeeded": true,
+          "gds_registered_nonempty": true,
+          "protected_evaluation_registered": true,
+          "upstream_source_unchanged": true
+        },
+        "claim_boundary": "One real bounded SpecIR-to-native-RTLScout-to-verified-RTL-to-GDS acceptance. It proves integration and evidence continuity for this specification; it is not a general RTL correctness or PPA-superiority claim.",
+        "natural_language_spec": "设计一个名为 native_adder8 的无时钟组合逻辑模块。输入 a、b 均为 8 位无符号数，输出 sum 为低 8 位加法结果，也就是模 256 加法。要求所有 65536 组输入都正确，通过 lint、仿真和 mutation gate 后，用 Nangate45 完整实现到 GDS。",
+        "verification": {
+          "testbench_sha256": "8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421",
+          "origin": "reference_model",
+          "reviewed_by": "tutorial-acceptance/reference-exhaustive-adder-v1",
+          "exhaustive_vectors": 65536
+        }
+      },
+      "runs": [
+        {
+          "run_id": "8a5c8118d30448198b094504d4d77e08",
+          "status": "passed"
+        },
+        {
+          "run_id": "cf44881b08424592adee249f826b6ae3",
+          "status": "passed"
+        },
+        {
+          "run_id": "95d6b57626b946faaa887235bf463b8b",
+          "status": "passed"
+        },
+        {
+          "run_id": "faf8167596b84c00928b4382e4954227",
+          "status": "passed"
+        },
+        {
+          "run_id": "a8c1f3dc74e14713a928cded6ebeb193",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "8a5c8118d30448198b094504d4d77e08",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "cf44881b08424592adee249f826b6ae3",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "95d6b57626b946faaa887235bf463b8b",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "faf8167596b84c00928b4382e4954227",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/state/rtl-candidates/bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a.sv",
+          "kind": "referenced_file",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/state/verification-oracles/8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421.sv",
+          "kind": "referenced_file",
+          "expected_sha256": "8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421",
+          "actual_sha256": "8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421",
+          "verified": true,
+          "size_bytes": 928
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/8a5c8118d30448198b094504d4d77e08/5bf59caf9541464db0b920f99899da0e/attempt-1/outputs/verification.json",
+          "kind": "verification_report",
+          "expected_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "actual_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "verified": true,
+          "size_bytes": 261
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/8a5c8118d30448198b094504d4d77e08/5bf59caf9541464db0b920f99899da0e/attempt-1/outputs/verification.log",
+          "kind": "log",
+          "expected_sha256": "0c43256ff55ff3caf1be03e020c02434b169b5e58f816efe1868b1eaaff208a9",
+          "actual_sha256": "0c43256ff55ff3caf1be03e020c02434b169b5e58f816efe1868b1eaaff208a9",
+          "verified": true,
+          "size_bytes": 3436
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/8a5c8118d30448198b094504d4d77e08/5bf59caf9541464db0b920f99899da0e/attempt-1/outputs/verified_design.sv",
+          "kind": "rtl",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/95d6b57626b946faaa887235bf463b8b/9d4d1619d1744594abe4ef1c96bb6ed2/attempt-1/outputs/mutation.json",
+          "kind": "mutation_report",
+          "expected_sha256": "7b61feb49a604c13898bb5ea3bc422064f43a7d69abaa4c8dd083a781185b33d",
+          "actual_sha256": "7b61feb49a604c13898bb5ea3bc422064f43a7d69abaa4c8dd083a781185b33d",
+          "verified": true,
+          "size_bytes": 2006
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/95d6b57626b946faaa887235bf463b8b/9d4d1619d1744594abe4ef1c96bb6ed2/attempt-1/outputs/mutation.log",
+          "kind": "log",
+          "expected_sha256": "8463da15432ea4c4257074cfca47d51b39cbc259a11ea0c0666d30ef8731d0e2",
+          "actual_sha256": "8463da15432ea4c4257074cfca47d51b39cbc259a11ea0c0666d30ef8731d0e2",
+          "verified": true,
+          "size_bytes": 7854
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/candidate_history.json",
+          "kind": "rtl_candidate_history",
+          "expected_sha256": "e8a48b2e056efd84906d3271069486455d853745892b930ea876d6abfeef477d",
+          "actual_sha256": "e8a48b2e056efd84906d3271069486455d853745892b930ea876d6abfeef477d",
+          "verified": true,
+          "size_bytes": 4369
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/candidates/eval-001.sv",
+          "kind": "rtl_candidate",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/candidates/eval-002.sv",
+          "kind": "rtl_candidate",
+          "expected_sha256": "dc0e09bcb9173f0879f8c20bedff390f7710a31377161ddab94d18e209894b33",
+          "actual_sha256": "dc0e09bcb9173f0879f8c20bedff390f7710a31377161ddab94d18e209894b33",
+          "verified": true,
+          "size_bytes": 408
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/design.sv",
+          "kind": "rtl",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/native_chat_log.txt",
+          "kind": "agent_trace",
+          "expected_sha256": "ee478fdb0a548d2ea1642a63f23858574ceac022946e26d860de5c932568c2a5",
+          "actual_sha256": "ee478fdb0a548d2ea1642a63f23858574ceac022946e26d860de5c932568c2a5",
+          "verified": true,
+          "size_bytes": 9481
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/native_provenance.json",
+          "kind": "provenance",
+          "expected_sha256": "c47b88ebac4c6597f89405daeb6d52616e73a7777c3cd4a4ff8ba2507421d37c",
+          "actual_sha256": "c47b88ebac4c6597f89405daeb6d52616e73a7777c3cd4a4ff8ba2507421d37c",
+          "verified": true,
+          "size_bytes": 1114
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/provider_trace.json",
+          "kind": "model_trace",
+          "expected_sha256": "e47d27bbac31f7773b626c5d439a431d5ad2f6e455014f74fe9706caf073b13f",
+          "actual_sha256": "e47d27bbac31f7773b626c5d439a431d5ad2f6e455014f74fe9706caf073b13f",
+          "verified": true,
+          "size_bytes": 5391
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/rtlscout_result.json",
+          "kind": "rtlscout_result",
+          "expected_sha256": "ac1a33caa85faaf2a5070a19f7927be96f52657542eee7756d0bf89e14fca266",
+          "actual_sha256": "ac1a33caa85faaf2a5070a19f7927be96f52657542eee7756d0bf89e14fca266",
+          "verified": true,
+          "size_bytes": 9732
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/outputs/summary.txt",
+          "kind": "report",
+          "expected_sha256": "912be184dc281cc552849897ccf99c0dc980c0e5dcf7625012274b1d4ccb4403",
+          "actual_sha256": "912be184dc281cc552849897ccf99c0dc980c0e5dcf7625012274b1d4ccb4403",
+          "verified": true,
+          "size_bytes": 502
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/a8c1f3dc74e14713a928cded6ebeb193/a3104d4b8ee648d68b015b90c6757c1b/attempt-1/rtlscout.log",
+          "kind": "log",
+          "expected_sha256": "4b7f0bf3866ad3e1202cc10e3fbaecda7759396d64bd73b30b8f266147bdaa9c",
+          "actual_sha256": "4b7f0bf3866ad3e1202cc10e3fbaecda7759396d64bd73b30b8f266147bdaa9c",
+          "verified": true,
+          "size_bytes": 3513
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/cf44881b08424592adee249f826b6ae3/73506843c6014c5f86f1fbfb1979479e/attempt-1/outputs/simulation.json",
+          "kind": "simulation_report",
+          "expected_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "actual_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "verified": true,
+          "size_bytes": 330
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/cf44881b08424592adee249f826b6ae3/73506843c6014c5f86f1fbfb1979479e/attempt-1/outputs/simulation.log",
+          "kind": "log",
+          "expected_sha256": "af67ededd9369598dba9f19f937cfc43ccd6a2b9c42a03ee679dc45f0fcb41fb",
+          "actual_sha256": "af67ededd9369598dba9f19f937cfc43ccd6a2b9c42a03ee679dc45f0fcb41fb",
+          "verified": true,
+          "size_bytes": 1197
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/analysis/common_evaluation.json",
+          "kind": "report",
+          "expected_sha256": "c7cfd5d93e0c5415b788037ab58363a1f036da2f53c3c567f6f458973edaf756",
+          "actual_sha256": "c7cfd5d93e0c5415b788037ab58363a1f036da2f53c3c567f6f458973edaf756",
+          "verified": true,
+          "size_bytes": 7229
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/design_input_manifest.json",
+          "kind": "design_input_manifest",
+          "expected_sha256": "ea52513af913eface8a7ad894c95b29acffcf881ff2913852f0d1aefe6185a9a",
+          "actual_sha256": "ea52513af913eface8a7ad894c95b29acffcf881ff2913852f0d1aefe6185a9a",
+          "verified": true,
+          "size_bytes": 600
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/designs/nangate45/native_adder8/config.mk",
+          "kind": "config",
+          "expected_sha256": "4e0030ca8dd8944e9983a073ca41c11848777ac873bfbdeabcfc1216763d8275",
+          "actual_sha256": "4e0030ca8dd8944e9983a073ca41c11848777ac873bfbdeabcfc1216763d8275",
+          "verified": true,
+          "size_bytes": 562
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/designs/nangate45/native_adder8/constraint.sdc",
+          "kind": "other",
+          "expected_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "actual_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "verified": true,
+          "size_bytes": 151
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/designs/nangate45/native_adder8/pdn.tcl",
+          "kind": "other",
+          "expected_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "actual_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "verified": true,
+          "size_bytes": 674
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/flow_compatibility.json",
+          "kind": "report",
+          "expected_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "actual_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "verified": true,
+          "size_bytes": 266
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/logs/flow.log",
+          "kind": "log",
+          "expected_sha256": "f93dd17b95273342179d86f7443be6984fb33772889473f18b8dd481f4335511",
+          "actual_sha256": "f93dd17b95273342179d86f7443be6984fb33772889473f18b8dd481f4335511",
+          "verified": true,
+          "size_bytes": 112211
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/logs/nangate45/native_adder8/base/5_2_route.json",
+          "kind": "report",
+          "expected_sha256": "255743e3a368ce01f1cccb6a3c8d305edb7c507b9db09c001934c2a43b3c69aa",
+          "actual_sha256": "255743e3a368ce01f1cccb6a3c8d305edb7c507b9db09c001934c2a43b3c69aa",
+          "verified": true,
+          "size_bytes": 857
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/logs/nangate45/native_adder8/base/6_report.json",
+          "kind": "report",
+          "expected_sha256": "563343e7ae1f7dbf25c3910629e15b64e095b3ddf2399f6654a1a54c3dc62da9",
+          "actual_sha256": "563343e7ae1f7dbf25c3910629e15b64e095b3ddf2399f6654a1a54c3dc62da9",
+          "verified": true,
+          "size_bytes": 3118
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/parameter_contract.json",
+          "kind": "parameter_contract",
+          "expected_sha256": "af4a8a7b0229c97ea151ea5e804c6677373e297bbf60d26eb5c7ae832ba6864f",
+          "actual_sha256": "af4a8a7b0229c97ea151ea5e804c6677373e297bbf60d26eb5c7ae832ba6864f",
+          "verified": true,
+          "size_bytes": 6749
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/plan.json",
+          "kind": "report",
+          "expected_sha256": "20246b8d33cec73b63fa72c11cb045d02c9d0234776f6053af4221715f300ea8",
+          "actual_sha256": "20246b8d33cec73b63fa72c11cb045d02c9d0234776f6053af4221715f300ea8",
+          "verified": true,
+          "size_bytes": 2131
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/6_finish.rpt",
+          "kind": "report",
+          "expected_sha256": "7d9be3490c2d18bc77e7667eef1084d0ae54aea1e0a3ce80ecb527a4d51cd655",
+          "actual_sha256": "7d9be3490c2d18bc77e7667eef1084d0ae54aea1e0a3ce80ecb527a4d51cd655",
+          "verified": true,
+          "size_bytes": 13457
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_check.txt",
+          "kind": "report",
+          "expected_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "actual_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "verified": true,
+          "size_bytes": 123
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_stat.txt",
+          "kind": "report",
+          "expected_sha256": "9815a83bfe656b4f468810469e8cb5fd54e142ef9e51dcb2401f06ebc3ea1018",
+          "actual_sha256": "9815a83bfe656b4f468810469e8cb5fd54e142ef9e51dcb2401f06ebc3ea1018",
+          "verified": true,
+          "size_bytes": 1079
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/1_synth.odb",
+          "kind": "odb",
+          "expected_sha256": "bcc1558a6f6d8375254cb522b351a8a69bfc06a7276b28fdf7f5a9532bf529e3",
+          "actual_sha256": "bcc1558a6f6d8375254cb522b351a8a69bfc06a7276b28fdf7f5a9532bf529e3",
+          "verified": true,
+          "size_bytes": 423778
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/2_floorplan.odb",
+          "kind": "odb",
+          "expected_sha256": "dc89fa434af1d8454faae6fbc2e436a0084c46b891251c4ff0004937ee6ac540",
+          "actual_sha256": "dc89fa434af1d8454faae6fbc2e436a0084c46b891251c4ff0004937ee6ac540",
+          "verified": true,
+          "size_bytes": 470399
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/3_place.odb",
+          "kind": "odb",
+          "expected_sha256": "13516772d0e7938e1fab319bd063696225447c99b079f2629e1f527c8a7d1785",
+          "actual_sha256": "13516772d0e7938e1fab319bd063696225447c99b079f2629e1f527c8a7d1785",
+          "verified": true,
+          "size_bytes": 477973
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/4_cts.odb",
+          "kind": "odb",
+          "expected_sha256": "80a1c0dfa336ef6141221cc87ac2035b3759cb737b57239bc2a5ed62d024049f",
+          "actual_sha256": "80a1c0dfa336ef6141221cc87ac2035b3759cb737b57239bc2a5ed62d024049f",
+          "verified": true,
+          "size_bytes": 477973
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/5_route.odb",
+          "kind": "odb",
+          "expected_sha256": "1066963a13282464c8a6a552198aba52fcbde8fec48069df513abd12e05c88b5",
+          "actual_sha256": "1066963a13282464c8a6a552198aba52fcbde8fec48069df513abd12e05c88b5",
+          "verified": true,
+          "size_bytes": 602020
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.def",
+          "kind": "def",
+          "expected_sha256": "70b055371064979c13053e0f925fc33abc628f8013d5266819dde76c9edde0b3",
+          "actual_sha256": "70b055371064979c13053e0f925fc33abc628f8013d5266819dde76c9edde0b3",
+          "verified": true,
+          "size_bytes": 104263
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.gds",
+          "kind": "gds",
+          "expected_sha256": "75caaa20ff2cf4ccc7d1d12efbc6a2ec223a2d3213cb6e0641aed77c3806bcdc",
+          "actual_sha256": "75caaa20ff2cf4ccc7d1d12efbc6a2ec223a2d3213cb6e0641aed77c3806bcdc",
+          "verified": true,
+          "size_bytes": 164304
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.odb",
+          "kind": "odb",
+          "expected_sha256": "cd8bed97b458a3ac90ca7714bee357f66e5f09e929feae4018d45e4098d38919",
+          "actual_sha256": "cd8bed97b458a3ac90ca7714bee357f66e5f09e929feae4018d45e4098d38919",
+          "verified": true,
+          "size_bytes": 602020
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.v",
+          "kind": "netlist",
+          "expected_sha256": "aad6dfb4e20f9405f6751f5b4bd9f6c98050aa4d1214d0a8e7727c36b3b3e03b",
+          "actual_sha256": "aad6dfb4e20f9405f6751f5b4bd9f6c98050aa4d1214d0a8e7727c36b3b3e03b",
+          "verified": true,
+          "size_bytes": 4722
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/run_result.json",
+          "kind": "run_result",
+          "expected_sha256": "36bc266351e6a8d36023c63eeb5fe3b5a11c23cb9f9fba66fdaa2162bfe98887",
+          "actual_sha256": "36bc266351e6a8d36023c63eeb5fe3b5a11c23cb9f9fba66fdaa2162bfe98887",
+          "verified": true,
+          "size_bytes": 6697
+        },
+        {
+          "path": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/work/faf8167596b84c00928b4382e4954227/c1b36a5968cd4f13a8f07cf7c7311201/attempt-1/orfs/implementation/toolchain_snapshot.json",
+          "kind": "toolchain_snapshot",
+          "expected_sha256": "2ac50708004c6d42b6f66bd230c607589d544f7007bcb986909e776cd2ed92a7",
+          "actual_sha256": "2ac50708004c6d42b6f66bd230c607589d544f7007bcb986909e776cd2ed92a7",
+          "verified": true,
+          "size_bytes": 3767
+        }
+      ]
+    },
+    {
+      "id": "E02",
+      "title": "A2 native proposal / real execution / feedback",
+      "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/summary.json",
+      "sha256": "c11638e49bf345987afda2f7159856a67cb4b1f962ceb6a8520d95f6ff7f55aa",
+      "matching_governance_docs": [
+        "docs/governance/A2_ORFO_INTAKE.md",
+        "docs/governance/SLICE_041_A2_ORFO_PRODUCT_MIGRATION.md",
+        "docs/governance/SLICE_030_A2_ORFO_SINGLE_FEEDBACK_ADMISSION.md"
+      ],
+      "facts": {
+        "status": "succeeded",
+        "checks": {
+          "all_12_dimensions_preserved": true,
+          "runtime_candidate_origin_is_a2": true,
+          "protected_evaluator_participated": true,
+          "failure_feedback_preserved": true,
+          "next_candidate_after_feedback": true
+        },
+        "claim_boundary": "One real policy/execution/evaluator/feedback loop; not a campaign or PPA-superiority result.",
+        "feedback_status": "succeeded",
+        "feedback_feasible": false,
+        "first_candidate": {
+          "UTIL": 22,
+          "GP_PAD": 2,
+          "DP_PAD": 2,
+          "HIER_SYNTH": 1,
+          "PIN_ADJ": 0.12494800693719052,
+          "UP_ADJ": 0.11485421415648206,
+          "TNS_End_Percent": 2,
+          "LB_ADDON": 0.021069862431160286,
+          "CTS_CSIZE": 10,
+          "CTS_CDIA": 81,
+          "DPO": 1,
+          "CLK": 0.8398030390039897
+        },
+        "next_candidate": {
+          "UTIL": 23,
+          "GP_PAD": 3,
+          "DP_PAD": 2,
+          "HIER_SYNTH": 1,
+          "PIN_ADJ": 0.11535716741522478,
+          "UP_ADJ": 0.13763719847831246,
+          "TNS_End_Percent": 3,
+          "LB_ADDON": 0.017671872914611062,
+          "CTS_CSIZE": 11,
+          "CTS_CDIA": 82,
+          "DPO": 1,
+          "CLK": 1.2647461671099167
+        },
+        "historical_source": {
+          "pipeline_id": "pipeline-ef2fd9f80e8940a1b796a68de5af9916",
+          "revision": 99,
+          "rows_used": 5,
+          "claim": "historical ORFS measurements relabeled only into the new A2 protocol envelope; source protocol hashes retained"
+        }
+      },
+      "runs": [
+        {
+          "run_id": "ae6da176d4b34bbf831bb99c1cb6b7d9",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "335167f6f3bc4c15a03796e015bb7101",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "3b66e823738e406daaa575259aa715e6",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/candidate_execution_report.json",
+          "kind": "report",
+          "expected_sha256": "7211d9f79c18d3995101053233899722428223ffd954879b2a25d9ce56da302b",
+          "actual_sha256": "7211d9f79c18d3995101053233899722428223ffd954879b2a25d9ce56da302b",
+          "verified": true,
+          "size_bytes": 4274
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/candidate_materialization.json",
+          "kind": "optimizer_input_manifest",
+          "expected_sha256": "885fe45d5c975e546e1abbc48e32389f4e73d740d732da8c4cc41396df50f14b",
+          "actual_sha256": "885fe45d5c975e546e1abbc48e32389f4e73d740d732da8c4cc41396df50f14b",
+          "verified": true,
+          "size_bytes": 7803
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/candidate_metrics.json",
+          "kind": "optimizer_dataset",
+          "expected_sha256": "39c5a6c94b6e3c37ca0a761b23a6e734c2a5b8fc5cc4d840fc30dc0e071a1578",
+          "actual_sha256": "39c5a6c94b6e3c37ca0a761b23a6e734c2a5b8fc5cc4d840fc30dc0e071a1578",
+          "verified": true,
+          "size_bytes": 8309
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/orfs_agent_native_make.log",
+          "kind": "log",
+          "expected_sha256": "ee3f5304d77326ebeadbf3be112d014550ed5f12769b07eae502cc3fd883de98",
+          "actual_sha256": "ee3f5304d77326ebeadbf3be112d014550ed5f12769b07eae502cc3fd883de98",
+          "verified": true,
+          "size_bytes": 228716
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/protected_orfs_agent_evaluation.json",
+          "kind": "report",
+          "expected_sha256": "b6f3555283501d0d35d8ba3173727c3a63d8e23c993c4e99868882c8e5067621",
+          "actual_sha256": "b6f3555283501d0d35d8ba3173727c3a63d8e23c993c4e99868882c8e5067621",
+          "verified": true,
+          "size_bytes": 16783
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/reproduction_provenance.json",
+          "kind": "upstream_source_lock",
+          "expected_sha256": "a590b5eeed797ddd5bd6a3c8b5c1bbf767dfff50e8a90c98a72a0d4d49335f52",
+          "actual_sha256": "a590b5eeed797ddd5bd6a3c8b5c1bbf767dfff50e8a90c98a72a0d4d49335f52",
+          "verified": true,
+          "size_bytes": 3253
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/runtime_protocol_receipt.json",
+          "kind": "runtime_protocol_receipt",
+          "expected_sha256": "bd14d70f09835b2e24c370f8c3851fcdc35d94a97a3ac4785e01b85b428bf1b2",
+          "actual_sha256": "bd14d70f09835b2e24c370f8c3851fcdc35d94a97a3ac4785e01b85b428bf1b2",
+          "verified": true,
+          "size_bytes": 942
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/work/results/sky130hd/aes/DESIGN_aes__CLK_0.84__UTIL_22__AR_1__TECH_sky130hd__LB_ADDON_0.021__TIMING_EFFORT_2__POWER_EFFORT_0__HIER_SYNTH_1__GP_PAD_2__DP_PAD_2__RD_1__TD_1__DPO_1__CTS_CSIZE_10__CTS_CDIA_81__PIN_ADJ_0.125__UP_ADJ_0.115/6_final.def",
+          "kind": "def",
+          "expected_sha256": "70762fd264c1317f8eda84f05c47d91229d22a39366eb59cde8f080b25896b98",
+          "actual_sha256": "70762fd264c1317f8eda84f05c47d91229d22a39366eb59cde8f080b25896b98",
+          "verified": true,
+          "size_bytes": 20190637
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/work/results/sky130hd/aes/DESIGN_aes__CLK_0.84__UTIL_22__AR_1__TECH_sky130hd__LB_ADDON_0.021__TIMING_EFFORT_2__POWER_EFFORT_0__HIER_SYNTH_1__GP_PAD_2__DP_PAD_2__RD_1__TD_1__DPO_1__CTS_CSIZE_10__CTS_CDIA_81__PIN_ADJ_0.125__UP_ADJ_0.115/6_final.odb",
+          "kind": "odb",
+          "expected_sha256": "807bfa66c0b59550314ea95e4f9bf93d706c45a80c0d2ae136d54465edd94051",
+          "actual_sha256": "807bfa66c0b59550314ea95e4f9bf93d706c45a80c0d2ae136d54465edd94051",
+          "verified": true,
+          "size_bytes": 37573813
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/work/results/sky130hd/aes/DESIGN_aes__CLK_0.84__UTIL_22__AR_1__TECH_sky130hd__LB_ADDON_0.021__TIMING_EFFORT_2__POWER_EFFORT_0__HIER_SYNTH_1__GP_PAD_2__DP_PAD_2__RD_1__TD_1__DPO_1__CTS_CSIZE_10__CTS_CDIA_81__PIN_ADJ_0.125__UP_ADJ_0.115/6_final.sdc",
+          "kind": "sdc",
+          "expected_sha256": "5e3c3ac335a9f06eb49d2458b15cf714191aa05a59af7f4d4fb94ba02baff73a",
+          "actual_sha256": "5e3c3ac335a9f06eb49d2458b15cf714191aa05a59af7f4d4fb94ba02baff73a",
+          "verified": true,
+          "size_bytes": 33896
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/work/results/sky130hd/aes/DESIGN_aes__CLK_0.84__UTIL_22__AR_1__TECH_sky130hd__LB_ADDON_0.021__TIMING_EFFORT_2__POWER_EFFORT_0__HIER_SYNTH_1__GP_PAD_2__DP_PAD_2__RD_1__TD_1__DPO_1__CTS_CSIZE_10__CTS_CDIA_81__PIN_ADJ_0.125__UP_ADJ_0.115/6_final.spef",
+          "kind": "spef",
+          "expected_sha256": "109bfbe526ef38c993cda80c3130aba4b32debcbb15e58965cac5332c522f828",
+          "actual_sha256": "109bfbe526ef38c993cda80c3130aba4b32debcbb15e58965cac5332c522f828",
+          "verified": true,
+          "size_bytes": 20660039
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/335167f6f3bc4c15a03796e015bb7101/e34de1af7adf49a6a76e51eebd3fb29d/attempt-1/work/results/sky130hd/aes/DESIGN_aes__CLK_0.84__UTIL_22__AR_1__TECH_sky130hd__LB_ADDON_0.021__TIMING_EFFORT_2__POWER_EFFORT_0__HIER_SYNTH_1__GP_PAD_2__DP_PAD_2__RD_1__TD_1__DPO_1__CTS_CSIZE_10__CTS_CDIA_81__PIN_ADJ_0.125__UP_ADJ_0.115/6_final.v",
+          "kind": "netlist",
+          "expected_sha256": "6eaf2b47e5ae27c7508a9ce7a09c0027155fdbf5c09664a2c038d3ba15004fbd",
+          "actual_sha256": "6eaf2b47e5ae27c7508a9ce7a09c0027155fdbf5c09664a2c038d3ba15004fbd",
+          "verified": true,
+          "size_bytes": 3764462
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_candidates.json",
+          "kind": "optimizer_candidates",
+          "expected_sha256": "518c1ce3f61a5150cc51f6abfefc2cf4e3867a98e562722783fde893a0759bce",
+          "actual_sha256": "518c1ce3f61a5150cc51f6abfefc2cf4e3867a98e562722783fde893a0759bce",
+          "verified": true,
+          "size_bytes": 303
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_checkpoint.json",
+          "kind": "optimizer_checkpoint",
+          "expected_sha256": "317ee0d913b60d08b258349f419cc345794cd9b5816cba7dc0d26246a72f02c9",
+          "actual_sha256": "317ee0d913b60d08b258349f419cc345794cd9b5816cba7dc0d26246a72f02c9",
+          "verified": true,
+          "size_bytes": 1466
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_knowledge_retrieval.json",
+          "kind": "knowledge_retrieval",
+          "expected_sha256": "8975d4b031d919b34cfd5db450e5f517595cd7ed26c62e71668326d9894336a8",
+          "actual_sha256": "8975d4b031d919b34cfd5db450e5f517595cd7ed26c62e71668326d9894336a8",
+          "verified": true,
+          "size_bytes": 12507
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_observations.json",
+          "kind": "optimizer_dataset",
+          "expected_sha256": "67a84455109d7c8694fa95d8f9b7ce17b1b3b5e41f47de8161aff04d563c9e26",
+          "actual_sha256": "67a84455109d7c8694fa95d8f9b7ce17b1b3b5e41f47de8161aff04d563c9e26",
+          "verified": true,
+          "size_bytes": 63241
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_policy_trace.json",
+          "kind": "optimizer_trace",
+          "expected_sha256": "b90ac8893006a846fa787853a7c7c466dafd426ed1c8611b9439811097c53c76",
+          "actual_sha256": "b90ac8893006a846fa787853a7c7c466dafd426ed1c8611b9439811097c53c76",
+          "verified": true,
+          "size_bytes": 1920
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/a2_source_lock.json",
+          "kind": "upstream_source_lock",
+          "expected_sha256": "312a3008e6b99ca0aa70b9f933a742652102f3444e751ba83e8350542d02a928",
+          "actual_sha256": "312a3008e6b99ca0aa70b9f933a742652102f3444e751ba83e8350542d02a928",
+          "verified": true,
+          "size_bytes": 1317
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/model_provider_trace.json",
+          "kind": "model_provider_trace",
+          "expected_sha256": "f9de60fa7699049b7a19af0359e00777c9f95463421f89c46048f3e8add1d433",
+          "actual_sha256": "f9de60fa7699049b7a19af0359e00777c9f95463421f89c46048f3e8add1d433",
+          "verified": true,
+          "size_bytes": 4982
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/3b66e823738e406daaa575259aa715e6/0ff92fb5d2ae4756b91c3c4beb9dd478/attempt-1/runtime_protocol_receipt.json",
+          "kind": "runtime_protocol_receipt",
+          "expected_sha256": "c4dd629ce8edd0587f1be7443d71f44a8efc7911b49070f4bf36452fcd60538a",
+          "actual_sha256": "c4dd629ce8edd0587f1be7443d71f44a8efc7911b49070f4bf36452fcd60538a",
+          "verified": true,
+          "size_bytes": 891
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_candidates.json",
+          "kind": "optimizer_candidates",
+          "expected_sha256": "25f09043af0003ca8830177328bcffee22df422e1be38c9aa43f1a3b1e608b06",
+          "actual_sha256": "25f09043af0003ca8830177328bcffee22df422e1be38c9aa43f1a3b1e608b06",
+          "verified": true,
+          "size_bytes": 303
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_checkpoint.json",
+          "kind": "optimizer_checkpoint",
+          "expected_sha256": "8aaf23a9c157b758442549b42a76b42ee78b89f2fcfde3222bab6f854a0e3edb",
+          "actual_sha256": "8aaf23a9c157b758442549b42a76b42ee78b89f2fcfde3222bab6f854a0e3edb",
+          "verified": true,
+          "size_bytes": 1390
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_knowledge_retrieval.json",
+          "kind": "knowledge_retrieval",
+          "expected_sha256": "8975d4b031d919b34cfd5db450e5f517595cd7ed26c62e71668326d9894336a8",
+          "actual_sha256": "8975d4b031d919b34cfd5db450e5f517595cd7ed26c62e71668326d9894336a8",
+          "verified": true,
+          "size_bytes": 12507
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_observations.json",
+          "kind": "optimizer_dataset",
+          "expected_sha256": "ffa9fc424739d781d9d26a7ea83d90ed144376f142e937dcbfb258b85615ed35",
+          "actual_sha256": "ffa9fc424739d781d9d26a7ea83d90ed144376f142e937dcbfb258b85615ed35",
+          "verified": true,
+          "size_bytes": 52385
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_policy_trace.json",
+          "kind": "optimizer_trace",
+          "expected_sha256": "7140339b1e856bbe49fd2dfbd26b3a22dad8590a05054149a01a5aec9bfad851",
+          "actual_sha256": "7140339b1e856bbe49fd2dfbd26b3a22dad8590a05054149a01a5aec9bfad851",
+          "verified": true,
+          "size_bytes": 1920
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/a2_source_lock.json",
+          "kind": "upstream_source_lock",
+          "expected_sha256": "312a3008e6b99ca0aa70b9f933a742652102f3444e751ba83e8350542d02a928",
+          "actual_sha256": "312a3008e6b99ca0aa70b9f933a742652102f3444e751ba83e8350542d02a928",
+          "verified": true,
+          "size_bytes": 1317
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/model_provider_trace.json",
+          "kind": "model_provider_trace",
+          "expected_sha256": "b84e00460422ca87ebb337f9295f36a40bde33fb06a919eb37a69a70965cf674",
+          "actual_sha256": "b84e00460422ca87ebb337f9295f36a40bde33fb06a919eb37a69a70965cf674",
+          "verified": true,
+          "size_bytes": 6943
+        },
+        {
+          "path": "var/evidence/a2-orfo-single-feedback-20260905-r4/work/ae6da176d4b34bbf831bb99c1cb6b7d9/74805600420940c0bb44e5b44a2eb98a/attempt-1/runtime_protocol_receipt.json",
+          "kind": "runtime_protocol_receipt",
+          "expected_sha256": "8561632395e0882a669f02baf6d18a7f6609dba2830d5c6f90d21d7425954cd8",
+          "actual_sha256": "8561632395e0882a669f02baf6d18a7f6609dba2830d5c6f90d21d7425954cd8",
+          "verified": true,
+          "size_bytes": 891
+        }
+      ]
+    },
+    {
+      "id": "E03",
+      "title": "Executed backend-to-RTL checkpoint recovery",
+      "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/summary.json",
+      "sha256": "1606eb84083be453a9efe2e8b1cfa7986899089332d08059247f0250472bbf6d",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_044_EXECUTED_CROSS_STAGE_RTL_RECOVERY.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "statuses": {
+          "clean_checkpoint_verify": "succeeded",
+          "clean_checkpoint_simulation": "succeeded",
+          "fault_verify": "succeeded",
+          "fault_simulation": "succeeded",
+          "fault_orfs": "failed",
+          "restored_verify": "succeeded",
+          "restored_simulation": "succeeded",
+          "restored_orfs": "succeeded"
+        },
+        "checks": {
+          "source_acceptance_pinned": true,
+          "fault_protocol_pinned": true,
+          "clean_checkpoint_independently_verified": true,
+          "fault_frontend_passed": true,
+          "fault_backend_really_failed": true,
+          "failure_artifacts_retained": true,
+          "diagnosis_has_no_fake_qor": true,
+          "typed_fix_decision": true,
+          "restore_plan_is_durable": true,
+          "restore_selects_exact_clean_hash": true,
+          "restored_frontend_passed": true,
+          "restored_backend_succeeded": true,
+          "restored_gds_registered": true,
+          "restored_protected_qor_registered": true,
+          "failed_and_success_checks_both_durable": true,
+          "external_sources_unchanged": true,
+          "bounded_backend_budget": true
+        },
+        "claim_boundary": "One platform-owned, bounded cross-stage recovery acceptance over the exact RTL from a pinned native RTLScout acceptance. A SYNTHESIS-only unresolved blackbox passed the unchanged functional oracle and failed real ORFS; L1 recorded a conservative no-QoR failure diagnosis and typed restore plan, then reverified the clean content-addressed checkpoint and reached a real registered GDS with protected QoR. This is not CLOSER-Bench, a repair-policy accuracy result, or evidence of general recovery capability.",
+        "official_closer_bench_result": false
+      },
+      "runs": [
+        {
+          "run_id": "82417c559e8f4996b5d3e3c2bfe467ec",
+          "status": "passed"
+        },
+        {
+          "run_id": "dfc54207f87e42d98daa1e7922c944d7",
+          "status": "passed"
+        },
+        {
+          "run_id": "dfe1d8cda04d42109d3c1002c2760735",
+          "status": "passed"
+        },
+        {
+          "run_id": "a05aecd1561349dcabafa8e255278c33",
+          "status": "passed"
+        },
+        {
+          "run_id": "23c5ef37b4d34f76aefd458881fb7f77",
+          "status": "failed"
+        },
+        {
+          "run_id": "2c857c9777c9403b999cbc3d73aca2d3",
+          "status": "passed"
+        },
+        {
+          "run_id": "8d5014eb0dba486799178a7f89a7a6a2",
+          "status": "passed"
+        },
+        {
+          "run_id": "5181ec1c41cd48cc82d43f9e7cccd5e7",
+          "status": "passed"
+        },
+        {
+          "run_id": "82417c559e8f4996b5d3e3c2bfe467ec",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "dfc54207f87e42d98daa1e7922c944d7",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "dfe1d8cda04d42109d3c1002c2760735",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "a05aecd1561349dcabafa8e255278c33",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "2c857c9777c9403b999cbc3d73aca2d3",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "8d5014eb0dba486799178a7f89a7a6a2",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "5181ec1c41cd48cc82d43f9e7cccd5e7",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/state/rtl-candidates/bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a.sv",
+          "kind": "referenced_file",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/state/rtl-candidates/e81c473e2a8b4c2aa8d2f5ce5584b228054be2a0cc68a2f411a24607fc53b037.sv",
+          "kind": "referenced_file",
+          "expected_sha256": "e81c473e2a8b4c2aa8d2f5ce5584b228054be2a0cc68a2f411a24607fc53b037",
+          "actual_sha256": "e81c473e2a8b4c2aa8d2f5ce5584b228054be2a0cc68a2f411a24607fc53b037",
+          "verified": true,
+          "size_bytes": 667
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/state/verification-oracles/8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421.sv",
+          "kind": "referenced_file",
+          "expected_sha256": "8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421",
+          "actual_sha256": "8283ed55da396f576f870e7276235517b5d48fd25df51cd206eb8c4c5a0ca421",
+          "verified": true,
+          "size_bytes": 928
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/analysis/flow_error.log",
+          "kind": "log",
+          "expected_sha256": "8560c333755b10447217727c598fd686b873a5d1b2a661c335a384007b7797df",
+          "actual_sha256": "8560c333755b10447217727c598fd686b873a5d1b2a661c335a384007b7797df",
+          "verified": true,
+          "size_bytes": 78
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/design_input_manifest.json",
+          "kind": "design_input_manifest",
+          "expected_sha256": "b80c77411910b30124b8e9a28a7f659798ec49cf63a8038325bfd795fb459064",
+          "actual_sha256": "b80c77411910b30124b8e9a28a7f659798ec49cf63a8038325bfd795fb459064",
+          "verified": true,
+          "size_bytes": 606
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/designs/nangate45/native_adder8/config.mk",
+          "kind": "config",
+          "expected_sha256": "7a208a375a52d47fd9458ed032cabe1e92d912e06077b7cf37d6e90fccb19d96",
+          "actual_sha256": "7a208a375a52d47fd9458ed032cabe1e92d912e06077b7cf37d6e90fccb19d96",
+          "verified": true,
+          "size_bytes": 568
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/designs/nangate45/native_adder8/constraint.sdc",
+          "kind": "other",
+          "expected_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "actual_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "verified": true,
+          "size_bytes": 151
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/designs/nangate45/native_adder8/pdn.tcl",
+          "kind": "other",
+          "expected_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "actual_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "verified": true,
+          "size_bytes": 674
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/flow_compatibility.json",
+          "kind": "report",
+          "expected_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "actual_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "verified": true,
+          "size_bytes": 266
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/logs/flow.log",
+          "kind": "log",
+          "expected_sha256": "f577a0895bf4b8b1ae52649b155832ee846445efcf426dddee25b8aceeeb4295",
+          "actual_sha256": "f577a0895bf4b8b1ae52649b155832ee846445efcf426dddee25b8aceeeb4295",
+          "verified": true,
+          "size_bytes": 20485
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/parameter_contract.json",
+          "kind": "parameter_contract",
+          "expected_sha256": "4f40549785e7ee02487cff3498a2a8a5b0fb1d0f146b82576e45de9817fa18ae",
+          "actual_sha256": "4f40549785e7ee02487cff3498a2a8a5b0fb1d0f146b82576e45de9817fa18ae",
+          "verified": true,
+          "size_bytes": 6755
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/plan.json",
+          "kind": "report",
+          "expected_sha256": "d8ccc962e530cb6beead75ebf1725dcd8dcdd2e3ae963209a30b55aa0ba1365f",
+          "actual_sha256": "d8ccc962e530cb6beead75ebf1725dcd8dcdd2e3ae963209a30b55aa0ba1365f",
+          "verified": true,
+          "size_bytes": 2155
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_check.txt",
+          "kind": "report",
+          "expected_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "actual_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "verified": true,
+          "size_bytes": 123
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_stat.txt",
+          "kind": "report",
+          "expected_sha256": "13b80a584a46b1bf98e1c2886705e97d98d36660742b9bfdf39ab4a4bc8d017c",
+          "actual_sha256": "13b80a584a46b1bf98e1c2886705e97d98d36660742b9bfdf39ab4a4bc8d017c",
+          "verified": true,
+          "size_bytes": 360
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/run_result.json",
+          "kind": "run_result",
+          "expected_sha256": "b2eeb0e76a8cfa4543ed0615f3c7f1558813f52dd9a1ab2eb4db9740845898c6",
+          "actual_sha256": "b2eeb0e76a8cfa4543ed0615f3c7f1558813f52dd9a1ab2eb4db9740845898c6",
+          "verified": true,
+          "size_bytes": 3190
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/23c5ef37b4d34f76aefd458881fb7f77/b1a609ceb5c04c8e84463415456099d0/attempt-1/orfs/implementation/toolchain_snapshot.json",
+          "kind": "toolchain_snapshot",
+          "expected_sha256": "7c20b63193513842185d8b3b5994e96ff899813797bfc6795e3846a82f9988e1",
+          "actual_sha256": "7c20b63193513842185d8b3b5994e96ff899813797bfc6795e3846a82f9988e1",
+          "verified": true,
+          "size_bytes": 3785
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/2c857c9777c9403b999cbc3d73aca2d3/f5b5f8de64cc4398aaf91e9a93b070ce/attempt-1/outputs/verification.json",
+          "kind": "verification_report",
+          "expected_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "actual_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "verified": true,
+          "size_bytes": 261
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/2c857c9777c9403b999cbc3d73aca2d3/f5b5f8de64cc4398aaf91e9a93b070ce/attempt-1/outputs/verification.log",
+          "kind": "log",
+          "expected_sha256": "53bb4076fd76d60f7b120b996a422e81377a99ff2a71019baf11ed725113ea3f",
+          "actual_sha256": "53bb4076fd76d60f7b120b996a422e81377a99ff2a71019baf11ed725113ea3f",
+          "verified": true,
+          "size_bytes": 3466
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/2c857c9777c9403b999cbc3d73aca2d3/f5b5f8de64cc4398aaf91e9a93b070ce/attempt-1/outputs/verified_design.sv",
+          "kind": "rtl",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/analysis/common_evaluation.json",
+          "kind": "report",
+          "expected_sha256": "94e6617f2f87e0cab39e96c87fb17c529dd9d2aef3baa7177db93f433a2f5e65",
+          "actual_sha256": "94e6617f2f87e0cab39e96c87fb17c529dd9d2aef3baa7177db93f433a2f5e65",
+          "verified": true,
+          "size_bytes": 7258
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/design_input_manifest.json",
+          "kind": "design_input_manifest",
+          "expected_sha256": "4cf4984e4f68a7b60821cdaae2ae9bb566db329b1d9b654fdbd9f29194a0f995",
+          "actual_sha256": "4cf4984e4f68a7b60821cdaae2ae9bb566db329b1d9b654fdbd9f29194a0f995",
+          "verified": true,
+          "size_bytes": 606
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/designs/nangate45/native_adder8/config.mk",
+          "kind": "config",
+          "expected_sha256": "67fc767fe24a3247c7168713683cc195a472e3348dc07a541838eb315442d69f",
+          "actual_sha256": "67fc767fe24a3247c7168713683cc195a472e3348dc07a541838eb315442d69f",
+          "verified": true,
+          "size_bytes": 568
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/designs/nangate45/native_adder8/constraint.sdc",
+          "kind": "other",
+          "expected_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "actual_sha256": "32c24461c0e79475e739f3052dcae03bb0abef60dc2cc7a4111e2e5cd102686f",
+          "verified": true,
+          "size_bytes": 151
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/designs/nangate45/native_adder8/pdn.tcl",
+          "kind": "other",
+          "expected_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "actual_sha256": "c37cbe810864c5a55a5ec0cd16d65d60f28c8d6a27ccadac566edc44defa3d17",
+          "verified": true,
+          "size_bytes": 674
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/flow_compatibility.json",
+          "kind": "report",
+          "expected_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "actual_sha256": "14e380061a0c9d3f46bd4fe2b11989ba57cc53bf316a1ed4fc61c17663f21c0d",
+          "verified": true,
+          "size_bytes": 266
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/logs/flow.log",
+          "kind": "log",
+          "expected_sha256": "c615967dd89d57b7c974962f00b359be6a2b398bc5dbf407d5b94c7f71a0cf78",
+          "actual_sha256": "c615967dd89d57b7c974962f00b359be6a2b398bc5dbf407d5b94c7f71a0cf78",
+          "verified": true,
+          "size_bytes": 113247
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/logs/nangate45/native_adder8/base/5_2_route.json",
+          "kind": "report",
+          "expected_sha256": "255743e3a368ce01f1cccb6a3c8d305edb7c507b9db09c001934c2a43b3c69aa",
+          "actual_sha256": "255743e3a368ce01f1cccb6a3c8d305edb7c507b9db09c001934c2a43b3c69aa",
+          "verified": true,
+          "size_bytes": 857
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/logs/nangate45/native_adder8/base/6_report.json",
+          "kind": "report",
+          "expected_sha256": "563343e7ae1f7dbf25c3910629e15b64e095b3ddf2399f6654a1a54c3dc62da9",
+          "actual_sha256": "563343e7ae1f7dbf25c3910629e15b64e095b3ddf2399f6654a1a54c3dc62da9",
+          "verified": true,
+          "size_bytes": 3118
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/parameter_contract.json",
+          "kind": "parameter_contract",
+          "expected_sha256": "8e20de4a158ae018194cef0935cbcf4128a4e747d68bde9b33b9d1bfd25b48c7",
+          "actual_sha256": "8e20de4a158ae018194cef0935cbcf4128a4e747d68bde9b33b9d1bfd25b48c7",
+          "verified": true,
+          "size_bytes": 6755
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/plan.json",
+          "kind": "report",
+          "expected_sha256": "5ee656bf23695ca21b1a4ea66ee9031c5346aa81ed53afe9c0332eda92b373a2",
+          "actual_sha256": "5ee656bf23695ca21b1a4ea66ee9031c5346aa81ed53afe9c0332eda92b373a2",
+          "verified": true,
+          "size_bytes": 2155
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/6_finish.rpt",
+          "kind": "report",
+          "expected_sha256": "7d9be3490c2d18bc77e7667eef1084d0ae54aea1e0a3ce80ecb527a4d51cd655",
+          "actual_sha256": "7d9be3490c2d18bc77e7667eef1084d0ae54aea1e0a3ce80ecb527a4d51cd655",
+          "verified": true,
+          "size_bytes": 13457
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_check.txt",
+          "kind": "report",
+          "expected_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "actual_sha256": "b1a59b416cb02ddc763e2d615db3e0d20d43687abe4b376d88da4713715b60a2",
+          "verified": true,
+          "size_bytes": 123
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/reports/nangate45/native_adder8/base/synth_stat.txt",
+          "kind": "report",
+          "expected_sha256": "9815a83bfe656b4f468810469e8cb5fd54e142ef9e51dcb2401f06ebc3ea1018",
+          "actual_sha256": "9815a83bfe656b4f468810469e8cb5fd54e142ef9e51dcb2401f06ebc3ea1018",
+          "verified": true,
+          "size_bytes": 1079
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/1_synth.odb",
+          "kind": "odb",
+          "expected_sha256": "bf9df91a42872cdeff571f394b099d81163cb1c5832d07adb07ff6a3b2156432",
+          "actual_sha256": "bf9df91a42872cdeff571f394b099d81163cb1c5832d07adb07ff6a3b2156432",
+          "verified": true,
+          "size_bytes": 423784
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/2_floorplan.odb",
+          "kind": "odb",
+          "expected_sha256": "c5cae3d092ebcc31593d6eeefd22638b6fa487055bf13b8bff4242f030650eac",
+          "actual_sha256": "c5cae3d092ebcc31593d6eeefd22638b6fa487055bf13b8bff4242f030650eac",
+          "verified": true,
+          "size_bytes": 470405
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/3_place.odb",
+          "kind": "odb",
+          "expected_sha256": "798a5cfb6772539f573876ae726e621fd1eb175b2ef80f76e3107f0a18cdb0c4",
+          "actual_sha256": "798a5cfb6772539f573876ae726e621fd1eb175b2ef80f76e3107f0a18cdb0c4",
+          "verified": true,
+          "size_bytes": 477979
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/4_cts.odb",
+          "kind": "odb",
+          "expected_sha256": "c252b10329bace5ea6888e5a35a13361cc96f079770d489d746eb2f41d580029",
+          "actual_sha256": "c252b10329bace5ea6888e5a35a13361cc96f079770d489d746eb2f41d580029",
+          "verified": true,
+          "size_bytes": 477979
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/5_route.odb",
+          "kind": "odb",
+          "expected_sha256": "c823cc5c78bb62e2353eb61b802ec6a3921b4a14b43f77ba1bb41676ff5e7106",
+          "actual_sha256": "c823cc5c78bb62e2353eb61b802ec6a3921b4a14b43f77ba1bb41676ff5e7106",
+          "verified": true,
+          "size_bytes": 602026
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.def",
+          "kind": "def",
+          "expected_sha256": "70b055371064979c13053e0f925fc33abc628f8013d5266819dde76c9edde0b3",
+          "actual_sha256": "70b055371064979c13053e0f925fc33abc628f8013d5266819dde76c9edde0b3",
+          "verified": true,
+          "size_bytes": 104263
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.gds",
+          "kind": "gds",
+          "expected_sha256": "de9e3da0f965f3aeaf9553830d9542f6428e72970b7d2ed23f24b7376dae1d70",
+          "actual_sha256": "de9e3da0f965f3aeaf9553830d9542f6428e72970b7d2ed23f24b7376dae1d70",
+          "verified": true,
+          "size_bytes": 164304
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.odb",
+          "kind": "odb",
+          "expected_sha256": "11f7604cc176d0c7c2b08c7de21c2f18e5ce3668b52aba99324a2cbce8f13b99",
+          "actual_sha256": "11f7604cc176d0c7c2b08c7de21c2f18e5ce3668b52aba99324a2cbce8f13b99",
+          "verified": true,
+          "size_bytes": 602026
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/results/nangate45/native_adder8/base/6_final.v",
+          "kind": "netlist",
+          "expected_sha256": "aad6dfb4e20f9405f6751f5b4bd9f6c98050aa4d1214d0a8e7727c36b3b3e03b",
+          "actual_sha256": "aad6dfb4e20f9405f6751f5b4bd9f6c98050aa4d1214d0a8e7727c36b3b3e03b",
+          "verified": true,
+          "size_bytes": 4722
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/run_result.json",
+          "kind": "run_result",
+          "expected_sha256": "efd9491fd9f078c709e62ee93e81d41c0cb919e71b9373d277be1e75a5c759d4",
+          "actual_sha256": "efd9491fd9f078c709e62ee93e81d41c0cb919e71b9373d277be1e75a5c759d4",
+          "verified": true,
+          "size_bytes": 6702
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/5181ec1c41cd48cc82d43f9e7cccd5e7/913021de3269412988d5401c1cd1af04/attempt-1/orfs/implementation/toolchain_snapshot.json",
+          "kind": "toolchain_snapshot",
+          "expected_sha256": "c0f431709718e5c982299d9bcf983a397ca956871ad3e904401c7b32375b7318",
+          "actual_sha256": "c0f431709718e5c982299d9bcf983a397ca956871ad3e904401c7b32375b7318",
+          "verified": true,
+          "size_bytes": 3785
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/82417c559e8f4996b5d3e3c2bfe467ec/2bcfe2a044cc4a9c8b0c4d6522bbaa3f/attempt-1/outputs/verification.json",
+          "kind": "verification_report",
+          "expected_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "actual_sha256": "86de7e7a74d686e1156dda9dc6453e1c8b7c1c7890c3203f73e84e79afd02e82",
+          "verified": true,
+          "size_bytes": 261
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/82417c559e8f4996b5d3e3c2bfe467ec/2bcfe2a044cc4a9c8b0c4d6522bbaa3f/attempt-1/outputs/verification.log",
+          "kind": "log",
+          "expected_sha256": "d369a478b37661c9041306cb017cc8a07811683ac267de3262b52873527f435a",
+          "actual_sha256": "d369a478b37661c9041306cb017cc8a07811683ac267de3262b52873527f435a",
+          "verified": true,
+          "size_bytes": 3466
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/82417c559e8f4996b5d3e3c2bfe467ec/2bcfe2a044cc4a9c8b0c4d6522bbaa3f/attempt-1/outputs/verified_design.sv",
+          "kind": "rtl",
+          "expected_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "actual_sha256": "bc06e926eb3b9df99c1455ebb78d04a5f618bda623f261c4437c5a5ed50de69a",
+          "verified": true,
+          "size_bytes": 136
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/8d5014eb0dba486799178a7f89a7a6a2/bce89c4b561c40f493684ecd5f2905dc/attempt-1/outputs/simulation.json",
+          "kind": "simulation_report",
+          "expected_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "actual_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "verified": true,
+          "size_bytes": 330
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/8d5014eb0dba486799178a7f89a7a6a2/bce89c4b561c40f493684ecd5f2905dc/attempt-1/outputs/simulation.log",
+          "kind": "log",
+          "expected_sha256": "d85d4adbda606acbb6d3494965003bb2ba9de862074046b3cd0a929b573701e5",
+          "actual_sha256": "d85d4adbda606acbb6d3494965003bb2ba9de862074046b3cd0a929b573701e5",
+          "verified": true,
+          "size_bytes": 1227
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/a05aecd1561349dcabafa8e255278c33/92b59d505a6c4920be87449cbf615867/attempt-1/outputs/simulation.json",
+          "kind": "simulation_report",
+          "expected_sha256": "4666f22b391f925cede92344413ae934483e5e443587bfc01369c9c567558d3f",
+          "actual_sha256": "4666f22b391f925cede92344413ae934483e5e443587bfc01369c9c567558d3f",
+          "verified": true,
+          "size_bytes": 330
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/a05aecd1561349dcabafa8e255278c33/92b59d505a6c4920be87449cbf615867/attempt-1/outputs/simulation.log",
+          "kind": "log",
+          "expected_sha256": "8938982c837099dfae06d408fbf83bcf9d532d7dafcb449c84b34b2b6c4803c2",
+          "actual_sha256": "8938982c837099dfae06d408fbf83bcf9d532d7dafcb449c84b34b2b6c4803c2",
+          "verified": true,
+          "size_bytes": 1227
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/dfc54207f87e42d98daa1e7922c944d7/d20efad5f438490e8f733cd7125be369/attempt-1/outputs/simulation.json",
+          "kind": "simulation_report",
+          "expected_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "actual_sha256": "3c5a3b47ea855a07bb1cfc6509b0f792780c3f5c7009c87699371e6fbfd35aea",
+          "verified": true,
+          "size_bytes": 330
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/dfc54207f87e42d98daa1e7922c944d7/d20efad5f438490e8f733cd7125be369/attempt-1/outputs/simulation.log",
+          "kind": "log",
+          "expected_sha256": "fd974ff0cb8fd605b4d4ef89fc0bf75e81b242bc4252a10f61a4a354754211d7",
+          "actual_sha256": "fd974ff0cb8fd605b4d4ef89fc0bf75e81b242bc4252a10f61a4a354754211d7",
+          "verified": true,
+          "size_bytes": 1227
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/dfe1d8cda04d42109d3c1002c2760735/544b0c52b68f4bef916d3a83cdd5ac0d/attempt-1/outputs/verification.json",
+          "kind": "verification_report",
+          "expected_sha256": "d89316088e0c6e636e7cf3882ac6087db178e29c3a6dab210eb9c95431067e27",
+          "actual_sha256": "d89316088e0c6e636e7cf3882ac6087db178e29c3a6dab210eb9c95431067e27",
+          "verified": true,
+          "size_bytes": 261
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/dfe1d8cda04d42109d3c1002c2760735/544b0c52b68f4bef916d3a83cdd5ac0d/attempt-1/outputs/verification.log",
+          "kind": "log",
+          "expected_sha256": "6bb17b1a87f30e79dec8cdc45d052b7dc2f28e5ab9c8f4d0bef88340d7681f93",
+          "actual_sha256": "6bb17b1a87f30e79dec8cdc45d052b7dc2f28e5ab9c8f4d0bef88340d7681f93",
+          "verified": true,
+          "size_bytes": 3542
+        },
+        {
+          "path": "var/evidence/platform-cross-stage-rtl-recovery-20260905-r2/work/dfe1d8cda04d42109d3c1002c2760735/544b0c52b68f4bef916d3a83cdd5ac0d/attempt-1/outputs/verified_design.sv",
+          "kind": "rtl",
+          "expected_sha256": "e81c473e2a8b4c2aa8d2f5ce5584b228054be2a0cc68a2f411a24607fc53b037",
+          "actual_sha256": "e81c473e2a8b4c2aa8d2f5ce5584b228054be2a0cc68a2f411a24607fc53b037",
+          "verified": true,
+          "size_bytes": 667
+        }
+      ]
+    },
+    {
+      "id": "E04",
+      "title": "ORAssistant native retrieval in Runtime",
+      "path": "var/evidence/orassistant-platform-20260905-r3/summary.json",
+      "sha256": "615864ce23a50d97e192c5b90db73f79774a43e543aa036073b5b8e03b54e43e",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_032_ORASSISTANT_CITED_RETRIEVAL.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "runtime_succeeded": true,
+          "all_required_artifacts_registered": true,
+          "native_bm25_used": true,
+          "drt_0349_evidence_returned": true,
+          "citations_have_document_and_chunk_hashes": true,
+          "explanation_is_evidence_scoped": true,
+          "denied_surfaces_confirmed": true,
+          "native_smoke_preceded_platform": true
+        },
+        "claim_boundary": "One real read-only Runtime query with native ORAssistant BM25 and resolvable citations; no broad RAG-quality, LLM diagnosis, or EDA success claim."
+      },
+      "runs": [
+        {
+          "run_id": "b8108f2064ed41a981bd38ea49099a66",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/orassistant-native-retrieval-20260905-r1/native_smoke.json",
+          "kind": "referenced_file",
+          "expected_sha256": "c944d04f8702672a183b1f1386090551329479c373d5f5ee333023e236bd5714",
+          "actual_sha256": "c944d04f8702672a183b1f1386090551329479c373d5f5ee333023e236bd5714",
+          "verified": true,
+          "size_bytes": 33121
+        },
+        {
+          "path": "var/evidence/orassistant-platform-20260905-r3/work/b8108f2064ed41a981bd38ea49099a66/0c1112b1bdff4ea09faea7fe64a4afc4/attempt-1/corpus_manifest.json",
+          "kind": "knowledge_corpus_manifest",
+          "expected_sha256": "5edf160b709ef554c731b7f571a07d445718334d8e18c86581ebe92fd4ca58e8",
+          "actual_sha256": "5edf160b709ef554c731b7f571a07d445718334d8e18c86581ebe92fd4ca58e8",
+          "verified": true,
+          "size_bytes": 23011
+        },
+        {
+          "path": "var/evidence/orassistant-platform-20260905-r3/work/b8108f2064ed41a981bd38ea49099a66/0c1112b1bdff4ea09faea7fe64a4afc4/attempt-1/explanation.json",
+          "kind": "knowledge_explanation",
+          "expected_sha256": "a012752b33e9eacc748e5e114933bb5ac64ab68ad569256c256073a95bc664de",
+          "actual_sha256": "a012752b33e9eacc748e5e114933bb5ac64ab68ad569256c256073a95bc664de",
+          "verified": true,
+          "size_bytes": 2585
+        },
+        {
+          "path": "var/evidence/orassistant-platform-20260905-r3/work/b8108f2064ed41a981bd38ea49099a66/0c1112b1bdff4ea09faea7fe64a4afc4/attempt-1/native_trace.json",
+          "kind": "knowledge_provenance",
+          "expected_sha256": "04bfe3306e3c8054deb6edb1b58782f868bd7f3d0ff54762b2ceadc029a58041",
+          "actual_sha256": "04bfe3306e3c8054deb6edb1b58782f868bd7f3d0ff54762b2ceadc029a58041",
+          "verified": true,
+          "size_bytes": 1837
+        },
+        {
+          "path": "var/evidence/orassistant-platform-20260905-r3/work/b8108f2064ed41a981bd38ea49099a66/0c1112b1bdff4ea09faea7fe64a4afc4/attempt-1/retrieval.json",
+          "kind": "knowledge_retrieval",
+          "expected_sha256": "bccdcfd395dc30a445e2c9970367207793f3d5f73639252d9b91136700b94422",
+          "actual_sha256": "bccdcfd395dc30a445e2c9970367207793f3d5f73639252d9b91136700b94422",
+          "verified": true,
+          "size_bytes": 7130
+        }
+      ]
+    },
+    {
+      "id": "E05",
+      "title": "Four-domain stage diagnostics",
+      "path": "var/evidence/four-domain-stage-diagnostics-20260905-r1/summary.json",
+      "sha256": "4677856456a0911471f8139f7a5d174c90a3052c3be56679bd01d0b2205ec98e",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_034_FOUR_DOMAIN_STAGE_DIAGNOSTICS.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "four_domains": true,
+          "timing_is_protected_fact": true,
+          "timing_value_preserved": true,
+          "timing_headroom_computed": true,
+          "drc_value_preserved": true,
+          "power_fact_without_fake_budget": true,
+          "missing_congestion_is_explicit": true,
+          "all_metric_evidence_registered": true,
+          "no_unverified_root_cause": true,
+          "no_blocker_on_feasible_observed_domains": true,
+          "input_acceptance_pinned": true
+        },
+        "claim_boundary": "Deterministic normalization and threshold analysis over one real accepted Runtime view. Missing congestion remains unavailable and absent power budget remains unknown. This does not claim root-cause localization."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E06",
+      "title": "Typed control-state replay",
+      "path": "var/evidence/l1-pdagent-control-state-20260905-r1/summary.json",
+      "sha256": "9360cb95377cd7c1f57e105d95776557337f300a6451a2b482702af82751d158",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_035_PDAGENT_CONTROL_STATE.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "real_input_pinned": true,
+          "protected_timing_preserved": true,
+          "timing_blocker_detected": true,
+          "planner_hub_path": true,
+          "analyzer_bound_to_report": true,
+          "debugger_bound_to_facts": true,
+          "typed_stop_not_shell": true,
+          "recovery_budget_unchanged": true,
+          "durable_latest_round_trip": true,
+          "no_runtime_or_artifact_mutation": true
+        },
+        "claim_boundary": "A durable role/state transition replay over one real protected ORFS measurement. It does not execute a fix, copy PDAGENT code, or validate PDAGENT-BENCH task accuracy."
+      },
+      "runs": [
+        {
+          "run_id": "335167f6f3bc4c15a03796e015bb7101",
+          "status": "completed"
+        }
+      ],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E07",
+      "title": "Artifact graph",
+      "path": "var/evidence/edatracer-style-artifact-graph-20260905-r1/summary.json",
+      "sha256": "df79d33949160f1efc8b018afd0f918729b1e99e0e3a008bbb0f325422e37aa4",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_036_EDATRACER_STYLE_ARTIFACT_GRAPH.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "source_pinned": true,
+          "all_runtime_runs_indexed": true,
+          "required_entities": true,
+          "stage_artifact_edges": true,
+          "metric_source_edges": true,
+          "cross_run_content_edges": true,
+          "file_line_locations": true,
+          "no_absolute_document_names": true,
+          "registered_hash_evidence": true,
+          "runtime_database_unchanged": true,
+          "raw_workspace_hidden": true
+        },
+        "claim_boundary": "A bounded typed graph over the five real Runtime runs in one accepted Spec-to-GDS flow, with Runtime-mediated excerpts and artifact/file-line citations. It is not EDATracer's vector index, dataset scale, or benchmark result."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E08",
+      "title": "Convergence classification",
+      "path": "var/evidence/evidence-backed-convergence-20260905-r1/summary.json",
+      "sha256": "a1ebfb85c691b5827c130ab7604e0000c9c7bd74448c57d2826a50341bb32d2f",
+      "matching_governance_docs": [],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "source_campaign_completed": true,
+          "full_budget_retained": true,
+          "independent_confirmations_retained": true,
+          "mixed_search_not_overclaimed": true,
+          "replicated_metric_is_stable": true,
+          "failure_tail_not_hidden": true,
+          "same_protocol_only": true,
+          "all_success_points_protected": true,
+          "source_databases_unchanged": true
+        },
+        "claim_boundary": "This is deterministic trend classification over pinned, protected-evaluator-attested measurements. Stable independent confirmations demonstrate repeated metric equality, not optimizer convergence or PPA superiority; the mixed search trajectory remains unknown, and failed measurements remain visible."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E09",
+      "title": "Typed recovery policy",
+      "path": "var/evidence/l1-typed-recovery-policy-20260905-r1/summary.json",
+      "sha256": "cfaeb05bff8c98356b4704d1a77849cc9fb3b83531cfd89e865a10fe4216781e",
+      "matching_governance_docs": [],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "real_stalled_evidence_preserved": true,
+          "stalled_without_new_authorization_fails_closed": true,
+          "real_blocker_requests_typed_fix": true,
+          "real_regression_tail_detected": true,
+          "divergence_selects_evidence_checkpoint": true,
+          "all_decisions_durable": true,
+          "no_shell_or_parameter_payload": true,
+          "source_evidence_unchanged": true
+        },
+        "claim_boundary": "Typed, durable policy decisions replayed from real protected evidence. No retry, fix, rollback, L2 handoff, EDA run, or artifact mutation is executed. A2 escalation remains denied until a new durable authorization is verified and consumed by the handoff service."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E10",
+      "title": "A2 configured 151-run campaign; no execution",
+      "path": "var/evidence/a2-orfo-product-migration-20260905-r3/summary.json",
+      "sha256": "86aefcc9c9b7f08199e080d6c4f1da70e7eed6c5052a97d7e49cfc991d656b3c",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_041_A2_ORFO_PRODUCT_MIGRATION.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "product_role_is_a2_feedback": true,
+          "old_orfs_optimizer_rejected": true,
+          "pinned_upstream_head": true,
+          "native_launcher_budget": true,
+          "full_151_measurement_budget": true,
+          "full_12d_shared_domain": true,
+          "variable_clock_retained": true,
+          "configured_without_execution": true,
+          "durable_checkpoint_reopened": true,
+          "http_forces_scheduling_only": true,
+          "os_worker_owns_execution": true,
+          "prior_real_feedback_evidence_intact": true
+        },
+        "claim_boundary": "This acceptance proves product routing, complete native-sized campaign configuration, durable persistence and API/worker execution separation. It submits none of the 151 EDA measurements; native A2->real ORFS->protected evaluator->A2 feedback is evidenced separately by Slice 030.",
+        "required_eda_runs": 151,
+        "budget": {
+          "initial_samples": 26,
+          "feedback_steps": 5,
+          "suggestions_per_step": 25,
+          "confirmations": 0
+        }
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E11",
+      "title": "PostEDA derived diagnostic evaluation",
+      "path": "var/evidence/posteda-platform-diagnostic-20260905-r1/summary.json",
+      "sha256": "1684cbea302c22100ad08bfa0efe50a283b42fe758d617c44281c299b1d04a3b",
+      "matching_governance_docs": [
+        "docs/governance/POSTEDA_BENCH_INTAKE.md",
+        "docs/governance/SLICE_042_POSTEDA_DIAGNOSTIC_EVALUATION.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "native_smoke_preceded_platform": true,
+          "public_runtime_succeeded": true,
+          "public_artifacts_registered": true,
+          "native_upstream_parser_used": true,
+          "hidden_label_firewall": true,
+          "four_domain_diagnosis": true,
+          "drc_fact_and_headroom": true,
+          "drc_blocker_found": true,
+          "typed_safe_decision": true,
+          "prediction_sealed_before_scoring": true,
+          "score_runtime_succeeded": true,
+          "score_artifacts_registered": true,
+          "private_exact_score": true,
+          "derived_not_official": true,
+          "hidden_values_not_exported": true,
+          "source_unchanged": true
+        },
+        "claim_boundary": "One admitted PostEDA-Bench DRC q1 public artifact was normalized into the platform four-domain diagnosis and a typed inspect-before-repair decision, then privately checked against upstream hidden metadata. The 1.0 value is a derived integration diagnostic score, not official PostEDA-Bench SR/ERR/VRR, repair success, or broad diagnostic accuracy."
+      },
+      "runs": [],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/posteda-platform-diagnostic-20260905-r1/work/362957c51a314cf0b2fdd8e915a8170c/9103f0635bcf4940aa7d399d00d803c0/attempt-1/public_case.json",
+          "kind": "benchmark_public_case",
+          "expected_sha256": "af6e3ab65952d85d38a4b866b4daef0ff8d8dc7b1d3f476a780ae32513aca845",
+          "actual_sha256": "af6e3ab65952d85d38a4b866b4daef0ff8d8dc7b1d3f476a780ae32513aca845",
+          "verified": true,
+          "size_bytes": 899
+        }
+      ]
+    },
+    {
+      "id": "E12",
+      "title": "CLOSER paper alignment; not official benchmark",
+      "path": "var/evidence/closer-protocol-alignment-20260905-r2/summary.json",
+      "sha256": "f3acd9b1f40fa4a9c1311f90495a207269c431b62f25b8a59b9335d019e8873b",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_045_CLOSER_ALIGNMENT_REFRESH.md"
+      ],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "paper_is_version_locked": true,
+          "missing_source_blocks_execution": true,
+          "real_spec_to_gds_is_counted": true,
+          "typed_recovery_is_counted": true,
+          "executed_recovery_is_counted_without_official_claim": true,
+          "no_official_claim": true,
+          "source_evidence_pinned": true
+        },
+        "claim_boundary": "Evidence-backed alignment audit against the public CLOSER-Bench paper only. No CLOSER source, task, hidden oracle or scorer was available or executed, so this is not a benchmark result. One separately frozen platform-owned fault now supplies bounded executed recovery evidence; the official stage-paired tasks, hidden oracle and repeated trials remain unavailable.",
+        "alignment_counts": {
+          "met": 5,
+          "partial": 2,
+          "missing": 3
+        }
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E13",
+      "title": "Managed L1 reference",
+      "path": "var/evidence/l1-managed-aes-reference-20260904-r5/summary.json",
+      "sha256": "636f595490036abfdc5fc585a766de5a3610b703cbce3256f27a3b6273a62cc9",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_022_L1_MANAGED_AES_REFERENCE.md"
+      ],
+      "facts": {
+        "claim_boundary": "One real managed L1 reference baseline through finish. It proves typed Goal/Policy/Runtime/feedback and GDS connectivity; it is not an ORFS-Agent campaign or a PPA-superiority claim."
+      },
+      "runs": [
+        {
+          "run_id": "4934a4baebe74ac0bb5943a37a24942a",
+          "status": "submitted"
+        },
+        {
+          "run_id": "4934a4baebe74ac0bb5943a37a24942a",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": [
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/analysis/common_evaluation.json",
+          "kind": "report",
+          "expected_sha256": "3c6a24480ccd636f4ef1fdd95ce28fcafeecadca15cca7c1a6ed919c80f731b7",
+          "actual_sha256": "3c6a24480ccd636f4ef1fdd95ce28fcafeecadca15cca7c1a6ed919c80f731b7",
+          "verified": true,
+          "size_bytes": 7231
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/design_input_manifest.json",
+          "kind": "design_input_manifest",
+          "expected_sha256": "4f3742fc9f1f4bd0f542b11d756d21a2ae4c249210f09d16726ed74d403fa80f",
+          "actual_sha256": "4f3742fc9f1f4bd0f542b11d756d21a2ae4c249210f09d16726ed74d403fa80f",
+          "verified": true,
+          "size_bytes": 3047
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/designs/sky130hd/aes_cipher_top/config.mk",
+          "kind": "config",
+          "expected_sha256": "a4adc1742752675e06d16ee3aba9aa1d076ee89aecfa69bc16d0eef406ccf492",
+          "actual_sha256": "a4adc1742752675e06d16ee3aba9aa1d076ee89aecfa69bc16d0eef406ccf492",
+          "verified": true,
+          "size_bytes": 2077
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/designs/sky130hd/aes_cipher_top/constraint.sdc",
+          "kind": "other",
+          "expected_sha256": "aa675a0a1ce100a655b230f623a5fb3bdc4e32be92994844abce7243ad9c9d5f",
+          "actual_sha256": "aa675a0a1ce100a655b230f623a5fb3bdc4e32be92994844abce7243ad9c9d5f",
+          "verified": true,
+          "size_bytes": 459
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/designs/sky130hd/aes_cipher_top/fastroute.tcl",
+          "kind": "other",
+          "expected_sha256": "0e7b93c568df6a0894eae5f14fe05b1a47dc766caaa017e50985f06b6770fc85",
+          "actual_sha256": "0e7b93c568df6a0894eae5f14fe05b1a47dc766caaa017e50985f06b6770fc85",
+          "verified": true,
+          "size_bytes": 255
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/flow_compatibility.json",
+          "kind": "report",
+          "expected_sha256": "98b67a3179cbad1d8249f45ca4652b1c77368172267906594c1abbe2de08414e",
+          "actual_sha256": "98b67a3179cbad1d8249f45ca4652b1c77368172267906594c1abbe2de08414e",
+          "verified": true,
+          "size_bytes": 1192
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/logs/flow.log",
+          "kind": "log",
+          "expected_sha256": "20291a25e749bb727aff4cd289f2fdcd4ab9082310d44cb743841044d80f5d17",
+          "actual_sha256": "20291a25e749bb727aff4cd289f2fdcd4ab9082310d44cb743841044d80f5d17",
+          "verified": true,
+          "size_bytes": 205404
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/logs/sky130hd/aes_cipher_top/base/5_2_route.json",
+          "kind": "report",
+          "expected_sha256": "f70fd33431b2cd2d80d7817f5e19455b31d3ac546f2eb78c9ce9c6564d92d99b",
+          "actual_sha256": "f70fd33431b2cd2d80d7817f5e19455b31d3ac546f2eb78c9ce9c6564d92d99b",
+          "verified": true,
+          "size_bytes": 2273
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/logs/sky130hd/aes_cipher_top/base/6_report.json",
+          "kind": "report",
+          "expected_sha256": "8f88f51ecc3f57e4435c347d6f30ba7f25f4a68435fd1c656b19795e5d3abcb0",
+          "actual_sha256": "8f88f51ecc3f57e4435c347d6f30ba7f25f4a68435fd1c656b19795e5d3abcb0",
+          "verified": true,
+          "size_bytes": 2391
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/parameter_contract.json",
+          "kind": "parameter_contract",
+          "expected_sha256": "d701a9120c4f1a50d00ddcf5eddf52cd54d66dcde1a2b51cbd13d5496d8f3a93",
+          "actual_sha256": "d701a9120c4f1a50d00ddcf5eddf52cd54d66dcde1a2b51cbd13d5496d8f3a93",
+          "verified": true,
+          "size_bytes": 7145
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/plan.json",
+          "kind": "report",
+          "expected_sha256": "2820a7935d3985571abaa9c8f2b377262ec79d2b3b233116267bcd6d47f8800b",
+          "actual_sha256": "2820a7935d3985571abaa9c8f2b377262ec79d2b3b233116267bcd6d47f8800b",
+          "verified": true,
+          "size_bytes": 5363
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/reports/sky130hd/aes_cipher_top/base/6_finish.rpt",
+          "kind": "report",
+          "expected_sha256": "70781d42082a19c562ee8eabaec06736a8c3311d364198ec87c9f411dbcbe331",
+          "actual_sha256": "70781d42082a19c562ee8eabaec06736a8c3311d364198ec87c9f411dbcbe331",
+          "verified": true,
+          "size_bytes": 28233
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/reports/sky130hd/aes_cipher_top/base/synth_check.txt",
+          "kind": "report",
+          "expected_sha256": "9bdd6ee96bbf5498efb2baafc95827e95aa7172fda5fecf0405e06b519513bd1",
+          "actual_sha256": "9bdd6ee96bbf5498efb2baafc95827e95aa7172fda5fecf0405e06b519513bd1",
+          "verified": true,
+          "size_bytes": 124
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/reports/sky130hd/aes_cipher_top/base/synth_stat.txt",
+          "kind": "report",
+          "expected_sha256": "3e4bc3c3a10a0dca82fb97ff89e1c2aabcd01a467525d26889363ff3e490c912",
+          "actual_sha256": "3e4bc3c3a10a0dca82fb97ff89e1c2aabcd01a467525d26889363ff3e490c912",
+          "verified": true,
+          "size_bytes": 4621
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/1_synth.v",
+          "kind": "netlist",
+          "expected_sha256": "d5e6232e6f1c129af9fe7c8eca7fe442a67c08c2f5a250bfce87fc12ad1c8f2e",
+          "actual_sha256": "d5e6232e6f1c129af9fe7c8eca7fe442a67c08c2f5a250bfce87fc12ad1c8f2e",
+          "verified": true,
+          "size_bytes": 2232240
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/2_floorplan.odb",
+          "kind": "odb",
+          "expected_sha256": "270adfd536845aafc4345b0a7cad0383d51aeab404601a00c96239f893b9d3d3",
+          "actual_sha256": "270adfd536845aafc4345b0a7cad0383d51aeab404601a00c96239f893b9d3d3",
+          "verified": true,
+          "size_bytes": 11035260
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/3_place.odb",
+          "kind": "odb",
+          "expected_sha256": "5d1ea18a27c477234566644ba10c488d6769e9b36ed0c06b16c2ae1aa97ea441",
+          "actual_sha256": "5d1ea18a27c477234566644ba10c488d6769e9b36ed0c06b16c2ae1aa97ea441",
+          "verified": true,
+          "size_bytes": 11267117
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/4_cts.odb",
+          "kind": "odb",
+          "expected_sha256": "cf94141e9b9094d68eb4ce03970bda4f4803ad039e0ef97a8eee46df169cb88f",
+          "actual_sha256": "cf94141e9b9094d68eb4ce03970bda4f4803ad039e0ef97a8eee46df169cb88f",
+          "verified": true,
+          "size_bytes": 11420327
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/5_route.odb",
+          "kind": "odb",
+          "expected_sha256": "4446514f8497ff57db4f5ed82206b58a8316f822b88e2b4cc3b1277cec336c7a",
+          "actual_sha256": "4446514f8497ff57db4f5ed82206b58a8316f822b88e2b4cc3b1277cec336c7a",
+          "verified": true,
+          "size_bytes": 36995758
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/6_final.def",
+          "kind": "def",
+          "expected_sha256": "17e261461fe2aff1fd1bdf43dcce05e1c59e25b8c1b82dd45eeb935cb2f52985",
+          "actual_sha256": "17e261461fe2aff1fd1bdf43dcce05e1c59e25b8c1b82dd45eeb935cb2f52985",
+          "verified": true,
+          "size_bytes": 19622706
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/6_final.gds",
+          "kind": "gds",
+          "expected_sha256": "e0ffd93fc9597eb40cce81e831569a1fabd60bffbe2d3149123a6ca8af6df3b4",
+          "actual_sha256": "e0ffd93fc9597eb40cce81e831569a1fabd60bffbe2d3149123a6ca8af6df3b4",
+          "verified": true,
+          "size_bytes": 21501878
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/6_final.odb",
+          "kind": "odb",
+          "expected_sha256": "3ede12460a98314caae2f78fb0659ecc1b62b0933fad27ed3b5568563afabb47",
+          "actual_sha256": "3ede12460a98314caae2f78fb0659ecc1b62b0933fad27ed3b5568563afabb47",
+          "verified": true,
+          "size_bytes": 36995758
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/results/sky130hd/aes_cipher_top/base/6_final.v",
+          "kind": "netlist",
+          "expected_sha256": "abf55d79f1e456e09b37cf85071ea54802746478f1fc07caa5724956e12212e9",
+          "actual_sha256": "abf55d79f1e456e09b37cf85071ea54802746478f1fc07caa5724956e12212e9",
+          "verified": true,
+          "size_bytes": 3779899
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/run_result.json",
+          "kind": "run_result",
+          "expected_sha256": "68b2e28510de8277474b77baa55fdbad4b6d827906996ac75ce8f6d5f1d5a40d",
+          "actual_sha256": "68b2e28510de8277474b77baa55fdbad4b6d827906996ac75ce8f6d5f1d5a40d",
+          "verified": true,
+          "size_bytes": 6735
+        },
+        {
+          "path": "var/evidence/l1-managed-aes-reference-20260904-r5/state/work/4934a4baebe74ac0bb5943a37a24942a/553c3d63e63c4684a0ebb73f4680397a/attempt-1/orfs/implementation/toolchain_snapshot.json",
+          "kind": "toolchain_snapshot",
+          "expected_sha256": "b05d40248621fca0ed27ccf621d7c7456376d4c40feef7bd6884b24458e32aca",
+          "actual_sha256": "b05d40248621fca0ed27ccf621d7c7456376d4c40feef7bd6884b24458e32aca",
+          "verified": true,
+          "size_bytes": 7256
+        }
+      ]
+    },
+    {
+      "id": "E14",
+      "title": "Typed natural-language tool calls",
+      "path": "var/evidence/l1-codex-tool-call-20260904-r1/summary.json",
+      "sha256": "e0b2b89ea662e03632314b826fe13a2649b6f01437ec9a8c026492c5c781a5c6",
+      "matching_governance_docs": [
+        "docs/governance/SLICE_029_REAL_CODEX_L1_TOOL_CALL.md"
+      ],
+      "facts": {
+        "claim_boundary": "A real managed Codex invocation selected one typed read-only L1 tool, cited a hash-validated Runtime artifact, passed platform Policy, and received a tool receipt. It did not execute EDA, prove QoR improvement, or grant the model a shell/path/credential capability."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E15",
+      "title": "Native A2 initializer",
+      "path": "var/evidence/a2-orfo-native-initializer-20260905-r1/summary.json",
+      "sha256": "3dd98e03032091716a6e55eb8f584f5f86d393392140699339d2ab5f7c78e7e3",
+      "matching_governance_docs": [],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "runtime_succeeded": true,
+          "native_upstream_entrypoint": true,
+          "four_bootstrap_candidates": true,
+          "all_12_dimensions": true,
+          "variable_clock_retained": true,
+          "no_model_call_for_random_initializer": true,
+          "registered_candidate_hash_valid": true,
+          "source_lock_unchanged": true
+        },
+        "claim_boundary": "A native A2-ORFO 12-D bootstrap generation Runtime smoke. It generates initial candidates but does not execute ORFS or claim measured QoR. The durable controller executes each point before policy fitting."
+      },
+      "runs": [],
+      "checked_artifacts": []
+    },
+    {
+      "id": "E16",
+      "title": "Durable A2 controller",
+      "path": "var/evidence/a2-orfo-durable-controller-20260905-r1/summary.json",
+      "sha256": "f8e2a9952b45d7a522ea7e067cf6742335989b3c93b3415d50e13e87f9d94d20",
+      "matching_governance_docs": [],
+      "facts": {
+        "accepted": true,
+        "checks": {
+          "controller_completed": true,
+          "one_real_feedback_step": true,
+          "full_12d_preserved": true,
+          "real_policy_candidate_preserved": true,
+          "protected_feedback_preserved": true,
+          "real_next_candidate_preserved": true,
+          "policy_then_feedback_capability": true,
+          "candidate_delegated_to_orfs_agent": true,
+          "durable_restart_progress": true,
+          "source_runtime_unchanged": true,
+          "source_summary_unchanged": true
+        },
+        "claim_boundary": "A durable controller replay over the already executed real A2 policy -> ORFS -> protected evaluator -> A2 feedback loop. It validates restart and evidence consumption without rerunning EDA. The source single-loop smoke remains the execution proof; neither artifact is a full campaign or PPA claim."
+      },
+      "runs": [
+        {
+          "run_id": "e81649a20d2a4ad5aaf9879346abe4da",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "c4d1336a75554efaa2ea4f923449efb0",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "39037c84844e4f628089c3bfd0eb6923",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "f225bd9a24ad4698adaf63b6061568d1",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "87672ea3d0d44b2da16548bfd261999b",
+          "status": "succeeded"
+        },
+        {
+          "run_id": "335167f6f3bc4c15a03796e015bb7101",
+          "status": "succeeded"
+        }
+      ],
+      "checked_artifacts": []
+    }
+  ],
+  "code": [
+    {
+      "id": "C01",
+      "path": "packages/contracts/src/openroad_platform_contracts/platform.py",
+      "line": 85,
+      "anchor": "class TaskSpec",
+      "sha256": "972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f",
+      "line_count": 466
+    },
+    {
+      "id": "C02",
+      "path": "packages/contracts/src/openroad_platform_contracts/platform.py",
+      "line": 139,
+      "anchor": "class PluginManifest",
+      "sha256": "972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f",
+      "line_count": 466
+    },
+    {
+      "id": "C03",
+      "path": "packages/contracts/src/openroad_platform_contracts/platform.py",
+      "line": 195,
+      "anchor": "class PluginResult",
+      "sha256": "972b22107c6c81ff2c1fe334f1bf4781a8046944462d7af8a817426b60770d3f",
+      "line_count": 466
+    },
+    {
+      "id": "C04",
+      "path": "packages/contracts/src/openroad_platform_contracts/agent_control.py",
+      "line": 30,
+      "anchor": "class ToolName",
+      "sha256": "3f5912c1aee3ec25bdc2355198e4f18419580baa7314c4bafc2ff01d29f1ba0c",
+      "line_count": 359
+    },
+    {
+      "id": "C05",
+      "path": "packages/contracts/src/openroad_platform_contracts/product_surface.py",
+      "line": 77,
+      "anchor": "DEFAULT_PRODUCT_SURFACE =",
+      "sha256": "54105ca2038d4360876625d3e8e49476452cc20f703ed02b2ab77763e5d5b4e5",
+      "line_count": 84
+    },
+    {
+      "id": "C06",
+      "path": "packages/execution/src/openroad_platform_execution/adapter.py",
+      "line": 36,
+      "anchor": "class ProcessAdapter",
+      "sha256": "04ceda9775b9547945b15ade16d9d61be26e573c97dc4c8a412894666c930fa6",
+      "line_count": 290
+    },
+    {
+      "id": "C07",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/runtime.py",
+      "line": 22,
+      "anchor": "class WorkflowRuntime",
+      "sha256": "bd3093eeb61afabb64cd10e17f2c0bdaa9a78fc36952cb9eb60657f92173aa82",
+      "line_count": 390
+    },
+    {
+      "id": "C08",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/l1_tool_registry.py",
+      "line": 48,
+      "anchor": "class L1RuntimeToolRegistry",
+      "sha256": "779b044f793c9498794cc880e9a80d32ac5b1830ce21b8d60a8820285cbbcec7",
+      "line_count": 67
+    },
+    {
+      "id": "C09",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/l1_runtime_bridge.py",
+      "line": 28,
+      "anchor": "class L1RuntimeBridge",
+      "sha256": "5bf5d75ff4260d9cda641be1e7151df5dea1e497f42ce7141343889c0013cb67",
+      "line_count": 408
+    },
+    {
+      "id": "C10",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/a2_orfo_campaign.py",
+      "line": 27,
+      "anchor": "class A2ORFOCampaignService",
+      "sha256": "959639c96f58feedcd712a7c9ac69a16628eb474046017fc8204864b2286c9da",
+      "line_count": 478
+    },
+    {
+      "id": "C11",
+      "path": "integrations/a2_orfo/a2_orfo_adapter.py",
+      "line": 386,
+      "anchor": "workflow = upstream.OptimizationWorkflow",
+      "sha256": "8dad6fcf507830d87d12f2f643861d0baa2e225eaa9e1828b43e13e3b8f571c7",
+      "line_count": 488
+    },
+    {
+      "id": "C12",
+      "path": "packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py",
+      "line": 195,
+      "anchor": "def _headroom",
+      "sha256": "37d48a29b1fb5eff3c403adfd7a7fa379142da7ba42acf47e17edcebc67f09bf",
+      "line_count": 408
+    },
+    {
+      "id": "C13",
+      "path": "packages/analysis/src/openroad_platform_analysis/stage_diagnostics.py",
+      "line": 251,
+      "anchor": "def diagnose_runtime",
+      "sha256": "37d48a29b1fb5eff3c403adfd7a7fa379142da7ba42acf47e17edcebc67f09bf",
+      "line_count": 408
+    },
+    {
+      "id": "C14",
+      "path": "packages/analysis/src/openroad_platform_analysis/orfs_protected_evaluator.py",
+      "line": 84,
+      "anchor": "def _evaluate_full_candidate",
+      "sha256": "a147f41e88252707d5146a9e2d92e0404ea9eaa9409d9aba33c95965051be1b3",
+      "line_count": 214
+    },
+    {
+      "id": "C15",
+      "path": "apps/l1_workbench/service.py",
+      "line": 628,
+      "anchor": "request = OptimizationRequest(",
+      "sha256": "6d35be985aa378c398ec49f859fadd611c17ca3cc9dc018d15a6860befbfe358",
+      "line_count": 809
+    },
+    {
+      "id": "C16",
+      "path": "apps/web/index.html",
+      "line": 273,
+      "anchor": "唯一 BO/GP",
+      "sha256": "f4db7e27541ab6d8d1d3e7963dd0eda425f4855e6887a4dd7c3ae3c4a9a8625e",
+      "line_count": 287
+    },
+    {
+      "id": "C17",
+      "path": "CONTRIBUTING.md",
+      "line": 81,
+      "anchor": "项目当前缺少顶层 LICENSE",
+      "sha256": "e9c424a2bd9378d13c972aaeda63d41b5089b18446ad6550a6a7a59423d0b8a3",
+      "line_count": 82
+    },
+    {
+      "id": "C18",
+      "path": "LICENSE",
+      "line": 1,
+      "anchor": "MIT License",
+      "sha256": "166cbabec71b303acf93427f29db4517f04a29c44ab04a810203b6ba88e7e172",
+      "line_count": 21
+    },
+    {
+      "id": "C19",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/l1_control_state_machine.py",
+      "line": 33,
+      "anchor": "class ",
+      "sha256": "4aaad873d81dac307250c5fd52e43b269b3bca441d0c36420a8ba48f163e41b6",
+      "line_count": 336
+    },
+    {
+      "id": "C20",
+      "path": "packages/analysis/src/openroad_platform_analysis/convergence.py",
+      "line": 13,
+      "anchor": "def ",
+      "sha256": "aab73a2e345c248739ac3ae2cdc1894fa33ca007206f36608d0c1a0eccf6a4bf",
+      "line_count": 90
+    },
+    {
+      "id": "C21",
+      "path": "packages/analysis/src/openroad_platform_analysis/artifact_graph.py",
+      "line": 19,
+      "anchor": "def ",
+      "sha256": "56ed751d741391579015619861684a977f0d53a4f9fc69acdcb57a7e5c9af3ca",
+      "line_count": 245
+    },
+    {
+      "id": "C22",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/rtl_checkpoint_restore.py",
+      "line": 14,
+      "anchor": "def ",
+      "sha256": "8d56923fd2ed5e0cd09b0e7a5f13e2e379073099910e6a3d96ecdd1110cd9aca",
+      "line_count": 102
+    },
+    {
+      "id": "C23",
+      "path": "apps/l1_workbench/a2_campaign_worker.py",
+      "line": 43,
+      "anchor": "def ",
+      "sha256": "fd32f03ab3f959ec3352944ed8ee0c4c3606a1da218584257ecd43b932d039e4",
+      "line_count": 144
+    },
+    {
+      "id": "C24",
+      "path": "apps/l1_workbench/terminal_dashboard.py",
+      "line": 23,
+      "anchor": "def ",
+      "sha256": "bb35dad2365295194f0ab4c44d11ef5125b644776d1577a65ff9a85aee1160fb",
+      "line_count": 395
+    },
+    {
+      "id": "C25",
+      "path": "packages/scheduler/src/openroad_platform_scheduler/l1_model_boundary.py",
+      "line": 21,
+      "anchor": "class ",
+      "sha256": "5cc89f5388b6952c74f3a89255bb6f9958d2f2540fd1812e9c6f2962d4d15023",
+      "line_count": 137
+    },
+    {
+      "id": "C26",
+      "path": "packages/execution/src/openroad_platform_execution/rtlscout_native_driver.py",
+      "line": 21,
+      "anchor": "def ",
+      "sha256": "2c57e656e9fa564677f35343dc12b6ce8e3c72f8b3cbad42408b7c3a2ecd6926",
+      "line_count": 76
+    }
+  ],
+  "attachments": [
+    {
+      "name": "ASPDAC27-AgenticEDA-Tutorial-zhiangwang-submitted.pdf",
+      "path": "/share/home/yuanwenjie/.codex/attachments/de9c7ece-edf7-41fa-a00c-bd1c12daff47/ASPDAC27-AgenticEDA-Tutorial-zhiangwang-submitted.pdf",
+      "sha256": "6ce1f5f5f65dc5e2a1dcaa8c8d23ffd595031f7c7688bd0ded6ba106583e6e72"
+    },
+    {
+      "name": "平台状况总结.docx",
+      "path": "/share/home/yuanwenjie/.codex/attachments/200ebc64-f378-4d88-8b6d-d5eeac34ba9c/平台状况总结.docx",
+      "sha256": "aaabb649c4997334f5cbfdbcd8802df09ba1ce18774793ba2f39bfbbefb957d5"
+    }
+  ],
+  "contracts_forbidden_import_edges": []
+}

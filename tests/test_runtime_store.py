@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -166,3 +167,40 @@ def test_runtime_store_rejects_unversioned_runtime_tables(tmp_path):
     with pytest.raises(RuntimeError, match="unversioned database"):
         RuntimeStore(path)
     assert path.read_bytes() == before
+
+
+def test_parallel_runtime_writes_use_shared_filesystem_safe_journal(tmp_path):
+    path = tmp_path / "runtime.db"
+    store = RuntimeStore(path)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+
+    def submit(index: int) -> str:
+        spec = TaskSpec(
+            task_id=f"parallel-{index}", project_id="project-1",
+            design_id="design-1", plugin_id="echo", max_attempts=1,
+            timeout_seconds=30,
+        )
+        run, stage = store.submit_plugin_run(spec, plugin_version="1.0.0")
+        attempt = store.start_attempt(
+            stage.stage_run_id, worker_id=f"worker-{index}",
+            workspace=str(tmp_path / f"attempt-{index}"), lease_seconds=30,
+        )
+        store.finish_attempt(
+            attempt.attempt_id, RuntimeStatus.SUCCEEDED, exit_code=0)
+        return run.run_id
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        run_ids = list(pool.map(submit, range(64)))
+
+    assert len(set(run_ids)) == 64
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        assert connection.execute("SELECT COUNT(*) FROM runtime_runs").fetchone()[0] == 64
+        assert connection.execute("SELECT COUNT(*) FROM runtime_stage_runs").fetchone()[0] == 64
+        assert connection.execute("SELECT COUNT(*) FROM runtime_attempts").fetchone()[0] == 64
+        assert connection.execute(
+            "SELECT COUNT(*) FROM runtime_runs WHERE status = 'succeeded'"
+        ).fetchone()[0] == 64
+        assert connection.execute("SELECT COUNT(*) FROM runtime_events").fetchone()[0] == 320

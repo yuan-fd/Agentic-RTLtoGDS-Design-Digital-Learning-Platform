@@ -11,6 +11,10 @@
       "cache_path": ".external-src/rtlscout",
       "license": "BSD-3-Clause-Clear",
       "entrypoint": "run_benchmark.py",
+      "native_agent": "core.agent.RTLAgent/PythonReactBackend",
+      "managed_provider_adapter": "codex-cli:gpt-5.6-terra through LLMClient.chat_completion only",
+      "canonical_evidence": "var/evidence/rtlscout-native-spec-to-gds-20260905-r8/summary.json",
+      "execution_class": "admitted native SpecIR-to-RTL plugin after provider-only adapter, independent verification/mutation, Runtime ORFS/GDS and protected-evaluator acceptance; no general correctness or PPA superiority claim",
       "required_python": ">=3.10",
       "submodules": {
         "deps/spire-hdl": "448f3935bd78ac96edb1d941d1c18b82cc319963"
@@ -31,6 +35,42 @@
       "execution_class": "admitted thin Runtime plugin after pinned-source, native GP/EI, and bounded Runtime/protected-evaluator smoke; no performance superiority claim"
     },
     {
+      "plugin_id": "a2-orfo",
+      "repository": "https://github.com/CODA-Team/TaiWei-flow-Agent.git",
+      "branch_at_audit": "main",
+      "commit": "8b20a3c1f22934a39c7ba51ed0ec6dffe730da2d",
+      "tree": "b3906db597359f5786e6cfc69f308479e26f5800",
+      "execution_checkout": "var/external-sources/a2-orfo-8b20a3c-clean",
+      "license": "BSD-3-Clause",
+      "entrypoint": "optimize.py:OptimizationWorkflow.run_iteration",
+      "embedding_model": {
+        "repository": "https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1",
+        "commit": "b33106f585b9ce46904ad7443a3b52b7a63e231c",
+        "license": "Apache-2.0"
+      },
+      "execution_class": "admitted bounded policy plugin after native RAG/ReAct/supervisor and real Runtime/protected-evaluator feedback smoke; native shell/SSH launchers denied; no campaign or PPA superiority claim"
+    },
+    {
+      "plugin_id": "orassistant",
+      "repository": "https://github.com/The-OpenROAD-Project/ORAssistant.git",
+      "branch_at_audit": "master",
+      "commit": "a5df2dfe54869fd929d966a4ce335b9d0892f676",
+      "tree": "9981a08b1166c82b32cd086d343dbe4a1347f84f",
+      "execution_checkout": "var/external-sources/orassistant-a5df2dfe-clean",
+      "license": "GPL-3.0-only",
+      "license_status": "Yellow: isolated execution admitted; no upstream source vendored or linked into platform core",
+      "entrypoint": "backend/src/chains/bm25_retriever_chain.py:BM25RetrieverChain",
+      "capability": "knowledge.openroad.retrieve",
+      "corpus": {
+        "repository": "https://github.com/The-OpenROAD-Project/OpenROAD.git",
+        "commit": "63ed2e0fe5992099b7d528177bbb7a4df9523907",
+        "tree": "e32e44b5594f05dbb57f37cd81c032998ad1aa2c",
+        "license": "BSD-3-Clause"
+      },
+      "canonical_evidence": "var/evidence/orassistant-platform-20260905-r3/summary.json",
+      "execution_class": "admitted read-only native preprocessing/BM25 retrieval plugin with artifact-backed citations; MCP, database, remote serialized indexes, cloud providers and EDA execution denied; no broad RAG-quality or diagnosis claim"
+    },
+    {
       "plugin_id": "statetune",
       "repository": "https://github.com/C-YuLong/stateTune.git",
       "branch_at_audit": "main",
@@ -48,6 +88,7 @@
       "cache_path": ".external-src/agenticpd",
       "license": null,
       "license_status": "not_declared_in_repository",
+      "execution_class": "source-audit-only; executable manifest denied until reviewed license or permission",
       "entrypoints": [
         "main.py",
         "multi_agent_gwtw.py"

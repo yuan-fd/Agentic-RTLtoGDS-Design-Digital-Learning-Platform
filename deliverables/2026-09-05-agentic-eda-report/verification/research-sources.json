@@ -1,0 +1,145 @@
+[
+  {
+    "id": "R01",
+    "name": "ChatEDA",
+    "url": "https://arxiv.org/abs/2308.10204",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2308.10204",
+    "title": "[2308.10204] ChatEDA: A Large Language Model Powered Autonomous Agent for EDA",
+    "metadata": {
+      "citation_doi": "10.1109/TCAD.2024.3383347",
+      "citation_date": "2023/08/20",
+      "citation_online_date": "2024/09/21",
+      "citation_arxiv_id": "2308.10204"
+    },
+    "sha256": "ad5c659f5c0a0888bc6eb5d0c183be501d05440e82ea3cc7a3b80d3574da0488",
+    "name_mentioned": true
+  },
+  {
+    "id": "R02",
+    "name": "EDAid",
+    "url": "https://aclanthology.org/2025.naacl-long.83/",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://aclanthology.org/2025.naacl-long.83/",
+    "title": "Divergent Thoughts toward One Goal: LLM-based Multi-Agent Collaboration System for Electronic Design Automation - ACL Anthology",
+    "metadata": {
+      "citation_doi": "10.18653/v1/2025.naacl-long.83"
+    },
+    "sha256": "21fdf9eecb3db25e4b366972f4977f9fc06885596a664e0516483668a65fe399",
+    "name_mentioned": true
+  },
+  {
+    "id": "R03",
+    "name": "RTLScout",
+    "url": "https://github.com/huawei-csl/RTLScout",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://github.com/huawei-csl/RTLScout",
+    "title": "GitHub - huawei-csl/rtlscout: RTLScout is a agentic RTL optimization framework · GitHub",
+    "metadata": {},
+    "sha256": "d05a2aa26e44a9b69d8a3adf6bd5d9ea459490cca5ecd5b9084300bba23a9e32",
+    "name_mentioned": true
+  },
+  {
+    "id": "R04",
+    "name": "A2-ORFO",
+    "url": "https://github.com/CODA-Team/TaiWei-flow-Agent",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://github.com/CODA-Team/TaiWei-flow-Agent",
+    "title": "GitHub - CODA-Team/TaiWei-flow-Agent · GitHub",
+    "metadata": {},
+    "sha256": "c6c5cfc830d33f63c9366f89c1ef10625ea55ecfa83c3ed8115850b5226cca56",
+    "name_mentioned": true
+  },
+  {
+    "id": "R05",
+    "name": "ResizerAgent",
+    "url": "https://github.com/ASU-VDA-Lab/ResizerAgent",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://github.com/ASU-VDA-Lab/ResizerAgent",
+    "title": "GitHub - ASU-VDA-Lab/ResizerAgent · GitHub",
+    "metadata": {},
+    "sha256": "21b04ef6fe1f145b7f2b2ff3ec0a76ce46ad2b36b3591b935e556c4663e8d86d",
+    "name_mentioned": true
+  },
+  {
+    "id": "R06",
+    "name": "GoalEvolve",
+    "url": "https://arxiv.org/abs/2608.16733",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2608.16733",
+    "title": "[2608.16733] GoalEvolve: From Handcrafted Algorithm Priors to Goal-Driven Evolution of Physical Design Algorithms",
+    "metadata": {
+      "citation_date": "2026/08/17",
+      "citation_online_date": "2026/08/17",
+      "citation_arxiv_id": "2608.16733"
+    },
+    "sha256": "1e538a6364ba08e9eac599367ef5b4dc2f524386a305cc30b7dd0b4d46620c56",
+    "name_mentioned": true
+  },
+  {
+    "id": "R07",
+    "name": "CLOSER-Bench",
+    "url": "https://arxiv.org/abs/2607.16632",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2607.16632",
+    "title": "[2607.16632] CLOSER-Bench: Evaluating Budgeted Cross-Stage Design Closure for Hardware Agents",
+    "metadata": {
+      "citation_date": "2026/07/18",
+      "citation_online_date": "2026/07/18",
+      "citation_arxiv_id": "2607.16632"
+    },
+    "sha256": "65d2602fdd5b32e8ba6fa60d23a1ae1dfa261903622f11424def4196dcd77d8b",
+    "name_mentioned": true
+  },
+  {
+    "id": "R08",
+    "name": "PostEDA-Bench",
+    "url": "https://arxiv.org/abs/2605.06936",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2605.06936",
+    "title": "[2605.06936] Bridging the Last Mile of Circuit Design: PostEDA-Bench, a Hierarchical Benchmark for PPA Convergence and DRC Fixing",
+    "metadata": {
+      "citation_date": "2026/05/07",
+      "citation_online_date": "2026/07/21",
+      "citation_arxiv_id": "2605.06936"
+    },
+    "sha256": "73852cc757341c0ef3d54bf95a4c6448d7fcd0eb93fc1590d6d8fd7b2a945ad1",
+    "name_mentioned": true
+  },
+  {
+    "id": "R09",
+    "name": "ORAssistant",
+    "url": "https://arxiv.org/abs/2410.03845",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://arxiv.org/abs/2410.03845",
+    "title": "[2410.03845] ORAssistant: A Custom RAG-based Conversational Assistant for OpenROAD",
+    "metadata": {
+      "citation_date": "2024/10/04",
+      "citation_online_date": "2024/11/30",
+      "citation_arxiv_id": "2410.03845"
+    },
+    "sha256": "fb3258d7b4aac1b00ab2c763a379cac06d61362c1b11242d38089be80bd92488",
+    "name_mentioned": true
+  },
+  {
+    "id": "R10",
+    "name": "OpenROAD Resizer",
+    "url": "https://openroad.readthedocs.io/en/latest/main/src/rsz/README.html",
+    "retrieved_at": "2026-09-05",
+    "status": 200,
+    "final_url": "https://openroad.readthedocs.io/en/latest/main/src/rsz/README.html",
+    "title": "Gate Resizer — OpenROAD  documentation",
+    "metadata": {},
+    "sha256": "017ff06a711e3c88b6464a317032749eb891f2f01417415ed22b706f9ba980ac",
+    "name_mentioned": false
+  }
+]

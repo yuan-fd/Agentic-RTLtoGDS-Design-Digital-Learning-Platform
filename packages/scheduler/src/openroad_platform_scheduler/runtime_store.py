@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -66,6 +67,12 @@ class RuntimeStore:
     def __init__(self, path: str | Path):
         self.path = Path(path).expanduser().resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # A RuntimeStore is shared by the worker's execution pool.  SQLite
+        # connections are intentionally short lived, but the state machine's
+        # write transactions must still be serialized within one authority.
+        # EDA processes remain parallel; only the small persistence commits
+        # pass through this lock.
+        self._write_lock = threading.RLock()
         self._initialize()
 
     def submit_plugin_run(
@@ -712,7 +719,13 @@ class RuntimeStore:
                     "Unsupported runtime schema version "
                     f"{version['value']!r}; expected {RUNTIME_SCHEMA_VERSION}"
                 )
-            connection.execute("PRAGMA journal_mode = WAL")
+            # The platform state root may live on a shared filesystem (for
+            # example GlusterFS).  SQLite explicitly does not support WAL on
+            # network filesystems because the shared-memory coordination is
+            # host-local.  A rollback journal preserves cross-process reader
+            # safety, while _write_lock serializes this Runtime authority's
+            # thread-pool writers.
+            connection.execute("PRAGMA journal_mode = DELETE")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS runtime_runs (
@@ -802,11 +815,13 @@ class RuntimeStore:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 30000")
         connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA synchronous = FULL")
         return connection
 
     def _transaction(self):
-        return _Transaction(self._connect())
+        return _Transaction(self._connect(), self._write_lock)
 
     @staticmethod
     def _event(
@@ -865,19 +880,29 @@ class RuntimeStore:
 
 
 class _Transaction:
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(self, connection: sqlite3.Connection, lock: threading.RLock):
         self.connection = connection
+        self.lock = lock
 
     def __enter__(self) -> sqlite3.Connection:
-        self.connection.execute("BEGIN IMMEDIATE")
+        self.lock.acquire()
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+        except BaseException:
+            self.connection.close()
+            self.lock.release()
+            raise
         return self.connection
 
     def __exit__(self, exc_type, exc, traceback) -> None:
-        if exc_type is None:
-            self.connection.commit()
-        else:
-            self.connection.rollback()
-        self.connection.close()
+        try:
+            if exc_type is None:
+                self.connection.commit()
+            else:
+                self.connection.rollback()
+        finally:
+            self.connection.close()
+            self.lock.release()
 
 
 def _utc(value: datetime | None = None) -> datetime:

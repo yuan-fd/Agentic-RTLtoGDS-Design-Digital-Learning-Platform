@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "project": "PostEDA-Bench",
+  "canonical_upstream": "https://github.com/pengjas/posteda-bench.git",
+  "repository_owner": "pengjas",
+  "required_commit": "51884e5f20e6e199219cec87c1c779a3dfab95bc",
+  "required_tree": "c5ccdf6e7165bcc9749e10dacd023bfe5cde20a4",
+  "commit_timestamp": "2026-07-28T00:12:49Z",
+  "default_branch_at_review": "main",
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "path": "LICENSE",
+    "git_blob": "fb435055a6adda574ffc2b9ab20c72d20b009b23",
+    "sha256": "ef11c38a4df050ec831b0186a6d73fe72e2dadcfe0ea7563394596b8e75a1526",
+    "decision": "Green-with-attribution"
+  },
+  "locked_files": {
+    "README.md": "6b1f9780d3530f70116150eb783e233e2fd44f40743c865decd5bf3594cbba0d",
+    "requirements.txt": "b525500bd3bd138f7ee7159cbfefddf7a21d770ebd5c38b815998dbb6604d674",
+    "eval/eval_drc_sr.sh": "76c2c1413769720fc30a14da913c3f66f81ac93be8a7fa6afc45ad0e2d9076b0",
+    "eval/eval_ppa_sr.sh": "c037dc0483557dc68ec1aa0fcce4c74e0acb3920571ff9c24b62303a76222a86",
+    "eval/ppa_metric_collection.py": "ccd8eae38d022c430f4e4d3f1732a84db15b371ca74c0e61643fbfa26767edce"
+  },
+  "native_entrypoints": [
+    "eval/eval_drc_sr.sh",
+    "eval/eval_ppa_sr.sh",
+    "eval/ppa_metric_collection.py",
+    "eval/equiv/check_equiv.sh"
+  ],
+  "task_counts": {"drc": 70, "ppa": 75, "total": 145},
+  "admission": "bounded-one-drc-diagnostic-task"
+}

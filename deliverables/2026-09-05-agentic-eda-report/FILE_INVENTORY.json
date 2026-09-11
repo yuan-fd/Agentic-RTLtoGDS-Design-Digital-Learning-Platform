@@ -1,0 +1,225 @@
+{
+  "boundary": "All files are new, within the dated documentation deliverable; no existing platform file edited.",
+  "files": [
+    {
+      "path": "01-proposal.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "02-architecture.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "03-intelligence.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "04-audit-roadmap.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "05-contributors.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "06-workshop.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "07-evidence.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "DOCUMENTATION_SLICE.md",
+      "kind": "documentation_manifest",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "FILES.sha256",
+      "kind": "documentation_manifest",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "FILE_INVENTORY.json",
+      "kind": "documentation_manifest",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "README.md",
+      "kind": "documentation_manifest",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "index.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/audit_sources.py",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/build_report.py",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/01-proposal.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/02-architecture.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/03-intelligence.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/04-audit-roadmap.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/05-contributors.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/06-workshop.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/07-evidence.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/chapters/index.html",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/style.css",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "source/validate_report.py",
+      "kind": "documentation_authoring_source",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/browser-architecture.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/browser-check.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/browser-complete.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/browser-desktop.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/browser-mobile.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/delivery-check.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/desktop-architecture.png",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/desktop-home.png",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/focused-tests.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/html-validation.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/mobile-complete.png",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/mobile-home.png",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/research-sources.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/source-audit.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/source-audit.log",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "verification/worktree-before.json",
+      "kind": "verification_record",
+      "included_in_share_archive": false
+    },
+    {
+      "path": "verification/worktree-check.json",
+      "kind": "verification_record",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "完整报告.html",
+      "kind": "reader_html",
+      "included_in_share_archive": true
+    },
+    {
+      "path": "教学汇报交付包.zip",
+      "kind": "delivery_archive",
+      "included_in_share_archive": false
+    },
+    {
+      "path": "教学汇报交付包.zip.sha256",
+      "kind": "delivery_archive",
+      "included_in_share_archive": false
+    }
+  ]
+}

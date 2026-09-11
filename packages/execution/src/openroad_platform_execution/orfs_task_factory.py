@@ -15,7 +15,9 @@ _BUILD_OPTION_KEYS = frozenset({
     "clock", "platform_name", "target_stage", "clock_period_ns",
     "core_utilization_pct", "place_density", "or_seed",
     "minimum_die_size_um", "stage_timeout_seconds", "timeout_seconds",
-    "max_attempts",
+    "max_attempts", "flow_parameters", "rtl_files", "rtl_root",
+    "rtl_include_dirs", "synth_hdl_frontend", "design_options", "sdc_path",
+    "fast_route_tcl_path",
 })
 _SCALAR_PARAMETER_KEYS = frozenset({
     "core_utilization_pct", "place_density", "minimum_die_size_um",

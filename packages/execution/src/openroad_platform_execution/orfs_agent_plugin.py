@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 import itertools
+import hashlib
 import os
 import platform
 import random
 import shutil
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -25,11 +27,34 @@ from .orfs_parameters import ORFS_PARAMETER_BY_NAME, validate_orfs_parameters
 ORFS_AGENT_PLUGIN_ID = "orfs-agent"
 ORFS_AGENT_PLUGIN_VERSION = "2025.1"
 ORFS_AGENT_UPSTREAM_COMMIT = "730f1fa11f9c17c0aaac332412af2b2538f42e9b"
+ORFS_AGENT_PAPER_ORFS_COMMIT = "ce8d36a7fef0ab9c47d183bcf078bce0f60f5a54"
 ORFS_AGENT_SHARED_PARAMETER_NAMES = (
     "core_utilization_pct", "tns_end_percent", "global_placement_padding",
     "detail_placement_padding", "enable_dpo", "place_density_lb_addon",
     "cts_cluster_size", "cts_cluster_diameter",
 )
+
+
+def _validate_execution_source(source: Path, lock: Mapping[str, Any]) -> None:
+    """Fail at composition time when a source-audit cache is used as code."""
+    cache = (Path(__file__).resolve().parents[4] / str(lock["cache_path"])).resolve()
+    if source == cache:
+        raise ValueError("ORFS-Agent source-audit cache is not an executable checkout")
+    if not source.is_dir():
+        raise FileNotFoundError(f"ORFS-Agent source is missing: {source}")
+    git = ("git", "-C", str(source))
+    actual = subprocess.check_output((*git, "rev-parse", "HEAD"), text=True).strip()
+    if actual != lock.get("commit"):
+        raise ValueError("ORFS-Agent execution checkout does not match the source lock")
+    if subprocess.run((*git, "symbolic-ref", "-q", "HEAD"), stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL, check=False).returncode == 0:
+        raise ValueError("ORFS-Agent execution checkout must be detached")
+    if subprocess.check_output((*git, "status", "--porcelain", "--untracked-files=all"), text=True):
+        raise ValueError("ORFS-Agent execution checkout must be clean, including untracked files")
+    license_path = source / "LICENSE"
+    if (not license_path.is_file()
+            or "BSD 3-Clause License" not in license_path.read_text(encoding="utf-8")):
+        raise ValueError("ORFS-Agent BSD-3-Clause execution license check failed")
 
 
 def _managed_codex_executable() -> str | None:
@@ -62,6 +87,146 @@ def _managed_codex_executable() -> str | None:
         if resolved.is_file() and os.access(resolved, os.X_OK):
             return str(launcher)
     return None
+
+
+def _validate_paper_execution_source(source: Path) -> None:
+    if not (source / "flow/Makefile").is_file():
+        raise FileNotFoundError("paper ORFS flow is missing")
+    git = ("git", "-C", str(source))
+    actual = subprocess.check_output((*git, "rev-parse", "HEAD"), text=True).strip()
+    if actual != ORFS_AGENT_PAPER_ORFS_COMMIT:
+        raise ValueError("paper ORFS checkout does not match the admitted commit")
+    if subprocess.run((*git, "symbolic-ref", "-q", "HEAD"), stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL, check=False).returncode == 0:
+        raise ValueError("paper ORFS execution checkout must be detached")
+    if subprocess.check_output((*git, "status", "--porcelain", "--untracked-files=all"), text=True):
+        raise ValueError("paper ORFS execution checkout must be clean, including submodule state")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _tree_sha256(root: Path, *, ignored_names: frozenset[str] = frozenset()) -> str:
+    if not root.is_dir():
+        raise FileNotFoundError(f"tool data directory is missing: {root}")
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if relative.parts and relative.parts[0] in ignored_names:
+            continue
+        if path.is_symlink():
+            digest.update(f"L\0{relative}\0{os.readlink(path)}\n".encode())
+        elif path.is_file():
+            digest.update(f"F\0{relative}\0{path.stat().st_size}\0".encode())
+            digest.update(_file_sha256(path).encode())
+            digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _receipt_sha256(value: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(
+        dict(value), sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+
+
+def _git_object(root: Path, relative: str) -> str:
+    return subprocess.check_output(
+        ("git", "-C", str(root), "rev-parse", f"HEAD:{relative}"), text=True,
+    ).strip()
+
+
+def _paper_receipts(
+    *, source: Path, paper_root: Path, openroad: Path, yosys: Path,
+    runtime_environment: Mapping[str, str],
+) -> dict[str, Any]:
+    yosys_share = yosys.parent.parent / "share"
+    yosys_datdir = yosys_share / "yosys"
+    if not yosys_datdir.is_dir() or yosys_datdir.resolve() != yosys_share.resolve():
+        raise ValueError("Yosys compiled datdir share/yosys does not resolve to installed data")
+    toolchain = {
+        "schema_version": 1, "kind": "orfs-agent-paper-toolchain",
+        "orfs_agent_commit": ORFS_AGENT_UPSTREAM_COMMIT,
+        "paper_orfs_commit": ORFS_AGENT_PAPER_ORFS_COMMIT,
+        "openroad_sha256": _file_sha256(openroad),
+        "yosys_sha256": _file_sha256(yosys),
+        "yosys_datdir_sha256": _tree_sha256(
+            yosys_share, ignored_names=frozenset({"yosys"})),
+        "yosys_datdir_layout": "share/yosys resolves to installed share root",
+        "runtime_environment": dict(sorted(runtime_environment.items())),
+        "architecture": platform.machine(),
+    }
+    configs = source / "AutoTuner-integration/AutoTuner/autotune_configs"
+    sdc_names = {"aes": "aes_cipher_top.sdc", "ibex": "ibex_core.sdc",
+                 "jpeg": "jpeg_encoder.sdc"}
+    inputs: dict[str, Any] = {}
+    for design in ("aes", "ibex", "jpeg"):
+        design_tree = _git_object(paper_root, f"flow/designs/src/{design}")
+        for platform_name in ("asap7", "sky130hd"):
+            design_receipt = {
+                "schema_version": 1, "kind": "orfs-agent-paper-design-bundle",
+                "design": design, "platform": platform_name,
+                "paper_orfs_commit": ORFS_AGENT_PAPER_ORFS_COMMIT,
+                "paper_design_tree_git_oid": design_tree,
+                "autotuner_config_sha256": _file_sha256(configs / f"{design}_{platform_name}.mk"),
+                "autotuner_sdc_sha256": _file_sha256(configs / sdc_names[design]),
+                "autotuner_fastroute_sha256": _file_sha256(configs / f"fastroute_{platform_name}.tcl"),
+            }
+            pdk_receipt = {
+                "schema_version": 1, "kind": "orfs-agent-paper-pdk-bundle",
+                "platform": platform_name,
+                "paper_orfs_commit": ORFS_AGENT_PAPER_ORFS_COMMIT,
+                "paper_platform_tree_git_oid": _git_object(
+                    paper_root, f"flow/platforms/{platform_name}"),
+            }
+            inputs[f"{platform_name}/{design}"] = {
+                "design": design_receipt,
+                "design_bundle_sha256": _receipt_sha256(design_receipt),
+                "pdk": pdk_receipt,
+                "pdk_bundle_sha256": _receipt_sha256(pdk_receipt),
+            }
+    return {"toolchain": toolchain,
+            "toolchain_receipt_sha256": _receipt_sha256(toolchain),
+            "inputs": inputs}
+
+
+def orfs_agent_full_protocol_receipts(
+    *, source_root: str | Path, paper_orfs_root: str | Path,
+    openroad_bin: str | Path, yosys_bin: str | Path,
+    design: str, platform_name: str,
+    paper_runtime_environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Return hash-bound protocol identities for one admitted full campaign."""
+    source = Path(source_root).expanduser().resolve()
+    paper_root = Path(paper_orfs_root).expanduser().resolve()
+    openroad = Path(openroad_bin).expanduser().resolve()
+    yosys = Path(yosys_bin).expanduser().resolve()
+    lock_path = Path(__file__).resolve().parents[4] / "integrations/orfs_agent/source.lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    _validate_execution_source(source, lock)
+    _validate_paper_execution_source(paper_root)
+    for executable in (openroad, yosys):
+        if not executable.is_file() or not os.access(executable, os.X_OK):
+            raise FileNotFoundError(f"paper tool executable is missing: {executable}")
+    runtime_environment = dict(paper_runtime_environment or {})
+    if any(key not in {"LD_LIBRARY_PATH", "LIBRARY_PATH", "TCLLIBPATH"}
+           or not isinstance(value, str) for key, value in runtime_environment.items()):
+        raise ValueError("paper runtime environment contains an unsupported entry")
+    receipts = _paper_receipts(
+        source=source, paper_root=paper_root, openroad=openroad, yosys=yosys,
+        runtime_environment=runtime_environment,
+    )
+    try:
+        selected = receipts["inputs"][f"{platform_name}/{design}"]
+    except KeyError as exc:
+        raise ValueError("unsupported full ORFS-Agent design/platform") from exc
+    return {**selected,
+            "toolchain": receipts["toolchain"],
+            "toolchain_receipt_sha256": receipts["toolchain_receipt_sha256"]}
 
 
 def build_orfs_agent_initial_warmup_recipes(
@@ -286,6 +451,10 @@ def build_orfs_agent_native_task(
 def orfs_agent_plugin_manifest(
     source_root: str | Path, *, python_executable: str | Path = sys.executable,
     default_timeout_seconds: int = 1800,
+    paper_orfs_root: str | Path | None = None,
+    openroad_bin: str | Path | None = None,
+    yosys_bin: str | Path | None = None,
+    paper_runtime_environment: Mapping[str, str] | None = None,
 ) -> PluginManifest:
     source = Path(source_root).expanduser().resolve()
     python = Path(python_executable).expanduser().absolute()
@@ -297,11 +466,42 @@ def orfs_agent_plugin_manifest(
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
     if lock.get("commit") != ORFS_AGENT_UPSTREAM_COMMIT:
         raise ValueError("ORFS-Agent source lock does not match the admitted upstream commit")
+    _validate_execution_source(source, lock)
     adapter = Path(__file__).resolve().parents[4] / "integrations/orfs_agent/orfs_agent_adapter.py"
     environment = {"ORFS_AGENT_SOURCE": str(source),
                    "ORFS_AGENT_EXPECTED_COMMIT": ORFS_AGENT_UPSTREAM_COMMIT,
                    "PYTHONDONTWRITEBYTECODE": "1",
                    "PATH": f"{python.parent}:/usr/bin:/bin"}
+    paper_values = (paper_orfs_root, openroad_bin, yosys_bin)
+    if any(value is not None for value in paper_values):
+        if not all(value is not None for value in paper_values):
+            raise ValueError("paper ORFS root, OpenROAD, and Yosys must be configured together")
+        paper_root = Path(str(paper_orfs_root)).expanduser().resolve()
+        openroad = Path(str(openroad_bin)).expanduser().resolve()
+        yosys = Path(str(yosys_bin)).expanduser().resolve()
+        _validate_paper_execution_source(paper_root)
+        for name, executable in (("OpenROAD", openroad), ("Yosys", yosys)):
+            if not executable.is_file() or not os.access(executable, os.X_OK):
+                raise FileNotFoundError(f"paper {name} executable is missing: {executable}")
+        environment.update({
+            "ORFS_AGENT_PAPER_ORFS_ROOT": str(paper_root),
+            "ORFS_AGENT_PAPER_ORFS_COMMIT": ORFS_AGENT_PAPER_ORFS_COMMIT,
+            "OPENROAD_BIN": str(openroad), "YOSYS_BIN": str(yosys),
+            "PATH": f"{openroad.parent}:{yosys.parent}:{python.parent}:/usr/bin:/bin",
+        })
+        for key, value in dict(paper_runtime_environment or {}).items():
+            if key not in {"LD_LIBRARY_PATH", "LIBRARY_PATH", "TCLLIBPATH"} or not isinstance(value, str):
+                raise ValueError(f"unsupported paper toolchain environment: {key}")
+            environment[key] = value
+        receipts = _paper_receipts(
+            source=source, paper_root=paper_root, openroad=openroad, yosys=yosys,
+            runtime_environment=dict(paper_runtime_environment or {}),
+        )
+        environment["ORFS_AGENT_PAPER_RECEIPTS_JSON"] = json.dumps(
+            receipts, sort_keys=True, separators=(",", ":"),
+        )
+    elif paper_runtime_environment:
+        raise ValueError("paper runtime environment requires the complete paper toolchain")
     codex = _managed_codex_executable()
     if codex:
         environment["ORFS_AGENT_CODEX_EXECUTABLE"] = codex
@@ -309,22 +509,36 @@ def orfs_agent_plugin_manifest(
         # than relying on an interactive shell profile in an adapter process.
         node = shutil.which("node")
         if node:
-            environment["PATH"] = f"{Path(node).parent}:{python.parent}:/usr/bin:/bin"
+            environment["PATH"] = f"{Path(node).parent}:{environment['PATH']}"
+    capabilities = ["optimizer.l2.propose", "optimizer.l2.dataset-bridge",
+                    "optimizer.l2.upstream-full-12d"]
+    if all(value is not None for value in paper_values):
+        capabilities.append("optimizer.l2.upstream-full-candidate")
     manifest = PluginManifest(
         plugin_id=ORFS_AGENT_PLUGIN_ID, plugin_version=ORFS_AGENT_PLUGIN_VERSION,
         adapter_entry=(str(python), str(adapter)),
-        capabilities=("optimizer.l2.propose", "optimizer.l2.dataset-bridge"),
+        capabilities=tuple(capabilities),
         supported_arch=(platform.machine(),),
-        input_schema={"type": "object", "required": ["mode", "design", "platform", "objective", "observations"]},
+        input_schema={"type": "object", "required": ["mode", "design", "platform", "parameter_domain"]},
         output_schema={"type": "object", "required": ["status", "artifacts", "provenance"]},
-        required_tools=("git", "python3"), default_timeout_seconds=default_timeout_seconds,
+        required_tools=(("git", "python3", "make", "openroad", "yosys")
+                        if all(value is not None for value in paper_values)
+                        else ("git", "python3")),
         artifact_rules=(
-            {"kind": "optimizer_dataset", "required": True},
-            {"kind": "optimizer_input_manifest", "required": True},
-            {"kind": "upstream_source_lock", "required": True},
+            # Required kinds are mode-specific and therefore live on TaskSpec.
+            # A manifest-wide requirement would force the full-policy mode to
+            # fabricate a dataset-bridge manifest (or vice versa).
+            {"kind": "optimizer_dataset", "required": False},
+            {"kind": "optimizer_input_manifest", "required": False},
+            {"kind": "upstream_source_lock", "required": False},
             {"kind": "optimizer_candidates", "required": False},
             {"kind": "optimizer_trace", "required": False},
+            {"kind": "runtime_protocol_receipt", "required": False},
+            {"kind": "mapped_orfs_config", "required": False},
             {"kind": "report", "required": False}, {"kind": "log", "required": False},
+            {"kind": "odb", "required": False}, {"kind": "def", "required": False},
+            {"kind": "netlist", "required": False}, {"kind": "sdc", "required": False},
+            {"kind": "spef", "required": False},
         ),
         environment=environment,
     )

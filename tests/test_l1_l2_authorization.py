@@ -14,6 +14,7 @@ from openroad_platform_scheduler.l1_trace_service import L1TraceService
 from openroad_platform_scheduler.l1_trace_store import L1TraceStore
 from openroad_platform_scheduler.l2_handoff import OptimizationHandoffService
 from openroad_platform_scheduler.l2_handoff_store import L2HandoffStore
+from openroad_platform_scheduler.pipeline_checkpoint import PipelineCheckpointStore
 
 
 def _goal():
@@ -32,12 +33,12 @@ def _observe(trace, before, state_id, run):
 
 
 def _manifest():
-    return PluginManifest("orfs-agent", "2025.1", ("adapter",), ("optimizer.l2.propose",), ("x86_64",),
+    return PluginManifest("a2-orfo", "2026.06.23", ("adapter",), ("optimizer.l2.a2-orfo-feedback",), ("x86_64",),
         {"type": "object"}, {"type": "object"}, (), 60)
 
 
 def _request(state):
-    return OptimizationRequest("request-1", "trace-1", "goal-1", state.state_id, "orfs-agent", "optimizer.l2.propose",
+    return OptimizationRequest("request-1", "trace-1", "goal-1", state.state_id, "a2-orfo", "optimizer.l2.a2-orfo-feedback",
         "maximize setup WNS", EvidencePointer("artifact:protocol", "c" * 64),
         EvidencePointer("artifact:domain", "d" * 64), "fixed-seed-v1", AgentBudget(2, 1, 60))
 
@@ -68,6 +69,31 @@ def test_only_explicit_escalation_with_two_runtime_facts_can_authorize(tmp_path)
     assert one_shot.submit_authorized(runtime,_request(candidate),goal,candidate,auth,_manifest()).run_id == "run-l2"
     assert one_shot.submit_authorized(runtime,_request(candidate),goal,candidate,auth,_manifest()).run_id == "run-l2"
     assert runtime.count == 1
+
+    # A claimant may die before binding. The deterministic controller subject
+    # recovers that gap and repeated calls return the same durable pipeline.
+    controller_store = L2HandoffStore(tmp_path / "controller-handoff.sqlite")
+    assert controller_store.claim_target(auth.authorization_id) is None
+    checkpoints = PipelineCheckpointStore(tmp_path / "controllers.sqlite")
+    controller_handoff = OptimizationHandoffService(
+        DEFAULT_PRODUCT_SURFACE, None, trace_store=trace.store,
+        consumption_store=controller_store,
+    )
+    first = controller_handoff.create_authorized_controller(
+        checkpoints, _request(candidate), goal, candidate, auth, _manifest(),
+        pipeline_kind="a2-orfo-campaign-v1",
+        initial_state={"status": "authorized", "request": _request(candidate).to_dict(),
+                       "authorization": auth.to_dict()},
+    )
+    second = controller_handoff.create_authorized_controller(
+        checkpoints, _request(candidate), goal, candidate, auth, _manifest(),
+        pipeline_kind="a2-orfo-campaign-v1",
+        initial_state={"status": "authorized", "request": _request(candidate).to_dict(),
+                       "authorization": auth.to_dict()},
+    )
+    assert first["pipeline_id"] == second["pipeline_id"]
+    assert controller_store.claim_target(auth.authorization_id) == (
+        "pipeline", first["pipeline_id"])
 
 
 def test_handoff_rejects_forged_or_missing_durable_authorization(tmp_path):

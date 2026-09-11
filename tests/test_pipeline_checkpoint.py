@@ -1,8 +1,13 @@
+import sqlite3
+
 from openroad_platform_scheduler import PipelineCheckpointStore
 
 
 def test_pipeline_checkpoint_create_or_get_and_optimistic_revision(tmp_path):
-    store = PipelineCheckpointStore(tmp_path / "pipelines.db")
+    path = tmp_path / "pipelines.db"
+    store = PipelineCheckpointStore(path)
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
     first = store.create_or_get(pipeline_kind="rtl", subject_id="spec-1",
                                 owner_id="owner", initial_state={"status": "new"})
     again = store.create_or_get(pipeline_kind="rtl", subject_id="spec-1",

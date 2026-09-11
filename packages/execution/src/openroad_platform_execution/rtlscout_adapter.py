@@ -298,71 +298,36 @@ def main(argv: list[str] | None = None) -> int:
             }, sort_keys=True), encoding="utf-8")
             (bench / "tb.sv").write_text(testbench, encoding="utf-8")
             benchmark_roots = ["--benchmarks-root", str(bench.parent)]
+        provider_trace = workspace / "rtlscout_provider_trace.json"
         if provider == "codex-cli":
             if not specir_mode:
                 raise ValueError("codex-cli is supported only for the SpecIR-v2 RTLScout entry")
-            payload = _codex_cli_candidates(
-                source=source, python=python, workspace=workspace, bench=bench,
-                spec=spec, testbench_sha256=expected_tb_hash, model=model_name,
-                max_steps=max_steps, cost_metric=str(parameters["cost_metric"]),
-                log_path=upstream_log,
-            )
-            if payload.get("passed") is not True:
-                return _failure(args.result, started, "rtl_validation_failed",
-                                str(payload.get("error") or "no Codex candidate passed"))
-            outputs = workspace / "outputs"; outputs.mkdir(exist_ok=True)
-            rtl = outputs / "design.sv"; shutil.copy2(Path(payload["best_design"]), rtl)
-            report = outputs / "rtlscout_result.json"; report.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-            history_manifest = outputs / "candidate_history.json"
-            history_manifest.write_text(json.dumps({
-                "schema_version": 1,
-                "kind": "rtlscout_candidate_history",
-                "spec_id": spec.get("spec_id"),
-                "testbench_sha256": expected_tb_hash,
-                "candidates": payload.get("evaluations") or [],
-                "claim_boundary": "Every authored RTL candidate is retained; evaluator pass is not a proof beyond the frozen verification package.",
-            }, ensure_ascii=False, sort_keys=True, indent=2), encoding="utf-8")
-            summary = outputs / "summary.txt"; summary.write_text(
-                f"RTLScout Codex bridge: PASS; {payload['best_cost']} {payload['cost_metric']}\n",
-                encoding="utf-8")
-            metrics = [{"name": f"rtlscout.{name}", "value": value,
-                        "unit": "count" if name.startswith("num_") or name == "transistors" else None,
-                        "parser_id": "rtlscout-result", "parser_version": "1",
-                        "context": {"benchmark": benchmark, "provider": provider, "input_mode": "specir-v2"}}
-                       for name, value in (payload.get("best_metrics") or {}).items()
-                       if isinstance(value, (int, float, str))]
-            _write(args.result, {
-                "schema_version": 1, "status": "succeeded", "exit_code": 0,
-                "started_at": started, "ended_at": _now(), "metrics": metrics,
-                "artifacts": [{"kind": "rtl", "path": "outputs/design.sv", "language": "systemverilog"},
-                              {"kind": "rtlscout_result", "path": "outputs/rtlscout_result.json"},
-                              {"kind": "rtl_candidate_history", "path": "outputs/candidate_history.json"},
-                              *[{"kind": "rtl_candidate", "path": item["candidate"],
-                                 "language": "systemverilog", "sha256": item["candidate_sha256"],
-                                 "eval_index": item["eval_index"]}
-                                for item in payload.get("evaluations") or []
-                                if item.get("candidate") and item.get("candidate_sha256")],
-                              {"kind": "report", "path": "outputs/summary.txt"},
-                              {"kind": "log", "path": "rtlscout.log"}], "failure": None,
-                "provenance": {"adapter": "rtlscout-v2-codex-bridge", "upstream_commit": actual_commit,
-                               "provider": provider, "model": model_name, "fake_model": False,
-                               "rtl_sha256": sha256(rtl), "input_mode": "specir-v2",
-                               "spec_id": spec.get("spec_id"), "oracle_immutable": True,
-                               "candidate_evaluations": len(payload.get("evaluations") or []),
-                               "tool_paths": payload.get("tool_paths")},
-            })
-            return 0
-        command = [
-            str(python), str(source / "run_benchmark.py"),
-            "--benchmark", benchmark,
-            "--model", model,
-            "--runs-dir", str(runs),
-            "--max-steps", str(max_steps),
-            "--cost-metric", str(parameters["cost_metric"]),
-            "--dont-save-workspaces",
-            *benchmark_roots,
-        ]
+            codex = shutil.which("codex")
+            native_driver = Path(__file__).with_name("rtlscout_native_driver.py")
+            if not codex or not native_driver.is_file():
+                raise ValueError("managed Codex or the RTLScout native driver is unavailable")
+            command = [
+                str(python), str(native_driver),
+                "--source", str(source),
+                "--benchmark", benchmark,
+                "--benchmarks-root", str(bench.parent),
+                "--runs-dir", str(runs),
+                "--model", model_name,
+                "--max-steps", str(max_steps),
+                "--cost-metric", str(parameters["cost_metric"]),
+                "--provider-trace", str(provider_trace),
+                "--codex-executable", codex,
+            ]
+        else:
+            command = [
+                str(python), str(source / "run_benchmark.py"),
+                "--benchmark", benchmark,
+                "--model", model,
+                "--runs-dir", str(runs),
+                "--max-steps", str(max_steps),
+                "--cost-metric", str(parameters["cost_metric"]),
+                *benchmark_roots,
+            ]
         with upstream_log.open("w", encoding="utf-8") as log:
             completed = subprocess.run(
                 command, cwd=source, env=dict(os.environ),
@@ -392,9 +357,12 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         run_root = upstream_result.parent
-        best = run_root / "best_design" / "design.sv"
+        best_name = str((payload.get("best_eval") or {}).get("design_file") or "design.sv")
+        if Path(best_name).name != best_name or Path(best_name).suffix not in {".v", ".sv"}:
+            raise ValueError("passing RTLScout result names an invalid best design file")
+        best = run_root / "best_design" / best_name
         if not best.is_file() or best.stat().st_size == 0:
-            raise ValueError("passing RTLScout result has no best_design/design.sv")
+            raise ValueError(f"passing RTLScout result has no best_design/{best_name}")
         outputs = workspace / "outputs"
         outputs.mkdir(exist_ok=True)
         rtl = outputs / "design.sv"
@@ -410,6 +378,81 @@ def main(argv: list[str] | None = None) -> int:
                 f"RTLScout {benchmark}: PASS; {payload.get('best_cost')} {payload.get('cost_metric')}\n",
                 encoding="utf-8",
             )
+        extra_artifacts: list[dict[str, Any]] = []
+        if specir_mode:
+            candidate_dir = outputs / "candidates"
+            candidate_dir.mkdir(exist_ok=True)
+            candidates = []
+            for evaluation in payload.get("all_evals") or []:
+                index = evaluation.get("eval_index")
+                if not isinstance(index, int):
+                    continue
+                evaluated_name = str(evaluation.get("design_file") or "")
+                if (not evaluated_name or Path(evaluated_name).name != evaluated_name
+                        or Path(evaluated_name).suffix not in {".v", ".sv"}):
+                    continue
+                source_candidate = run_root / f"eval_{index}" / "workspace" / evaluated_name
+                snapshot_tb = run_root / f"eval_{index}" / "workspace" / "tb.sv"
+                if snapshot_tb.is_file() and sha256(snapshot_tb) != expected_tb_hash:
+                    raise ValueError("RTLScout native Agent changed the frozen verification oracle")
+                if not source_candidate.is_file() or not source_candidate.stat().st_size:
+                    continue
+                destination = candidate_dir / f"eval-{index:03d}{Path(evaluated_name).suffix}"
+                shutil.copy2(source_candidate, destination)
+                row = {
+                    "eval_index": index,
+                    "upstream_design_file": evaluated_name,
+                    "path": str(destination.relative_to(workspace)),
+                    "sha256": sha256(destination),
+                    "passed": evaluation.get("passed"),
+                    "cost": evaluation.get("cost_value"),
+                    "correctness": evaluation.get("correctness"),
+                }
+                candidates.append(row)
+                extra_artifacts.append({
+                    "kind": "rtl_candidate", "path": row["path"],
+                    "language": "systemverilog", "sha256": row["sha256"],
+                    "eval_index": index,
+                })
+            history_manifest = outputs / "candidate_history.json"
+            history_manifest.write_text(json.dumps({
+                "schema_version": 1,
+                "kind": "rtlscout_candidate_history",
+                "agent_entrypoint": "run_benchmark.py/core.agent.RTLAgent",
+                "spec_id": spec.get("spec_id"),
+                "testbench_sha256": expected_tb_hash,
+                "candidates": candidates,
+                "claim_boundary": "Native RTLScout measurements under the frozen verification package; not general functional proof.",
+            }, ensure_ascii=False, sort_keys=True, indent=2), encoding="utf-8")
+            extra_artifacts.append({"kind": "rtl_candidate_history", "path": "outputs/candidate_history.json"})
+            native_chat = run_root / "chat_log.txt"
+            if native_chat.is_file():
+                shutil.copy2(native_chat, outputs / "native_chat_log.txt")
+                extra_artifacts.append({"kind": "agent_trace", "path": "outputs/native_chat_log.txt"})
+            if provider_trace.is_file():
+                shutil.copy2(provider_trace, outputs / "provider_trace.json")
+                extra_artifacts.append({"kind": "model_trace", "path": "outputs/provider_trace.json"})
+            native_receipt = outputs / "native_provenance.json"
+            native_receipt.write_text(json.dumps({
+                "schema_version": 1,
+                "kind": "rtlscout_native_provenance",
+                "canonical_upstream": "https://github.com/huawei-csl/rtlscout.git",
+                "upstream_commit": actual_commit,
+                "native_entrypoint": "run_benchmark.py",
+                "native_agent": "core.agent.RTLAgent",
+                "native_backend": "react",
+                "provider_adapter": "platform-managed Codex LLMClient seam",
+                "requested_model": model_name,
+                "oracle_sha256": expected_tb_hash,
+                "oracle_immutable": True,
+                "spec_id": spec.get("spec_id"),
+                "upstream_result_sha256": sha256(report),
+                "provider_trace_sha256": sha256(outputs / "provider_trace.json") if provider_trace.is_file() else None,
+                "candidate_history_sha256": sha256(history_manifest),
+                "selected_rtl_sha256": sha256(rtl),
+                "claim_boundary": "Provider protocol adaptation only; candidate loop, EDA evaluation, best-design selection, and termination are pinned RTLScout code.",
+            }, ensure_ascii=False, sort_keys=True, indent=2), encoding="utf-8")
+            extra_artifacts.append({"kind": "provenance", "path": "outputs/native_provenance.json"})
         metrics = []
         for name, value in (payload.get("best_metrics") or {}).items():
             if isinstance(value, (int, float, str)):
@@ -430,12 +473,13 @@ def main(argv: list[str] | None = None) -> int:
             "artifacts": [
                 {"kind": "rtl", "path": "outputs/design.sv", "language": "systemverilog"},
                 {"kind": "rtlscout_result", "path": "outputs/rtlscout_result.json"},
+                *extra_artifacts,
                 {"kind": "report", "path": "outputs/summary.txt"},
                 {"kind": "log", "path": "rtlscout.log"},
             ],
             "failure": None,
             "provenance": {
-                "adapter": "rtlscout-v2" if specir_mode else "rtlscout-v1",
+                "adapter": "rtlscout-v2-native-react" if specir_mode and provider == "codex-cli" else ("rtlscout-v2" if specir_mode else "rtlscout-v1"),
                 "upstream_commit": actual_commit,
                 "provider": provider,
                 "model": model_name,
@@ -443,10 +487,13 @@ def main(argv: list[str] | None = None) -> int:
                 "rtl_sha256": sha256(rtl),
                 "input_mode": "specir-v2" if specir_mode else "benchmark",
                 "spec_id": (inputs.get("spec") or {}).get("spec_id") if specir_mode else None,
+                "native_agent_entrypoint": "run_benchmark.py/core.agent.RTLAgent" if specir_mode and provider == "codex-cli" else None,
+                "oracle_immutable": True if specir_mode else None,
+                "candidate_evaluations": len(payload.get("all_evals") or []) if specir_mode else None,
             },
         })
         return 0
-    except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError,
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError,
             subprocess.SubprocessError) as exc:
         return _failure(args.result, started, "adapter_error", f"{type(exc).__name__}: {exc}")
 

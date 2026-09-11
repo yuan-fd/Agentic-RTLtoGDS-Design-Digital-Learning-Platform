@@ -1503,7 +1503,14 @@ class ApiState:
     def start_external_optimizer_loop(self, payload: dict[str, Any], *,
                                       owner_id: str | None = None,
                                       include_legacy: bool = False) -> dict[str, Any]:
-        """Start the sole new L2 product path: Runtime evidence + ORFS-Agent."""
+        """Reject writes to the historical reduced-domain L2 controller."""
+        raise ValueError(
+            "legacy external optimizer writes are retired: use an authorized "
+            "L1 Workbench handoff to the complete 12-D variable-clock "
+            "ORFS-Agent campaign"
+        )
+        # Historical implementation retained below as source evidence. It is
+        # deliberately unreachable and must not be repaired or re-exposed.
         unexpected = sorted(set(payload) - {"spec_id", "candidate_id", "objective_profile"})
         if unexpected:
             raise ValueError("the autonomous v2 entry does not accept manual search controls: "
@@ -1599,6 +1606,12 @@ class ApiState:
                                         owner_id: str | None = None,
                                         include_legacy: bool = False,
                                         execute: bool = False) -> dict[str, Any]:
+        """Reject mutation of a historical reduced-domain L2 checkpoint."""
+        raise ValueError(
+            "legacy external optimizer writes are retired: historical "
+            "checkpoints are read-only"
+        )
+        # Historical implementation retained below as source evidence.
         checkpoint = self.pipeline_checkpoints.get(pipeline_id)
         if checkpoint["pipeline_kind"] != EXTERNAL_L2_KIND:
             raise KeyError(pipeline_id)
@@ -5032,13 +5045,12 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/v2/external-optimizer-loops":
                     self._json(state.start_external_optimizer_loop(
-                        autonomous_product_request(self._read_json()), owner_id=session.user_id,
+                        self._read_json(), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
                 match = re.fullmatch(r"/api/v2/external-optimizer-loops/([^/]+)/advance", path)
                 if match:
-                    if self._read_json():
-                        raise ValueError("external optimizer advance accepts no browser execution controls")
+                    self._read_json()
                     self._json(state.advance_external_optimizer_loop(
                         unquote(match.group(1)), owner_id=session.user_id,
                         include_legacy=session.legacy_access, execute=False))

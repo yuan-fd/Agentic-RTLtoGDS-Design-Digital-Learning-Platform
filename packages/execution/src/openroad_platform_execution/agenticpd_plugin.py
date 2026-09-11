@@ -46,6 +46,13 @@ def agenticpd_plugin_manifest(
     default_timeout_seconds: int = 600,
     credential: str | None = None,
 ) -> PluginManifest:
+    """Refuse executable admission while upstream licensing is unresolved."""
+    raise PermissionError(
+        "AgenticPD is source-audit-only: the pinned upstream revision has no "
+        "verified license or execution/redistribution permission"
+    )
+    # Historical constructor retained below as source-audit evidence. It is
+    # deliberately unreachable until a new reviewed intake records permission.
     source = Path(source_root).expanduser().resolve()
     python = Path(python_executable).expanduser().absolute()
     if not (source / "main.py").is_file() or not python.is_file():

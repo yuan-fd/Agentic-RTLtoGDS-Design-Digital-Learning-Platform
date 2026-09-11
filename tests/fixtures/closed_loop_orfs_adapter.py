@@ -57,6 +57,7 @@ def main() -> int:
                       encoding="utf-8")
     artifacts = [{"kind": "report", "path": "orfs/implementation/analysis/report.json"}]
     for kind, relative in {
+        "log": "orfs/implementation/flow.log",
         "odb": "orfs/implementation/final.odb",
         "config": "orfs/implementation/config.mk",
         "toolchain_snapshot": "orfs/implementation/toolchain.json",

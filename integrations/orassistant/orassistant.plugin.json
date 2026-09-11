@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orassistant",
+  "plugin_version": "a5df2dfe",
+  "adapter_entry": ["python3", "./orassistant_launcher.py"],
+  "capabilities": ["knowledge.openroad.retrieve"],
+  "supported_arch": ["aarch64"],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["query", "purpose", "corpus_id"],
+    "properties": {
+      "query": {"type": "string", "minLength": 1, "maxLength": 16384},
+      "purpose": {"enum": ["knowledge", "error_explanation"]},
+      "corpus_id": {"const": "openroad-source-docs-63ed2e0"}
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["status", "artifacts", "provenance"]
+  },
+  "required_tools": ["git", "python3.13"],
+  "default_timeout_seconds": 900,
+  "artifact_rules": [
+    {"kind": "knowledge_retrieval", "required": true},
+    {"kind": "knowledge_explanation", "required": true},
+    {"kind": "knowledge_corpus_manifest", "required": true},
+    {"kind": "knowledge_provenance", "required": true}
+  ],
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_DATASETS_OFFLINE": "1",
+    "LANGCHAIN_TRACING_V2": "false",
+    "NO_PROXY": "*",
+    "no_proxy": "*",
+    "PATH": "/usr/bin:/bin"
+  }
+}

@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from openroad_platform_execution import load_orfs_reference_design
+from openroad_platform_execution import (
+    ORFS_AGENT_PAPER_ORFS_COMMIT, load_orfs_agent_paper_reference_design,
+    load_orfs_reference_design,
+)
+from openroad_platform_execution import orfs_reference_designs as reference_module
 
 
 ORFS = Path(__file__).resolve().parents[2] / "OpenROAD-flow-scripts"
@@ -42,3 +46,57 @@ def test_primary_reference_bundle_is_complete_and_builds_valid_request(platform,
 def test_unregistered_reference_design_is_rejected():
     with pytest.raises(ValueError, match="unregistered"):
         load_orfs_reference_design(ORFS, platform="asap7", design="toy")
+
+
+def _paper_checkout(tmp_path: Path) -> Path:
+    root = tmp_path / "paper-orfs"
+    source = root / "flow/designs/src/aes"
+    source.mkdir(parents=True)
+    for name in (
+        "aes_cipher_top.v", "aes_inv_cipher_top.v", "aes_inv_sbox.v",
+        "aes_key_expand_128.v", "aes_rcon.v", "aes_sbox.v", "timescale.v",
+    ):
+        (source / name).write_text(
+            "module aes_cipher_top(input clk); endmodule\n"
+            if name == "aes_cipher_top.v" else f"// {name}\n",
+            encoding="utf-8",
+        )
+    sdc = root / "flow/designs/sky130hd/aes/constraint.sdc"
+    sdc.parent.mkdir(parents=True)
+    sdc.write_text("create_clock -period 4.5 [get_ports clk]\n", encoding="utf-8")
+    (sdc.parent / "fastroute.tcl").write_text(
+        "set_global_routing_layer_adjustment met1-met5 0.4\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_orfs_agent_paper_reference_is_distinct_and_complete(tmp_path, monkeypatch):
+    root = _paper_checkout(tmp_path)
+    monkeypatch.setattr(
+        reference_module, "_git_output",
+        lambda _root, *args: (ORFS_AGENT_PAPER_ORFS_COMMIT
+                              if args == ("rev-parse", "HEAD") else ""),
+    )
+    recipe = load_orfs_agent_paper_reference_design(root)
+    assert recipe.platform == "sky130hd"
+    assert recipe.design == "aes"
+    assert recipe.top == "aes_cipher_top"
+    assert recipe.clock_period_ns == 4.5
+    assert recipe.sdc_path.read_text(encoding="utf-8").find("4.5") >= 0
+    assert recipe.fast_route_tcl_path is not None
+    assert recipe.fast_route_tcl_path.read_text(encoding="utf-8").find("0.4") >= 0
+    assert len(recipe.rtl_files) == 7
+    assert recipe.native_baseline_overrides == {
+        "core_utilization_pct": 20, "place_density": .6,
+        "tns_end_percent": 100,
+    }
+    assert recipe.design_options == {"remove_abc_buffers": 1}
+    assert recipe.orfs_commit == ORFS_AGENT_PAPER_ORFS_COMMIT
+
+
+def test_orfs_agent_paper_reference_rejects_wrong_commit(tmp_path, monkeypatch):
+    root = _paper_checkout(tmp_path)
+    monkeypatch.setattr(reference_module, "_git_output", lambda *_args: "0" * 40)
+    with pytest.raises(ValueError, match="requires ORFS commit"):
+        load_orfs_agent_paper_reference_design(root)

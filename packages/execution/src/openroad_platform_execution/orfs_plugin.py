@@ -59,6 +59,7 @@ def build_orfs_task(
     synth_hdl_frontend: str | None = None,
     design_options: dict[str, object] | None = None,
     sdc_path: str | Path | None = None,
+    fast_route_tcl_path: str | Path | None = None,
 ) -> TaskSpec:
     """Create a TaskSpec with an immutable local RTL artifact reference."""
 
@@ -70,6 +71,8 @@ def build_orfs_task(
     bundle_root = Path(rtl_root).expanduser().resolve() if rtl_root is not None else None
     include_paths = tuple(Path(item).expanduser().resolve() for item in rtl_include_dirs)
     sdc = Path(sdc_path).expanduser().resolve() if sdc_path is not None else None
+    fast_route = (Path(fast_route_tcl_path).expanduser().resolve()
+                  if fast_route_tcl_path is not None else None)
     legacy = RunRequest(
         rtl_path=str(source), top=top, clock=clock,
         rtl_files=tuple(str(item) for item in bundle_paths),
@@ -78,6 +81,7 @@ def build_orfs_task(
         synth_hdl_frontend=synth_hdl_frontend,
         design_options=dict(design_options or {}),
         sdc_path=str(sdc) if sdc is not None else None,
+        fast_route_tcl_path=str(fast_route) if fast_route is not None else None,
         clock_period_ns=clock_period_ns, platform=platform_name,
         target_stage=RunStage(target_stage),
         core_utilization_pct=core_utilization_pct,
@@ -88,7 +92,8 @@ def build_orfs_task(
         flow_parameters=tuning,
     )
     legacy.validate()
-    expected = ["odb", "config", "toolchain_snapshot", "parameter_contract",
+    first_physical_artifact = "netlist" if target_stage == "synth" else "odb"
+    expected = [first_physical_artifact, "config", "toolchain_snapshot", "parameter_contract",
                 "design_input_manifest", "run_result", "log"]
     if target_stage == "finish":
         expected.extend(("def", "netlist", "gds"))
@@ -123,6 +128,11 @@ def build_orfs_task(
     if sdc is not None:
         inputs["sdc"] = {
             "path": str(sdc), "size_bytes": sdc.stat().st_size, "sha256": _sha256(sdc),
+        }
+    if fast_route is not None:
+        inputs["fast_route_tcl"] = {
+            "path": str(fast_route), "size_bytes": fast_route.stat().st_size,
+            "sha256": _sha256(fast_route),
         }
     task = TaskSpec(
         task_id=task_id or f"orfs-{uuid.uuid4().hex}",
@@ -201,6 +211,7 @@ def orfs_plugin_manifest(
                 "clock": {"type": ["string", "null"]},
                 "rtl_bundle": {"type": "object"},
                 "sdc": {"type": "object"},
+                "fast_route_tcl": {"type": "object"},
             },
         },
         output_schema={"type": "object", "required": ["status", "artifacts"]},

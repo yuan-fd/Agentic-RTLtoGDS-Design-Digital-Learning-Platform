@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orassistant",
+  "source": {
+    "repository": "https://github.com/The-OpenROAD-Project/ORAssistant.git",
+    "branch_at_audit": "master",
+    "commit": "a5df2dfe54869fd929d966a4ce335b9d0892f676",
+    "tree": "9981a08b1166c82b32cd086d343dbe4a1347f84f",
+    "execution_checkout": "var/external-sources/orassistant-a5df2dfe-clean",
+    "license": {
+      "spdx": "GPL-3.0-only",
+      "sha256": "81ea2669e3bfcdbf8c31ee10e5c41f0401109814793a7487a6a5901301ef71ae",
+      "redistribution": "Yellow: isolated execution is admitted; no upstream source is vendored or linked into platform core; distribution requires separate GPL compliance review"
+    },
+    "backend_pyproject_sha256": "bafb6d347efd58919b426a6335ca40b8d80bef16e4110bc46348d285921caefb"
+  },
+  "retrieval_files": {
+    "backend/src/chains/bm25_retriever_chain.py": "e2602a9547f435f446d51c0ffacf29937086e2ebccd61c3a266803d16f5f3f66",
+    "backend/src/chains/similarity_retriever_chain.py": "f42a5d5aafd45097b6302e49b837d64a78962e4d2d896071038e411acaf2679f",
+    "backend/src/chains/hybrid_retriever_chain.py": "132a2aa9c98ad973c75938f7c6553829c76e7539ba02c222f3d8f20408b00a91",
+    "backend/src/vectorstores/faiss.py": "15a739888ede2921b60e64b0239042838b4083785b5b8b5651bbf45189d75dbc",
+    "backend/src/tools/format_docs.py": "b8376e2082a87d9d383e78571f91ecd83149008d0191622b8a0e186fef36fb42",
+    "backend/src/tools/process_md.py": "97ef2bf0238c62813a555fb087c80b2a26a5c31499348aa874659157b719911f"
+  },
+  "execution_policy": {
+    "require_detached_clean_source": true,
+    "allowed_source_roots": [
+      "backend/src/chains",
+      "backend/src/vectorstores",
+      "backend/src/tools"
+    ],
+    "denied_source_roots": [
+      "backend/src/openroad_mcp",
+      "backend/src/database",
+      "backend/src/api",
+      "frontend",
+      "evaluation"
+    ],
+    "deny_serialized_vectorstore_loading": true,
+    "deny_shell_or_eda_execution": true,
+    "deny_runtime_network": true,
+    "adapter_boundary": "read-only native retrieval over a Runtime-staged, digest-locked text corpus; returned chunks are citation artifacts, not execution authority"
+  }
+}

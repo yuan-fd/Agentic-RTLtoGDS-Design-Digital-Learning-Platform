@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "baseline_regular_files": 930,
+  "changed_existing_files": [],
+  "unexpected_new_files": [],
+  "unchanged_tracked_dangling_symlinks": [
+    {
+      "path": "docs/evidence/l1_s4_bounded_smoke/test_durable_loop_real_runtimecurrent",
+      "target": "/share/home/yuanwenjie/openroad-platform/docs/evidence/l1_s4_bounded_smoke/test_durable_loop_real_runtime0",
+      "verification": "Already tracked in unchanged HEAD; current target equals HEAD; no initial working-tree modification."
+    },
+    {
+      "path": "docs/evidence/l1_s4_bounded_smoke/test_durable_loop_stop_observecurrent",
+      "target": "/share/home/yuanwenjie/openroad-platform/docs/evidence/l1_s4_bounded_smoke/test_durable_loop_stop_observe0",
+      "verification": "Already tracked in unchanged HEAD; current target equals HEAD; no initial working-tree modification."
+    },
+    {
+      "path": "docs/evidence/l1_s6_tutorial_smoke/test_tutorial_shaped_language_current",
+      "target": "/share/home/yuanwenjie/openroad-platform/docs/evidence/l1_s6_tutorial_smoke/test_tutorial_shaped_language_0",
+      "verification": "Already tracked in unchanged HEAD; current target equals HEAD; no initial working-tree modification."
+    },
+    {
+      "path": "docs/evidence/l1_s7_teaching_smoke/test_tutorial_shaped_language_current",
+      "target": "/share/home/yuanwenjie/openroad-platform/docs/evidence/l1_s7_teaching_smoke/test_tutorial_shaped_language_0",
+      "verification": "Already tracked in unchanged HEAD; current target equals HEAD; no initial working-tree modification."
+    }
+  ],
+  "note": "Initial regular-file inventory omitted four existing tracked dangling symlinks. Separate HEAD/link verification distinguishes them from new files; none were changed or removed.",
+  "allowed_write_root": "deliverables/2026-09-05-agentic-eda-report",
+  "head_unchanged": true
+}

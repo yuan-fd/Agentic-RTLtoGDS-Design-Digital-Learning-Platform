@@ -13,7 +13,7 @@ from openroad_platform_contracts.product_surface import ProductRole, ProductSurf
 
 class OptimizationHandoffService:
     """Authorize and correlate a TaskSpec; never implement an optimizer."""
-    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec], *, trace_store: Any | None = None, consumption_store: Any | None = None) -> None:
+    def __init__(self, surface: ProductSurface, task_builder: Callable[[OptimizationRequest, DesignGoal, DesignState], TaskSpec] | None, *, trace_store: Any | None = None, consumption_store: Any | None = None) -> None:
         self._surface, self._task_builder, self._trace_store, self._consumption_store = surface, task_builder, trace_store, consumption_store
 
     def task_for(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
@@ -33,6 +33,13 @@ class OptimizationHandoffService:
         still rejected.  The authorizer is responsible for reading the durable
         trace and constructing this immutable receipt.
         """
+        self._validate_authorized_boundary(request, goal, state, authorization, manifest)
+        return self._task_for_bound(request, goal, state, manifest, authorization=authorization)
+
+    def _validate_authorized_boundary(
+        self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
+        authorization: L2HandoffAuthorization, manifest: PluginManifest,
+    ) -> None:
         request.validate(); goal.validate(); state.validate(); authorization.validate(); manifest.validate()
         if state.status != "observed" or not state.evidence:
             raise ValueError("authorized L2 handoff requires an evidence-backed observed L1 state")
@@ -41,7 +48,7 @@ class OptimizationHandoffService:
                 or request.source_state_id != state.state_id):
             raise ValueError("L2 authorization does not bind the finalized L1 goal/state/trace")
         self._verify_durable_authorization(authorization)
-        return self._task_for_bound(request, goal, state, manifest, authorization=authorization)
+        self._validate_product_boundary(request, manifest)
 
     def _verify_durable_authorization(self, authorization: L2HandoffAuthorization) -> None:
         if self._trace_store is None:
@@ -64,12 +71,9 @@ class OptimizationHandoffService:
 
     def _task_for_bound(self, request: OptimizationRequest, goal: DesignGoal, state: DesignState,
                         manifest: PluginManifest, authorization: L2HandoffAuthorization | None = None) -> TaskSpec:
-        rule = self._surface.rule_for(ProductRole.L2_OPTIMIZATION)
-        self._surface.authorize(ProductRole.L2_OPTIMIZATION, manifest)
-        if (request.plugin_id, request.capability) != (rule.plugin_id, rule.capability):
-            raise PermissionError("optimization request does not match the approved product capability")
-        if manifest.plugin_id != request.plugin_id or request.capability not in manifest.capabilities:
-            raise PermissionError("optimization request plugin/capability is not admitted")
+        self._validate_product_boundary(request, manifest)
+        if self._task_builder is None:
+            raise ValueError("external L2 task builder is not configured")
         task = self._task_builder(request, goal, state)
         if not isinstance(task, TaskSpec):
             raise TypeError("external L2 task builder must return TaskSpec")
@@ -87,6 +91,49 @@ class OptimizationHandoffService:
                            "l2_baseline_run_id": authorization.baseline_run_id,
                            "l2_candidate_run_id": authorization.candidate_run_id})
         return replace(task, labels=labels)
+
+    def _validate_product_boundary(self, request: OptimizationRequest,
+                                   manifest: PluginManifest) -> None:
+        rule = self._surface.rule_for(ProductRole.L2_OPTIMIZATION)
+        self._surface.authorize(ProductRole.L2_OPTIMIZATION, manifest)
+        if (request.plugin_id, request.capability) != (rule.plugin_id, rule.capability):
+            raise PermissionError("optimization request does not match the approved product capability")
+        if manifest.plugin_id != request.plugin_id or request.capability not in manifest.capabilities:
+            raise PermissionError("optimization request plugin/capability is not admitted")
+
+    def create_authorized_controller(
+        self, checkpoints: Any, request: OptimizationRequest, goal: DesignGoal,
+        state: DesignState, authorization: L2HandoffAuthorization,
+        manifest: PluginManifest, *, pipeline_kind: str,
+        initial_state: dict[str, Any], owner_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create or recover one durable controller checkpoint per authorization."""
+        self._validate_authorized_boundary(request, goal, state, authorization, manifest)
+        if self._consumption_store is None:
+            raise ValueError("authorized L2 handoff requires a durable consumption store")
+        if (initial_state.get("status") != "authorized"
+                or initial_state.get("request") != request.to_dict()
+                or initial_state.get("authorization") != authorization.to_dict()):
+            raise ValueError("L2 controller state does not bind the authorized request")
+        prior = self._consumption_store.claim_target(authorization.authorization_id)
+        if prior is not None and prior[1]:
+            if prior[0] != "pipeline":
+                raise ValueError("L2 authorization was already consumed by another target kind")
+            return checkpoints.get(prior[1])
+        try:
+            checkpoint = checkpoints.create_or_get(
+                pipeline_kind=pipeline_kind, subject_id=authorization.authorization_id,
+                owner_id=owner_id, initial_state=initial_state,
+            )
+            if (checkpoint["state"].get("request") != request.to_dict()
+                    or checkpoint["state"].get("authorization") != authorization.to_dict()):
+                raise ValueError("durable L2 controller checkpoint binding mismatch")
+            self._consumption_store.bind_target(
+                authorization.authorization_id, "pipeline", checkpoint["pipeline_id"])
+            return checkpoint
+        except Exception:
+            self._consumption_store.release(authorization.authorization_id)
+            raise
 
     def submit(self, runtime: Any, request: OptimizationRequest, goal: DesignGoal,
                state: DesignState, manifest: PluginManifest) -> Any:

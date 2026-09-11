@@ -79,21 +79,32 @@ def test_public_overview_login_and_two_user_design_run_isolation(tmp_path: Path)
             body={"design_id": design["id"], "repetitions": 3, "max_rounds": 3},
         )
         assert status == 400
-        assert "does not accept manual search controls" in rejected["error"]
+        assert "legacy external optimizer writes are retired" in rejected["error"]
 
         status, submitted = request(
             alice, base, "/api/v2/external-optimizer-loops", method="POST",
             body={"design_id": design["id"], "objective_profile": "balanced"},
         )
         assert status == 400
-        assert "does not accept manual search controls: design_id" in submitted["error"]
+        assert "legacy external optimizer writes are retired" in submitted["error"]
+        status, historical = request(
+            alice, base, "/api/v2/external-optimizer-loops",
+        )
+        assert status == 200 and historical == {"external_optimizer_loops": []}
+        status, rejected_advance = request(
+            alice, base,
+            "/api/v2/external-optimizer-loops/historical-loop/advance",
+            method="POST", body={},
+        )
+        assert status == 400
+        assert "historical checkpoints are read-only" in rejected_advance["error"]
         for frozen_field in ("clock", "platform"):
             status, rejected_frozen = request(
                 alice, base, "/api/v2/external-optimizer-loops", method="POST",
                 body={"spec_id": "not-needed", frozen_field: "client-override"},
             )
             assert status == 400
-            assert f"does not accept manual search controls: {frozen_field}" in rejected_frozen["error"]
+            assert "legacy external optimizer writes are retired" in rejected_frozen["error"]
         assert request(alice, base, "/api/runtime/runs")[1]["runs"] == []
         assert request(bob, base, "/api/runtime/runs")[1]["runs"] == []
         assert request(alice, base, "/api/runtime/runs/from-design", method="POST",

@@ -20,7 +20,11 @@ class PipelineCheckpointStore:
         self.path = Path(path).expanduser().resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode = WAL")
+            # Checkpoints are commonly stored under the same shared project
+            # filesystem as Runtime state.  WAL's shared-memory protocol is
+            # not safe on network filesystems; a rollback journal keeps the
+            # durable controller portable across those deployments.
+            connection.execute("PRAGMA journal_mode = DELETE")
             connection.execute("""CREATE TABLE IF NOT EXISTS pipeline_checkpoints_v1 (
                 pipeline_id TEXT PRIMARY KEY,
                 pipeline_kind TEXT NOT NULL,
@@ -114,4 +118,6 @@ class PipelineCheckpointStore:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 30000")
+        connection.execute("PRAGMA synchronous = FULL")
         return connection

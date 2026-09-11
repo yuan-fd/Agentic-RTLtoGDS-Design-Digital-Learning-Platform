@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "plugin_id": "a2-orfo",
+  "status": "installed and locally verified; executable admission still requires real managed-provider and Runtime feedback smoke",
+  "architecture": "aarch64",
+  "python": {
+    "executable": ".tools/python-3.12.4-source/bin/python3",
+    "version": "3.12.4",
+    "venv": ".tools/venvs/a2-orfo"
+  },
+  "packages": {
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "scipy": "1.13.1",
+    "scikit-learn": "1.6.1",
+    "scikit-optimize": "0.10.2",
+    "joblib": "1.5.3",
+    "openai": "2.48.0",
+    "python-dotenv": "1.2.2",
+    "torch": "2.8.0",
+    "sentence-transformers": "5.1.2"
+  },
+  "resolved_packages": {
+    "transformers": "4.57.6",
+    "huggingface-hub": "0.36.2",
+    "tokenizers": "0.22.2",
+    "safetensors": "0.8.0",
+    "networkx": "3.6.1"
+  },
+  "pip_freeze_sha256": "dae5ddaf71b437c0e13996a8edbff881a61ca68a5cfab2654713a0019ae0edc6",
+  "model": {
+    "name": "mixedbread-ai/mxbai-embed-large-v1",
+    "commit": "b33106f585b9ce46904ad7443a3b52b7a63e231c",
+    "path": "var/external-models/mxbai-embed-large-v1-b33106f",
+    "tree_sha256": "feeb00c02e146d3a09d8b825af77224c2bbcc158bd5e2a5dbb18c3904d067f26",
+    "weights_sha256": "36bfa45da00eb762ef9feebe4cff315ec779efadd08da11846bef5ba5b59b8f8"
+  },
+  "network_policy": {
+    "installation": ["Python package index", "hf-mirror.com exact-commit model retrieval"],
+    "runtime": "deny except platform-managed model provider boundary"
+  },
+  "credential_policy": "No credential is stored in this file, a TaskSpec, an artifact, or an upstream checkout."
+}

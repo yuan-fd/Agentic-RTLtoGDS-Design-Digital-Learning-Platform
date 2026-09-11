@@ -34,7 +34,7 @@ _FIELD_VALUES = tuple(item.value for item in ClarificationField)
 
 
 class CodexGoalDraftProvider:
-    """Ephemeral structured-output provider backed by the managed Codex CLI."""
+    """Ephemeral structured provider for GoalDraft and SemanticToolCall data."""
 
     provider_id = "codex-cli-l1-goal-v1"
 
@@ -51,7 +51,8 @@ class CodexGoalDraftProvider:
             raise FileNotFoundError("codex CLI is unavailable for the L1 goal provider")
 
     def complete(self, request: Mapping[str, Any]) -> Mapping[str, Any]:
-        if not isinstance(request, Mapping) or request.get("kind") not in {"goal_draft", "goal_draft_revision"}:
+        if not isinstance(request, Mapping) or request.get("kind") not in {
+                "goal_draft", "goal_draft_revision", "tool_proposal"}:
             raise ValueError("goal provider received an unsupported request kind")
         prompt = self._prompt(request)
         with tempfile.TemporaryDirectory(prefix="openroad-l1-goal-") as raw:
@@ -97,21 +98,26 @@ class CodexGoalDraftProvider:
 
     def _prompt(self, request: Mapping[str, Any]) -> str:
         """One bounded instruction; the model may return typed JSON only."""
+        if request.get("kind") == "tool_proposal":
+            return self._tool_prompt(request)
         if request.get("kind") == "goal_draft_revision":
             context = (
                 "REVISION of an existing draft. Keep request_text, interpretation and "
-                "field_sources unchanged. Keep every existing question with the same "
-                "question_id, field and blocking value. Populate answers: for every supplied "
+                "field_sources unchanged. Copy every existing question in the same order with "
+                "the same question_id, field, prompt, blocking, and schema_version. Populate answers: for every supplied "
                 "ANSWER whose question_id matches a kept question, add one answers entry "
                 "{question_id, field (the same field as that question), value (the supplied "
                 "value), schema_version: 1}. Add no other answers."
             )
         else:
-            context = ("INITIAL parse of one natural-language EDA goal. Return questions for every "
-                       "policy-relevant fact the request omits (each with blocking=true and a concise "
-                       "clarification prompt). Return answers as an empty array: no answer may be "
-                       "invented at parse time. Facts the user did state belong in interpretation, "
-                       "not in answers.")
+            context = (
+                "INITIAL parse of one natural-language EDA goal. Copy REQUIRED_QUESTIONS "
+                "byte-for-byte in semantic content and array order: do not create, delete, rename, "
+                "re-field, reword, reorder, or change blocking/schema_version. For a required "
+                "question whose answer is explicitly stated in USER_REQUEST, add one typed answer "
+                "using exactly that question_id and field. Leave every omitted fact unanswered. "
+                "Never infer an answer merely from a question prompt."
+            )
         instruction = (
             "You are a constrained EDA goal interpreter. Reply with exactly one JSON object and nothing else "
             "(no markdown fences, no prose). The object must contain only these keys: "
@@ -128,7 +134,36 @@ class CodexGoalDraftProvider:
             "names, or RTL source: this is a typed language draft only.\n\n"
             f"{context}\n"
             f"USER_REQUEST={json.dumps(request.get('request_text'), ensure_ascii=False)}\n"
+            f"REQUIRED_QUESTIONS={json.dumps(request.get('required_questions'), ensure_ascii=False)}\n"
             f"PRIOR_DRAFT={json.dumps(request.get('prior_draft'), ensure_ascii=False)}\n"
             f"ANSWERS={json.dumps(request.get('answers'), ensure_ascii=False)}\n"
         )
         return instruction
+
+    def _tool_prompt(self, request: Mapping[str, Any]) -> str:
+        """Ask for one typed next action; never expose an execution language."""
+        goal, state, knowledge = request.get("goal"), request.get("state"), request.get("knowledge")
+        if not isinstance(goal, Mapping) or not isinstance(state, Mapping) or not isinstance(knowledge, list):
+            raise ValueError("tool proposal request lacks typed Goal/State/knowledge")
+        evidence = [item.get("evidence") for item in knowledge if isinstance(item, Mapping)]
+        tools = goal.get("allowed_tools") or []
+        return (
+            "You are the untrusted planning component of an EDA workbench. Return exactly one JSON "
+            "object and nothing else. You may propose one typed action; platform Policy and Runtime "
+            "will validate it. Never emit shell, Tcl, Python, a filesystem path, an executable, an "
+            "environment variable, or credentials. Use only facts in GOAL, STATE, and KNOWLEDGE.\n"
+            "Output exactly {call,decision_summary,citations}. call must be "
+            "{call_id,goal_id,state_id,tool,arguments,producer,evidence,schema_version}. "
+            f"Copy call_id={json.dumps(request.get('call_id'))}, "
+            f"goal_id={json.dumps(goal.get('goal_id'))}, state_id={json.dumps(state.get('state_id'))}, "
+            f"producer={json.dumps(request.get('provider_id'))}, schema_version=1. "
+            f"tool must be one of {json.dumps(tools)}. citations must contain one or more exact "
+            f"objects selected from AVAILABLE_EVIDENCE={json.dumps(evidence)}; call.evidence must be "
+            "a subset of citations. Arguments must match the selected typed tool and reference only "
+            "run/proposal/artifact identifiers already present in STATE or KNOWLEDGE. Prefer inspecting "
+            "measured facts before proposing a new EDA run. decision_summary must state the visible "
+            "evidence-based reason, without hidden reasoning.\n"
+            f"GOAL={json.dumps(goal, ensure_ascii=False)}\n"
+            f"STATE={json.dumps(state, ensure_ascii=False)}\n"
+            f"KNOWLEDGE={json.dumps(knowledge, ensure_ascii=False)}\n"
+        )

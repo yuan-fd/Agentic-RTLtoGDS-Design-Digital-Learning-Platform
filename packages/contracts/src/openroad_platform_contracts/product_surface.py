@@ -18,6 +18,7 @@ from .platform import PluginManifest
 class ProductRole(str, Enum):
     RTL_GENERATION = "product.rtl_generation"
     L2_OPTIMIZATION = "product.l2_optimization"
+    OPENROAD_KNOWLEDGE = "product.openroad_knowledge"
     INDEPENDENT_3D = "extension.independent_3d"
 
 
@@ -75,6 +76,9 @@ class ProductSurface:
 
 DEFAULT_PRODUCT_SURFACE = ProductSurface((
     ProductCapabilityRule(ProductRole.RTL_GENERATION, "rtlscout", "agent.rtl.generate"),
-    ProductCapabilityRule(ProductRole.L2_OPTIMIZATION, "orfs-agent", "optimizer.l2.propose"),
+    ProductCapabilityRule(ProductRole.L2_OPTIMIZATION, "a2-orfo",
+                          "optimizer.l2.a2-orfo-feedback"),
+    ProductCapabilityRule(ProductRole.OPENROAD_KNOWLEDGE, "orassistant",
+                          "knowledge.openroad.retrieve"),
     ProductCapabilityRule(ProductRole.INDEPENDENT_3D, "taiwei-pin-3d", "eda.3d.pin3d"),
 ))

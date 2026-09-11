@@ -136,7 +136,8 @@ def _stage_rtl(task: TaskSpec, workspace: Path) -> dict:
         sdc = (_checked_copy(task.inputs["sdc"], workspace / "inputs/constraint.sdc",
                              label="SDC") if isinstance(task.inputs.get("sdc"), dict) else None)
         return {"primary": destination, "files": (), "root": None,
-                "include_dirs": (), "synth_hdl_frontend": None, "sdc": sdc}
+                "include_dirs": (), "synth_hdl_frontend": None, "sdc": sdc,
+                "fast_route_tcl": _stage_fast_route_tcl(task, workspace)}
     if not isinstance(bundle, dict) or not isinstance(bundle.get("files"), list):
         raise ValueError("Task inputs.rtl_bundle must contain an ordered files list")
     root = workspace / "inputs/rtl"
@@ -167,7 +168,15 @@ def _stage_rtl(task: TaskSpec, workspace: Path) -> dict:
                          label="SDC") if isinstance(task.inputs.get("sdc"), dict) else None)
     return {"primary": primary, "files": tuple(files), "root": root,
             "include_dirs": tuple(include_dirs),
-            "synth_hdl_frontend": bundle.get("synth_hdl_frontend"), "sdc": sdc}
+            "synth_hdl_frontend": bundle.get("synth_hdl_frontend"), "sdc": sdc,
+            "fast_route_tcl": _stage_fast_route_tcl(task, workspace)}
+
+
+def _stage_fast_route_tcl(task: TaskSpec, workspace: Path) -> Path | None:
+    reference = task.inputs.get("fast_route_tcl")
+    return (_checked_copy(reference, workspace / "inputs/fastroute.tcl",
+                          label="FastRoute Tcl")
+            if isinstance(reference, dict) else None)
 
 
 def _legacy_request(task: TaskSpec, staged_rtl: dict) -> RunRequest:
@@ -180,6 +189,8 @@ def _legacy_request(task: TaskSpec, staged_rtl: dict) -> RunRequest:
         rtl_include_dirs=tuple(str(item) for item in staged_rtl["include_dirs"]),
         synth_hdl_frontend=staged_rtl["synth_hdl_frontend"],
         sdc_path=str(staged_rtl["sdc"]) if staged_rtl["sdc"] else None,
+        fast_route_tcl_path=(str(staged_rtl["fast_route_tcl"])
+                             if staged_rtl["fast_route_tcl"] else None),
         top=_optional_string(task.inputs.get("top"), "top"),
         clock=_optional_string(task.inputs.get("clock"), "clock"),
         clock_period_ns=float(parameters.get("clock_period_ns", 10.0)),

@@ -40,6 +40,17 @@ from .semantic_tools import SemanticToolPolicy, SemanticToolRegistry, ToolDefini
 from .l1_orfs_service import L1ORFSToolService
 from .design_goal_compiler import compile_design_goal, infer_goal_preference
 from .external_l2_service import EXTERNAL_L2_KIND, ExternalOptimizerLoopService
+from .orfs_agent_full_campaign import (
+    ORFS_AGENT_FULL_CAMPAIGN_KIND, ORFSAgentFullCampaignService,
+)
+from .l1_control_state_machine import L1ControlStateStore, PDAgentControlStateMachine
+from .l1_recovery_policy import (
+    A2_ORFO_CAPABILITY, A2_ORFO_PLUGIN_ID, decide_recovery,
+)
+from .rtl_checkpoint_restore import (
+    plan_rtl_checkpoint_restore, select_rtl_checkpoint_candidate,
+)
+from .a2_orfo_campaign import A2_ORFO_CAMPAIGN_KIND, A2ORFOCampaignService
 
 __all__ = [
     "Job", "JobStore", "Worker", "RuntimeAttempt", "RuntimeRun",
@@ -68,6 +79,11 @@ __all__ = [
     "L1ORFSToolService",
     "compile_design_goal", "infer_goal_preference",
     "EXTERNAL_L2_KIND", "ExternalOptimizerLoopService",
+    "ORFS_AGENT_FULL_CAMPAIGN_KIND", "ORFSAgentFullCampaignService",
+    "L1ControlStateStore", "PDAgentControlStateMachine",
+    "A2_ORFO_CAPABILITY", "A2_ORFO_PLUGIN_ID", "decide_recovery",
+    "plan_rtl_checkpoint_restore", "select_rtl_checkpoint_candidate",
+    "A2_ORFO_CAMPAIGN_KIND", "A2ORFOCampaignService",
 ]
 from .local_state import (
     LocalStateMirror, StateSnapshot, filesystem_type, require_local_sqlite_root,

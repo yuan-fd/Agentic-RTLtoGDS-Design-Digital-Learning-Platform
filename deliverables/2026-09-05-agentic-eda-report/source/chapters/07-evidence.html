@@ -1,0 +1,26 @@
+<div class="callout warn"><strong>怎样使用证据：</strong>摘要中的 succeeded/accepted 说明对应验收记录的状态。由本轮重新计算的哈希说明“当前可定位文件与记录一致”；两者都不能单独证明算法优势、广泛泛化或原始实验绝无缺陷。报告只提出与证据范围相匹配的结论。</div>
+<!-- EVIDENCE_TABLES -->
+<h2>给初学者的术语表</h2>
+<div class="table-wrap"><table><thead><tr><th>术语</th><th>在本报告里的含义</th><th>容易混淆的地方</th></tr></thead><tbody>
+<tr><td>Spec / SpecIR</td><td>需求及其结构化表达，说明功能、接口、时序行为与验收条件。</td><td>结构化了不代表需求已经完整或正确。</td></tr>
+<tr><td>RTL</td><td>用于描述数字电路行为与结构的设计输入。</td><td>能编译不等于符合需求。</td></tr>
+<tr><td>PDK / 工具链</td><td>实现所需工艺资料与具体工具版本、环境。</td><td>换版本或工艺会改变实验条件，不能忽略。</td></tr>
+<tr><td>SDC / timing target</td><td>时钟等时序约束与目标。</td><td>修改约束可能改变评价问题，不是无害“调参”。</td></tr>
+<tr><td>QoR / PPA</td><td>实现结果质量；常讨论功耗、性能和面积。</td><td>预测 QoR 与实测 QoR 不同；一个指标改善不保证全部目标合格。</td></tr>
+<tr><td>WNS / TNS</td><td>最差负时序余量与负时序余量总和；具体单位、阶段、检查类型须读评价定义。</td><td>不能跨不同约束或角点直接比较，也不宜把名词当作充分诊断。</td></tr>
+<tr><td>DRC</td><td>设计规则检查及其违例。</td><td>报告没有解析出数据不等于违例为零；某一种 DRC 通过也不是所有签核通过。</td></tr>
+<tr><td>Baseline / candidate</td><td>基线与待比较候选；需说明设计和协议是否一致。</td><td>任意旧运行不自动成为可比 baseline。</td></tr>
+<tr><td>Tool call</td><td>具有明确输入/输出和权限的操作请求。</td><td>不是让自然语言直接生成任意 shell。</td></tr>
+<tr><td>PluginManifest</td><td>插件身份、版本、能力、架构、执行入口与产物规则。</td><td>注册能力不等于成为默认产品入口。</td></tr>
+<tr><td>Task / run / attempt</td><td>任务定义、Runtime 运行记录、具体尝试。</td><td>重试产生新尝试，不应覆盖失败历史。</td></tr>
+<tr><td>Artifact / provenance</td><td>产物及其来源、版本、哈希、运行和父子关系。</td><td>LLM 总结是索引，不是原始证据的替代品。</td></tr>
+<tr><td>Checkpoint</td><td>带准确输入、状态、版本和证据的恢复点。</td><td>任意文件夹不自动满足下一个工具的装载条件。</td></tr>
+<tr><td>Policy</td><td>按目标、权限、状态和预算决定允许、拒绝或需澄清。</td><td>与上游负责候选搜索的“策略算法”不是同一职责。</td></tr>
+<tr><td>BO / surrogate</td><td>通过数据模型指导昂贵黑盒搜索的技术及其代理预测。</td><td>代理预测不能由插件自行登记成实测成绩。</td></tr>
+<tr><td>Headroom</td><td>本代码当前主要指测量相对阈值的余量。</td><td>不等于还能优化多少的可靠估计。</td></tr>
+<tr><td>Smoke / campaign</td><td>有限的集成检查 / 多轮有预算的实验过程。</td><td>一个 smoke 不证明长期稳定或统计优势。</td></tr>
+<tr><td>GDS</td><td>物理实现的版图交付格式。</td><td>文件产生不等于功能、时序和全部签核已通过。</td></tr>
+</tbody></table></div>
+<h2>声明分级</h2>
+<p><span class="badge">有界证据</span>已有明确范围内的记录和产物；<span class="badge partial">部分完成</span>存在实现或局部验收，但缺关键适用范围或长程证据；<span class="badge plan">建议设计</span>本报告提出的后续方案；<span class="badge blocked">停止 / 未准入</span>缺许可、版本、协议或真实入口；<span class="badge history">历史</span>保留旧证据但不视作当前产品路径。</p>
+<p>本报告不使用一个总“完成百分比”。一个小任务的真实闭环、一个通用接口和一个未运行的长 campaign 不能相加成有意义的百分数。</p>

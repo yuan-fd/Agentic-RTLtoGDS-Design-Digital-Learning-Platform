@@ -14,7 +14,7 @@ from openroad_platform_contracts import PluginManifest, SpecIR, TaskSpec, Verifi
 
 
 RTLSCOUT_PLUGIN_ID = "rtlscout"
-RTLSCOUT_PLUGIN_VERSION = "1.1.0"
+RTLSCOUT_PLUGIN_VERSION = "1.2.0"
 RTLSCOUT_UPSTREAM_COMMIT = "87a00edf6b9208f657dd9ffdda170004024c08ae"
 # v2 has one deployed model authority: the platform-managed Codex login.
 # ``fake`` is an isolated adapter-test fixture and is rejected by the product
@@ -187,6 +187,9 @@ def rtlscout_plugin_manifest(
             {"kind": "rtlscout_result", "required": True},
             {"kind": "rtl_candidate_history", "required": False},
             {"kind": "rtl_candidate", "required": False},
+            {"kind": "agent_trace", "required": False},
+            {"kind": "model_trace", "required": False},
+            {"kind": "provenance", "required": False},
             {"kind": "report", "required": True},
             {"kind": "log", "required": False},
         ),

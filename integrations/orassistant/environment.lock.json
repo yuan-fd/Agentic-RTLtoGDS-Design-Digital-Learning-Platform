@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "plugin_id": "orassistant",
+  "status": "retrieval-only environment installed and verified by native and Runtime smokes",
+  "architecture": "aarch64",
+  "required_python": ">=3.13",
+  "python": {
+    "version": "3.13.7",
+    "implementation": "CPython",
+    "install_root": "var/external-envs/orassistant-python/cpython-3.13.7-linux-aarch64-gnu",
+    "executable_sha256": "698364d7abd9ab9507470706db43a5b52ad469d3f029bdb67b55b6abb842d3a9"
+  },
+  "bootstrap": {
+    "tool": "uv",
+    "version": "0.12.9",
+    "repository": "https://github.com/astral-sh/uv",
+    "license": "Apache-2.0 OR MIT",
+    "license_sha256": {
+      "apache": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "mit": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+    },
+    "wheel": {
+      "filename": "uv-0.12.9-py3-none-manylinux_2_28_aarch64.whl",
+      "sha256": "c0f7e2b46e4c503f9497c0f41bba3570aa233685db814cd011225118f2d72b6a"
+    }
+  },
+  "retrieval_environment": {
+    "venv": "var/external-envs/orassistant-retrieval-a5df2dfe",
+    "source_lock": "upstream backend/uv.lock at ORAssistant commit a5df2dfe54869fd929d966a4ce335b9d0892f676",
+    "direct_packages": {
+      "langchain-classic": "1.0.8",
+      "langchain-community": "0.4.2",
+      "langchain-core": "1.6.1",
+      "langchain-text-splitters": "1.1.2",
+      "rank-bm25": "0.2.2",
+      "markdown": "3.10.3",
+      "beautifulsoup4": "4.15.0",
+      "tqdm": "4.70.0",
+      "python-dotenv": "1.2.3",
+      "tenacity": "9.1.4",
+      "pypdf": "6.16.2"
+    },
+    "resolved_package_count": 53,
+    "pip_freeze_sha256": "c5c9be83dc98fdcb29b3f08102ccfa600b7f3555d6725248570c9452af22f7c6",
+    "optional_provider_policy": "Google/Vertex/Ollama/HuggingFace provider imports are fail-closed shims because the admitted upstream BM25 path never instantiates them."
+  },
+  "full_backend_sync_attempt": {
+    "status": "interrupted",
+    "reason": "The monolithic upstream lock pulled unused multi-gigabyte CUDA/PyTorch dependencies for a CPU BM25-only capability; no executable acceptance used this partial environment.",
+    "path": "var/external-envs/orassistant-a5df2dfe"
+  },
+  "installation_policy": "Install only below ignored var/external-envs and an isolated uv cache; never modify system Python or the shared EDA toolchain.",
+  "runtime_policy": "No network, cloud credential, database, MCP server, ORFS process or serialized FAISS/pickle loading.",
+  "credential_policy": "No credential is accepted in TaskSpec, environment lock or evidence artifact."
+}

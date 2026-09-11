@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "corpus_id": "openroad-source-docs-63ed2e0",
+  "source": {
+    "repository": "https://github.com/The-OpenROAD-Project/OpenROAD.git",
+    "commit": "63ed2e0fe5992099b7d528177bbb7a4df9523907",
+    "tree": "e32e44b5594f05dbb57f37cd81c032998ad1aa2c",
+    "checkout": "var/external-sources/openroad-docs-63ed2e0-clean",
+    "license": {
+      "spdx": "BSD-3-Clause",
+      "sha256": "28cfc93cb2b552192bc316259d2c2a1aa5a980018cda1c5cd9b1143c9151aebb"
+    }
+  },
+  "selection": {
+    "include": [
+      "README.md",
+      "docs/**/*.md",
+      "src/**/README.md",
+      "src/**/messages.txt",
+      "src/**/doc/**/*.md",
+      "src/drt/test/via_access_layer.ok"
+    ],
+    "extensions": [".md", ".txt", ".ok"],
+    "max_files": 512,
+    "max_total_bytes": 33554432,
+    "chunk_size": 1200
+  },
+  "citation_url_template": "https://github.com/The-OpenROAD-Project/OpenROAD/blob/63ed2e0fe5992099b7d528177bbb7a4df9523907/{path}",
+  "policy": "Fresh text ingestion only. Never load a serialized vector store or remote corpus at Runtime. The Git tree and every emitted citation document hash are verified."
+}

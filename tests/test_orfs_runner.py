@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import json
 import pytest
 
 from openroad_platform_contracts import RunRequest, RunStage, RunStatus
 from openroad_platform_execution import ORFSRunner
+import openroad_platform_execution.orfs_runner as runner_module
 
 
 def _fake_runtime(tmp_path: Path):
@@ -145,6 +147,115 @@ def test_runner_fails_when_process_succeeds_without_required_artifact(tmp_path):
     assert result.status is RunStatus.FAILED
     assert "Required artifacts" in result.error
     assert (Path(plan.workdir) / "analysis/flow_error.log").is_file()
+
+
+def test_paper_orfs_synth_netlist_is_a_valid_stage_artifact(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    (orfs / "flow/Makefile").write_text(
+        "OUT := $(WORK_HOME)/results/nangate45/top/base\n"
+        "synth:\n\tmkdir -p $(OUT)\n\tprintf netlist > $(OUT)/1_synth.v\n"
+    )
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runner = ORFSRunner(
+        orfs_root=orfs, work_root=tmp_path / "runs",
+        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys",
+    )
+    result = runner.run(runner.prepare(RunRequest(
+        rtl_path=str(rtl), top="top", target_stage=RunStage.SYNTH)))
+    assert result.status is RunStatus.SUCCEEDED
+    assert any(Path(item.path).name == "1_synth.v" for item in result.artifacts)
+
+
+def test_runner_stages_hash_bound_fastroute_recipe(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    fast_route = tmp_path / "fastroute.tcl"
+    fast_route.write_text("set_global_routing_layer_adjustment met1-met5 0.4\n")
+    runner = ORFSRunner(
+        orfs_root=orfs, work_root=tmp_path / "runs",
+        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys",
+    )
+    plan = runner.prepare(RunRequest(
+        rtl_path=str(rtl), top="top", target_stage=RunStage.SYNTH,
+        fast_route_tcl_path=str(fast_route),
+    ))
+    staged = Path(plan.config_path).with_name("fastroute.tcl")
+    assert staged.read_bytes() == fast_route.read_bytes()
+    assert "FASTROUTE_TCL" in Path(plan.config_path).read_text()
+    snapshot = json.loads((Path(plan.workdir) / "toolchain_snapshot.json").read_text())
+    assert snapshot["request"]["fast_route_tcl"]["sha256"] == \
+        hashlib.sha256(fast_route.read_bytes()).hexdigest()
+
+
+def test_runner_backports_exact_upstream_headless_finish_fix_with_receipt(
+        tmp_path, monkeypatch):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    scripts = orfs / "flow/scripts"; scripts.mkdir()
+    original = (
+        "report_metrics 6 finish\n"
+        "if {[expr [llength [info procs save_image]] > 0]} {\n"
+        "  gui::show save_images false\n}\n"
+    )
+    patched = original.replace(
+        "if {[expr [llength [info procs save_image]] > 0]} {",
+        "if {[ord::openroad_gui_compiled] && "
+        "[llength [info commands gui::show]] > 0} {",
+    )
+    monkeypatch.setitem(
+        runner_module._HEADLESS_FINISH_BACKPORT, "source_sha256",
+        hashlib.sha256(original.encode()).hexdigest(),
+    )
+    monkeypatch.setitem(
+        runner_module._HEADLESS_FINISH_BACKPORT, "patched_sha256",
+        hashlib.sha256(patched.encode()).hexdigest(),
+    )
+    source = scripts / "final_report.tcl"
+    source.write_text(original)
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runner = ORFSRunner(
+        orfs_root=orfs, work_root=tmp_path / "runs",
+        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys",
+    )
+    plan = runner.prepare(RunRequest(
+        rtl_path=str(rtl), top="top", target_stage=RunStage.SYNTH,
+    ))
+    staged = Path(plan.flow_home) / "scripts/final_report.tcl"
+    assert "[llength [info commands gui::show]] > 0" in staged.read_text()
+    receipt_path = Path(plan.workdir) / "flow_compatibility.json"
+    receipt = json.loads(receipt_path.read_text())
+    change = receipt["changes"][0]
+    assert change["upstream_commit"] == \
+        "e7a0725758c0abde2b69e2cdba783435238748ef"
+    assert change["paired_openroad_commit"] == \
+        "4630b597e7da45019e0e17f19bc58f9128bdbc03"
+    assert change["source_sha256"] == hashlib.sha256(original.encode()).hexdigest()
+    assert change["patched_sha256"] == hashlib.sha256(staged.read_bytes()).hexdigest()
+    assert change["protected_inputs_changed"] is False
+    snapshot = json.loads(
+        (Path(plan.workdir) / "toolchain_snapshot.json").read_text()
+    )
+    assert snapshot["files"]["flow_compatibility_receipt"]["sha256"] == \
+        hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+
+def test_runner_does_not_guess_a_headless_patch_for_unrecognized_source(tmp_path):
+    orfs, bin_dir = _fake_runtime(tmp_path)
+    scripts = orfs / "flow/scripts"; scripts.mkdir()
+    original = "if {[expr [llength [info procs save_image]] > 0]} {\n# different\n"
+    (scripts / "final_report.tcl").write_text(original)
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runner = ORFSRunner(
+        orfs_root=orfs, work_root=tmp_path / "runs",
+        openroad_bin=bin_dir / "openroad", yosys_bin=bin_dir / "yosys",
+    )
+    plan = runner.prepare(RunRequest(
+        rtl_path=str(rtl), top="top", target_stage=RunStage.SYNTH,
+    ))
+    assert (Path(plan.flow_home) / "scripts/final_report.tcl").read_text() == original
+    receipt = json.loads(
+        (Path(plan.workdir) / "flow_compatibility.json").read_text()
+    )
+    assert receipt["changes"] == []
 
 
 def test_finish_failure_can_export_gds_without_claiming_valid_implementation(tmp_path):

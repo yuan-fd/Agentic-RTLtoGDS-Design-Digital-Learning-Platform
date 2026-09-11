@@ -39,6 +39,7 @@ class ToolName(str, Enum):
     QUERY_POWER = "query_power"
     QUERY_STAGE_METRICS = "query_stage_metrics"
     QUERY_ARTIFACT_EXCERPT = "query_artifact_excerpt"
+    QUERY_OPENROAD_KNOWLEDGE = "query_openroad_knowledge"
     COMPARE_RUNS = "compare_runs"
     STOP_OR_ESCALATE = "stop_or_escalate"
 
@@ -47,13 +48,14 @@ DEFAULT_L1_TOOLS = (
     ToolName.GET_DESIGN_SUMMARY, ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION,
     ToolName.QUERY_DRC, ToolName.QUERY_POWER, ToolName.QUERY_STAGE_METRICS,
     ToolName.QUERY_ARTIFACT_EXCERPT, ToolName.SET_FLOW_PARAMS, ToolName.RUN_STAGE,
-    ToolName.RUN_FULL_FLOW, ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE,
+    ToolName.QUERY_OPENROAD_KNOWLEDGE, ToolName.RUN_FULL_FLOW,
+    ToolName.COMPARE_RUNS, ToolName.STOP_OR_ESCALATE,
 )
 
 READ_ONLY_TOOLS = frozenset({
     ToolName.QUERY_TIMING, ToolName.QUERY_CONGESTION, ToolName.QUERY_DRC,
     ToolName.QUERY_POWER, ToolName.QUERY_ARTIFACT_EXCERPT,
-    ToolName.COMPARE_RUNS,
+    ToolName.QUERY_OPENROAD_KNOWLEDGE, ToolName.COMPARE_RUNS,
 })
 
 

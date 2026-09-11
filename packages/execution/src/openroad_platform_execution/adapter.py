@@ -85,14 +85,17 @@ class ProcessAdapter:
             result_path, outcome, started_at=started, ended_at=_now()
         )
         artifacts: tuple[dict, ...] = ()
-        if result.status is RuntimeStatus.SUCCEEDED:
-            try:
-                artifacts = self._validate_artifacts(root, manifest, task, result)
-            except (OSError, ValueError) as exc:
-                result = _protocol_failure(
-                    started, _now(), outcome.returncode,
-                    f"Artifact protocol error: {exc}",
-                )
+        try:
+            artifacts = self._validate_artifacts(
+                root, manifest, task, result,
+                require_expected=result.status is RuntimeStatus.SUCCEEDED,
+            )
+        except (OSError, ValueError) as exc:
+            result = _protocol_failure(
+                started, _now(), outcome.returncode,
+                f"Artifact protocol error: {exc}",
+            )
+            artifacts = ()
         return AdapterExecution(
             result=result,
             outcome=outcome,
@@ -205,9 +208,12 @@ class ProcessAdapter:
         manifest: PluginManifest,
         task: TaskSpec,
         result: PluginResult,
+        *,
+        require_expected: bool = True,
     ) -> tuple[dict, ...]:
         normalized = []
         kinds = []
+        store_keys: set[str] = set()
         allowed_kinds = {
             rule.get("kind") for rule in manifest.artifact_rules if rule.get("kind")
         }
@@ -225,23 +231,29 @@ class ProcessAdapter:
             kind = item["kind"]
             if allowed_kinds and kind not in allowed_kinds:
                 raise ValueError(f"Artifact kind is not allowed by manifest: {kind}")
+            store_key = str(path.relative_to(root))
+            if store_key in store_keys:
+                raise ValueError(
+                    f"Artifact store key is declared more than once: {store_key}")
+            store_keys.add(store_key)
             kinds.append(kind)
             normalized.append({
                 "kind": kind,
-                "store_key": str(path.relative_to(root)),
+                "store_key": store_key,
                 "size_bytes": path.stat().st_size,
                 "sha256": _sha256(path),
                 "metadata": {
                     key: value for key, value in item.items() if key not in {"kind", "path"}
                 },
             })
-        required = set(task.expected_artifacts)
-        required.update(
-            rule.get("kind") for rule in manifest.artifact_rules if rule.get("required")
-        )
-        missing = sorted(kind for kind in required if kind and kind not in kinds)
-        if missing:
-            raise ValueError(f"Required artifact kinds missing: {', '.join(missing)}")
+        if require_expected:
+            required = set(task.expected_artifacts)
+            required.update(
+                rule.get("kind") for rule in manifest.artifact_rules if rule.get("required")
+            )
+            missing = sorted(kind for kind in required if kind and kind not in kinds)
+            if missing:
+                raise ValueError(f"Required artifact kinds missing: {', '.join(missing)}")
         return tuple(normalized)
 
     @staticmethod

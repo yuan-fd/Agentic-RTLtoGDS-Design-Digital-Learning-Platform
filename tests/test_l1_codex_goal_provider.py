@@ -8,7 +8,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[1] / "apps" / "l1_workbench"))
 
 from codex_goal_provider import CodexGoalDraftProvider  # noqa: E402
-from openroad_platform_contracts.l1_goal_draft import GoalDraft  # noqa: E402
+from openroad_platform_contracts.l1_goal_draft import (  # noqa: E402
+    ClarificationQuestion, GoalDraft,
+)
 from openroad_platform_scheduler.l1_model_boundary import L1ModelBoundary  # noqa: E402
 
 _USER_TEXT = "Help improve mux setup timing, area must not rise more than 3%."
@@ -40,9 +42,17 @@ def _make_provider(tmp_path, payload, *, returncode=0):
     return provider
 
 
+def _required(payload=None):
+    return tuple(ClarificationQuestion.from_dict(item)
+                 for item in (payload or _payload())["questions"])
+
+
 def test_codex_provider_produces_a_bound_goal_draft(tmp_path):
     provider = _make_provider(tmp_path, _payload(with_blocking=True))
-    draft = L1ModelBoundary.compile_draft(provider, _USER_TEXT, draft_id="draft-1")
+    draft = L1ModelBoundary.compile_draft(
+        provider, _USER_TEXT, draft_id="draft-1",
+        required_questions=_required(),
+    )
     assert isinstance(draft, GoalDraft)
     assert draft.request_text == _USER_TEXT
     assert draft.parser_id == "codex-cli-l1-goal-v1"
@@ -53,7 +63,10 @@ def test_codex_provider_produces_a_bound_goal_draft(tmp_path):
 def test_codex_provider_clean_draft_has_no_unresolved_blocking_fields(tmp_path):
     payload = _payload(with_blocking=False)
     provider = _make_provider(tmp_path, payload)
-    draft = L1ModelBoundary.compile_draft(provider, _USER_TEXT, draft_id="draft-2")
+    draft = L1ModelBoundary.compile_draft(
+        provider, _USER_TEXT, draft_id="draft-2",
+        required_questions=_required(payload),
+    )
     assert draft.unresolved_blocking_fields() == ()
 
 
@@ -62,14 +75,54 @@ def test_codex_provider_rejects_forbidden_or_unknown_fields(tmp_path):
     payload["command"] = "rm -rf /"
     provider = _make_provider(tmp_path, payload)
     with pytest.raises(ValueError):
-        L1ModelBoundary.compile_draft(provider, _USER_TEXT, draft_id="draft-3")
+        L1ModelBoundary.compile_draft(
+            provider, _USER_TEXT, draft_id="draft-3",
+            required_questions=_required(payload),
+        )
 
 
 def test_codex_provider_rejects_changed_request_text(tmp_path):
     payload = _payload(text="a completely different sentence")
     provider = _make_provider(tmp_path, payload)
     with pytest.raises(ValueError, match="changed the user request"):
-        L1ModelBoundary.compile_draft(provider, _USER_TEXT, draft_id="draft-4")
+        L1ModelBoundary.compile_draft(
+            provider, _USER_TEXT, draft_id="draft-4",
+            required_questions=_required(),
+        )
+
+
+def test_codex_provider_cannot_invent_or_reword_operator_questions(tmp_path):
+    required = _required()
+    invented = _payload()
+    invented["questions"].append({
+        "question_id": "model-choice", "field": "toolchain",
+        "prompt": "Let the model select a toolchain.", "blocking": False,
+        "schema_version": 1,
+    })
+    with pytest.raises(ValueError, match="operator-owned question schema"):
+        L1ModelBoundary.compile_draft(
+            _make_provider(tmp_path, invented), _USER_TEXT,
+            draft_id="draft-invented", required_questions=required,
+        )
+    reworded = _payload()
+    reworded["questions"][0]["prompt"] = "A model-authored replacement prompt."
+    with pytest.raises(ValueError, match="operator-owned question schema"):
+        L1ModelBoundary.compile_draft(
+            _make_provider(tmp_path, reworded), _USER_TEXT,
+            draft_id="draft-reworded", required_questions=required,
+        )
+
+
+def test_codex_prompt_contains_operator_schema_and_forbids_invention():
+    provider = CodexGoalDraftProvider(executable="/bin/echo")
+    required = _payload()["questions"]
+    prompt = provider._prompt({
+        "kind": "goal_draft", "request_text": _USER_TEXT,
+        "required_questions": required,
+    })
+    assert "REQUIRED_QUESTIONS=" in prompt
+    assert json.dumps(required, ensure_ascii=False) in prompt
+    assert "do not create, delete, rename" in prompt
 
 
 def test_codex_provider_raises_when_no_structured_proposal(tmp_path):

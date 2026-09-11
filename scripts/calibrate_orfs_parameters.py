@@ -35,8 +35,9 @@ def _anchors(spec: dict, baseline: object) -> list[object]:
         return list(spec["choices"])
     del baseline
     midpoint = (spec["lower"] + spec["upper"]) / 2
-    step = spec.get("step") or 1
-    midpoint = spec["lower"] + round((midpoint - spec["lower"]) / step) * step
+    step = spec.get("step")
+    if step:
+        midpoint = spec["lower"] + round((midpoint - spec["lower"]) / step) * step
     if spec["kind"] == "int":
         midpoint = int(midpoint)
     values = [spec["lower"], midpoint, spec["upper"]]

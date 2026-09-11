@@ -11,7 +11,7 @@ An evidence-first, plugin-based control plane for reproducible chip-design exper
 Turning chip design from a manual flow into an **automated + self-learning** open platform:
 
 - **Typed interaction**: natural language becomes a reviewed SpecIR/DesignGoal and typed tool calls, never arbitrary shell text.
-- **Product path**: platform-managed RTLScout produces independently verified RTL; the admitted ORFS-Agent plugin is the sole 2D design-space-exploration product path.
+- **Product path**: platform-managed RTLScout produces independently verified RTL; A2-ORFO is the sole L2 product optimizer and uses the admitted ORFS-Agent as its complete 12-D variable-clock EDA executor.
 - **Open extension**: plugins execute through bounded adapters, Runtime and protected evaluation; 3D and specialty tools remain independent capabilities.
 
 **In one sentence: approved intent enters, independently verified evidence returns, and the platform never substitutes itself for an upstream research algorithm.**
@@ -26,7 +26,7 @@ Turning chip design from a manual flow into an **automated + self-learning** ope
 
 ![Design workflow](docs/images/workflow.png)
 
-*Natural-language SpecIR → platform-managed RTLScout → independent verification → verified RTL → DesignGoal/typed policy → admitted ORFS-Agent → immutable TaskSpec → Runtime → raw artifacts → protected QoR.  TaiWei 3D is a separate plugin workflow; research comparators are not product modes.*
+*Natural-language SpecIR → platform-managed RTLScout → independent verification → verified RTL → DesignGoal/typed policy → A2-ORFO policy → complete ORFS-Agent executor → immutable TaskSpec → Runtime → raw artifacts → protected QoR. TaiWei 3D is a separate plugin workflow; research comparators are not product modes.*
 
 ### Product architecture
 
@@ -34,8 +34,9 @@ Turning chip design from a manual flow into an **automated + self-learning** ope
 graph TD
     U[User · design intent] -->|natural-language spec| FE[Frontend · spec-to-rtl agent]
     FE -->|verified RTL| L1[DesignGoal + typed policy]
-    L1 -->|approved capability| L2[admitted ORFS-Agent plugin]
-    L2 -->|immutable TaskSpec| RT[Workflow Runtime]
+    L1 -->|approved capability| L2[A2-ORFO policy]
+    L2 --> EX[ORFS-Agent · complete 12-D executor]
+    EX -->|immutable TaskSpec| RT[Workflow Runtime]
     RT -->|raw artifacts| EV[Protected evaluator]
     EV --> OBS[(canonical QoR + provenance)]
     OBS -->|evidence only| L1[L1 trace and typed policy]
@@ -65,9 +66,9 @@ graph LR
 | Web workspace | Legacy UI | Frozen from product growth; it remains a transitional historical/developer surface pending P3 isolation |
 | Natural-language RTL generation | ✅ Available | Server Codex parses SpecIR; a separate verification agent freezes a testbench/oracle before RTLScout candidate search |
 | Frontend LLM entry | ✅ Available | Three entry buttons (upload / LLM spec / examples), agent run trace dashboard |
-| Product control plane | ✅ Working | SpecIR/RTL evidence, Runtime attempt control, artifact provenance and protected evaluation; L1 durable trace is planned |
-| L2 design-space exploration | Admitted plugin | ORFS-Agent is the sole product optimizer; local BO/GP remains research-only |
-| Agent trace dashboard | Planned L1 | Durable Goal → ToolCall → Runtime → Evidence trace workspace |
+| Product control plane | ✅ Working | Durable Goal/IR, typed Policy/tool calls, Runtime attempts, diagnostics, recovery, artifact provenance and protected evaluation |
+| L2 design-space exploration | Bounded loop accepted | A2-ORFO is the sole product optimizer; ORFS-Agent executes all 12 dimensions including variable clock; the 151-run campaign is configured but not started |
+| Agent trace dashboard | ✅ Terminal workbench | Durable Goal → ToolCall/Policy → Runtime → Evidence/Reflection panels; no hidden chain-of-thought or arbitrary shell |
 | Plugin ecosystem | Governed admission | Every plugin requires a pinned source, license conclusion and bounded smoke |
 | No-auth internal mode | ✅ Available | `OPENROAD_PLATFORM_NO_AUTH=1` skips registration |
 | Platform model | ✅ Server managed | Fixed internal Codex model; browser accepts no Provider or API key |
@@ -213,7 +214,7 @@ provenance is already enforced.
 | Platform core | **Zero runtime deps**; optional visualization: KLayout(pya)/Graphviz/Matplotlib/NumPy; test: pytest | [docs/ENVIRONMENT_BASELINE.md](docs/ENVIRONMENT_BASELINE.md) |
 | 2D toolchain | ORFS + OpenROAD + Yosys (`../OpenROAD-flow-scripts`) | same doc |
 | 3D toolchain | TaiWei-specific ORFS-Research/OpenROAD/Yosys (`.tools/taiwei-official-3d`, LD_LIBRARY_PATH configured) | [integrations/taiwei_pin_3d/environment.lock.json](integrations/taiwei_pin_3d/environment.lock.json) |
-| Plugin tools | RTLScout: verilator+yosys; AgenticPD: python; DPLEvolve: bash/git/python3 | [docs/PLUGINS.md](docs/PLUGINS.md) |
+| Plugin tools | RTLScout: verilator+yosys; AgenticPD: source-audit-only (no license); DPLEvolve: bash/git/python3 | [docs/PLUGINS.md](docs/PLUGINS.md) |
 
 **Environment management**: `.tools/` isolates toolchains and Python venvs
 (per-plugin venv + pinned commits); package paths injected via `PYTHONPATH`;

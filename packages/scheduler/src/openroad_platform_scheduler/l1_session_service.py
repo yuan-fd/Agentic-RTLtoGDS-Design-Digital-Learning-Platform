@@ -105,8 +105,14 @@ class L1SessionService:
         # receives Runtime, tools, shell text, or mutable workspace access.
         self.goal_finalizer = goal_finalizer or GoalFinalizer.finalize
 
-    def start(self, request_text: str, provider: L1StructuredProvider, policy: TrustedGoalPolicy) -> L1Session:
-        draft = L1ModelBoundary.compile_draft(provider, request_text, draft_id=f"draft-{uuid4().hex}")
+    def start(
+        self, request_text: str, provider: L1StructuredProvider,
+        policy: TrustedGoalPolicy, *, required_questions=(),
+    ) -> L1Session:
+        draft = L1ModelBoundary.compile_draft(
+            provider, request_text, draft_id=f"draft-{uuid4().hex}",
+            required_questions=tuple(required_questions),
+        )
         session_id, trace_id = f"l1-session-{uuid4().hex}", f"l1-trace-{uuid4().hex}"
         self.store.create(session_id, trace_id, draft, policy)
         return self._record_and_finalize(session_id, draft, policy)
@@ -135,12 +141,8 @@ class L1SessionService:
         if (draft.request_text != prior.request_text or tuple(draft.answers) != merged_answers
                 or draft.interpretation != prior.interpretation or draft.field_sources != prior.field_sources):
             raise ValueError("goal revision must preserve request and all typed answers")
-        revised_questions = {item.question_id: item for item in draft.questions}
-        if any((item.question_id not in revised_questions
-                or revised_questions[item.question_id].field is not item.field
-                or revised_questions[item.question_id].blocking is not item.blocking)
-               for item in prior.questions):
-            raise ValueError("goal revision may not remove or weaken prior clarification questions")
+        if draft.questions != prior.questions:
+            raise ValueError("goal revision changed the operator-owned question schema")
         self.store.prepare(session_id, draft)
         return self._record_and_finalize(session_id, draft, policy)
 

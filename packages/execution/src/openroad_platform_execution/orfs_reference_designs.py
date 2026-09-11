@@ -33,6 +33,7 @@ class ORFSReferenceDesign:
     native_baseline_overrides: Mapping[str, Any]
     source_fingerprint: str
     orfs_commit: str
+    fast_route_tcl_path: Path | None = None
 
     def request(self, *, flow_parameters: Mapping[str, Any], or_seed: int,
                 target_stage: RunStage = RunStage.FINISH,
@@ -119,12 +120,61 @@ DEFINITIONS = {
 }
 
 
+ORFS_AGENT_PAPER_ORFS_COMMIT = "ce8d36a7fef0ab9c47d183bcf078bce0f60f5a54"
+ORFS_AGENT_PAPER_AES_SKY130HD = {
+    "root": "aes", "top": "aes_cipher_top", "clock": "clk",
+    "sdc": "constraint.sdc", "period": 4.5,
+    "fast_route": "fastroute.tcl",
+    "options": {"remove_abc_buffers": 1},
+    "baseline": {"core_utilization_pct": 20, "place_density": .6,
+                 "tns_end_percent": 100},
+}
+
+
 def load_orfs_reference_design(orfs_root: str | Path, *, platform: str,
                                design: str) -> ORFSReferenceDesign:
     root = Path(orfs_root).expanduser().resolve()
     definition = DEFINITIONS.get((platform, design))
     if definition is None:
         raise ValueError(f"unregistered v2 reference design: {platform}/{design}")
+    return _load_reference_design(root, platform=platform, design=design,
+                                  definition=definition,
+                                  recipe_id="orfs-current-reference-v1")
+
+
+def load_orfs_agent_paper_reference_design(
+    orfs_root: str | Path, *, platform: str = "sky130hd", design: str = "aes",
+) -> ORFSReferenceDesign:
+    """Load the exact fixed-clock reference used before L2 variable-clock DSE.
+
+    This is deliberately a separate recipe from the current ORFS
+    Sky130HD/AES definition, whose SDC is 3.6 ns.  Accepting the current recipe
+    here would make the L1 evidence/design handoff ambiguous.
+    """
+    if (platform, design) != ("sky130hd", "aes"):
+        raise ValueError("ORFS-Agent paper reference is only sky130hd/aes")
+    root = Path(orfs_root).expanduser().resolve()
+    commit = _git_output(root, "rev-parse", "HEAD")
+    if commit != ORFS_AGENT_PAPER_ORFS_COMMIT:
+        raise ValueError(
+            "ORFS-Agent paper reference requires ORFS commit "
+            f"{ORFS_AGENT_PAPER_ORFS_COMMIT}; observed {commit or 'unknown'}"
+        )
+    dirty = _git_output(root, "status", "--porcelain", "--untracked-files=all")
+    if dirty:
+        raise ValueError("ORFS-Agent paper reference requires a clean detached checkout")
+    return _load_reference_design(
+        root, platform=platform, design=design,
+        definition=ORFS_AGENT_PAPER_AES_SKY130HD,
+        recipe_id="orfs-agent-paper-aes-sky130hd-v1",
+        expected_commit=ORFS_AGENT_PAPER_ORFS_COMMIT,
+    )
+
+
+def _load_reference_design(
+    root: Path, *, platform: str, design: str, definition: Mapping[str, Any],
+    recipe_id: str, expected_commit: str | None = None,
+) -> ORFSReferenceDesign:
     source_root = root / "flow/designs/src" / definition["root"]
     suffix = "*.sv" if definition.get("frontend") == "slang" else "*.v"
     files = tuple(sorted(source_root.glob(suffix)))
@@ -133,7 +183,9 @@ def load_orfs_reference_design(orfs_root: str | Path, *, platform: str,
     include_dirs = ((source_root / definition["include"],)
                     if definition.get("include") else ())
     sdc = root / "flow/designs" / platform / design / definition["sdc"]
-    required = (*files, *include_dirs, sdc)
+    fast_route = (root / "flow/designs" / platform / design /
+                  definition["fast_route"] if definition.get("fast_route") else None)
+    required = (*files, *include_dirs, sdc, *((fast_route,) if fast_route else ()))
     if not files or any(not path.exists() for path in required):
         raise FileNotFoundError(f"incomplete ORFS reference bundle: {platform}/{design}")
     if not any(path.stem == definition["top"] for path in files):
@@ -146,12 +198,14 @@ def load_orfs_reference_design(orfs_root: str | Path, *, platform: str,
             if path.is_file() and path.suffix.lower() in {".v", ".sv", ".vh", ".svh"}:
                 records.append((str(path.relative_to(root)), _sha256(path)))
     records.append((str(sdc.relative_to(root)), _sha256(sdc)))
-    commit = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
-    ).stdout.strip() or "unknown"
+    if fast_route is not None:
+        records.append((str(fast_route.relative_to(root)), _sha256(fast_route)))
+    commit = _git_output(root, "rev-parse", "HEAD") or "unknown"
+    if expected_commit is not None and commit != expected_commit:
+        raise ValueError("reference checkout changed during bundle resolution")
     fingerprint = hashlib.sha256(json.dumps(
-        {"definition": definition, "files": records, "orfs_commit": commit},
+        {"recipe_id": recipe_id, "definition": definition,
+         "files": records, "orfs_commit": commit},
         sort_keys=True, separators=(",", ":"),
     ).encode()).hexdigest()
     return ORFSReferenceDesign(
@@ -162,7 +216,15 @@ def load_orfs_reference_design(orfs_root: str | Path, *, platform: str,
         design_options=dict(definition.get("options") or {}),
         native_baseline_overrides=dict(definition["baseline"]),
         source_fingerprint=fingerprint, orfs_commit=commit,
+        fast_route_tcl_path=fast_route,
     )
+
+
+def _git_output(root: Path, *arguments: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(root), *arguments], text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    ).stdout.strip()
 
 
 def _sha256(path: Path) -> str:

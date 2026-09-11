@@ -19,12 +19,12 @@ def _goal_state():
 
 
 def _request():
-    return OptimizationRequest("request-1", "trace-1", "goal-1", "state-1", "orfs-agent",
-        "optimizer.l2.propose", "minimize area subject to timing", EvidencePointer("artifact:protocol", "c" * 64),
+    return OptimizationRequest("request-1", "trace-1", "goal-1", "state-1", "a2-orfo",
+        "optimizer.l2.a2-orfo-feedback", "minimize area subject to timing", EvidencePointer("artifact:protocol", "c" * 64),
         EvidencePointer("artifact:search-space", "d" * 64), "fixed-seed-v1", AgentBudget(4, 2, 60))
 
 
-def _manifest(plugin_id="orfs-agent", capabilities=("optimizer.l2.propose",)):
+def _manifest(plugin_id="a2-orfo", capabilities=("optimizer.l2.a2-orfo-feedback",)):
     return PluginManifest(plugin_id, "2025.1", ("adapter",), capabilities, ("x86_64",),
         {"type": "object"}, {"type": "object"}, (), 60)
 
@@ -59,12 +59,12 @@ def test_handoff_rejects_unverified_state_foreign_plugin_and_foreign_task():
 
 def test_handoff_rejects_non_product_capability_from_an_admitted_manifest():
     goal, state = _goal_state()
-    request = OptimizationRequest("request-1", "trace-1", "goal-1", "state-1", "orfs-agent",
+    request = OptimizationRequest("request-1", "trace-1", "goal-1", "state-1", "a2-orfo",
         "unapproved.l2.action", "minimize area subject to timing", EvidencePointer("artifact:protocol", "c" * 64),
         EvidencePointer("artifact:search-space", "d" * 64), "fixed-seed-v1", AgentBudget(4, 2, 60))
     with pytest.raises(PermissionError, match="approved product capability"):
         OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE, _builder).task_for(
-            request, goal, state, _manifest(capabilities=("optimizer.l2.propose", "unapproved.l2.action")))
+            request, goal, state, _manifest(capabilities=("optimizer.l2.a2-orfo-feedback", "unapproved.l2.action")))
 
 
 def test_handoff_only_submits_through_runtime():
@@ -75,4 +75,4 @@ def test_handoff_only_submits_through_runtime():
             return SimpleNamespace(run_id="run-1")
     runtime = Runtime()
     run = OptimizationHandoffService(DEFAULT_PRODUCT_SURFACE, _builder).submit(runtime, request, goal, state, _manifest())
-    assert run.run_id == "run-1" and runtime.capability == "optimizer.l2.propose"
+    assert run.run_id == "run-1" and runtime.capability == "optimizer.l2.a2-orfo-feedback"

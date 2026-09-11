@@ -40,10 +40,10 @@ def test_runtime_bridge_only_submits_immutable_task_and_observes_runtime(tmp_pat
     assert receipt.status == "accepted" and runtime.task.parameters["target_stage"] == "route"
     assert bridge.observation("run-1").attempt_id == "attempt-1"
     successor = bridge.reduce_and_trace(L1TraceService(L1TraceStore(tmp_path / "trace.sqlite")), "trace-1", state, run_id="run-1", next_state_id="state-2")
-    assert successor.metrics["setup_wns_ns"] == -0.1
+    assert successor.metrics == {}
 
 
-def test_runtime_bridge_projects_admitted_orfs_metrics_to_m1_goal_metrics(tmp_path):
+def test_runtime_bridge_does_not_promote_adapter_metrics_to_canonical_qor(tmp_path):
     rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
     runtime = _Runtime()
     runtime.describe = lambda run_id: {
@@ -59,9 +59,33 @@ def test_runtime_bridge_projects_admitted_orfs_metrics_to_m1_goal_metrics(tmp_pa
         }]}],
     }
     bridge = L1RuntimeBridge(runtime, build_orfs_task(rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
-    assert bridge.observation("run-1").metrics == {
-        "setup_wns_ns": -0.18, "area_um2": 100.0, "drc_errors": 0.0,
+    assert bridge.observation("run-1").metrics == {}
+
+
+def test_runtime_bridge_promotes_only_runtime_attested_protected_qor(tmp_path):
+    rtl = tmp_path / "top.v"; rtl.write_text("module top; endmodule\n")
+    runtime = _Runtime()
+    runtime.describe = lambda run_id: {
+        "run": {"status": "succeeded", "task_spec": {"labels": {"l1_goal_id": "goal-1"}}},
+        "stages": [{"stage_key": "finish", "successful_attempt_id": "attempt-1", "attempts": [{
+            "attempt_id": "attempt-1", "metrics": [{"name": "fake", "value": 999}],
+            "artifacts": [{
+                "artifact_id": "official-1", "sha256": "c" * 64,
+                "metadata": {"runtime_authority": "protected_evaluator",
+                             "producer": "protected-orfs-evaluator", "official_qor": True,
+                             "outcome": "completed", "evaluation_id": "evaluation-1",
+                             "canonical_metrics": {"setup_wns_ns": 0.05,
+                                                   "area_um2": 100.0, "drc_errors": 0}},
+            }],
+        }]}],
     }
+    bridge = L1RuntimeBridge(runtime, build_orfs_task(
+        rtl, project_id="p1", design_id="top"), ORFSRTLToGDSFactory())
+    observation = bridge.observation("run-1")
+    assert observation.metrics == {
+        "setup_wns_ns": 0.05, "area_um2": 100.0, "drc_errors": 0.0,
+    }
+    assert observation.evidence[0] == EvidencePointer("artifact:runtime-official-1", "c" * 64)
 
 
 def test_runtime_bridge_has_no_memory_experiment_state_and_handles_tutorial_controls(tmp_path):
@@ -86,9 +110,9 @@ def test_runtime_bridge_maps_each_tutorial_tool_to_a_bounded_surface(tmp_path, m
         def handler(goal, state, call):
             called.append(name); return ToolReceipt(call.call_id, goal.goal_id, state.state_id, call.tool, "completed", {}, (EvidencePointer("artifact:receipt", "c" * 64),))
         return handler
-    monkeypatch.setattr(bridge, "submit", route("submit")); monkeypatch.setattr(bridge, "set_flow_params", route("set")); monkeypatch.setattr(bridge, "stop_or_escalate", route("stop")); monkeypatch.setattr(bridge, "design_summary", route("summary")); monkeypatch.setattr(bridge, "query", route("query"))
-    args = {ToolName.GET_DESIGN_SUMMARY:{}, ToolName.QUERY_TIMING:{"run_id":"run-1"}, ToolName.QUERY_CONGESTION:{"run_id":"run-1"}, ToolName.QUERY_DRC:{"run_id":"run-1"}, ToolName.QUERY_POWER:{"run_id":"run-1"}, ToolName.QUERY_STAGE_METRICS:{"run_id":"run-1"}, ToolName.QUERY_ARTIFACT_EXCERPT:{"run_id":"run-1","artifact_id":"artifact-1","max_bytes":1}, ToolName.SET_FLOW_PARAMS:{"values":{"core_utilization_pct":1}}, ToolName.RUN_STAGE:{"stage":"route"}, ToolName.RUN_FULL_FLOW:{}, ToolName.COMPARE_RUNS:{"left_run_id":"run-1","right_run_id":"run-2","metrics":["setup_wns_ns"]}, ToolName.STOP_OR_ESCALATE:{"run_id":"run-1","reason":"bounded stop"}}
-    expected = {ToolName.GET_DESIGN_SUMMARY:"summary", ToolName.SET_FLOW_PARAMS:"set", ToolName.RUN_STAGE:"submit", ToolName.RUN_FULL_FLOW:"submit", ToolName.STOP_OR_ESCALATE:"stop"}
+    monkeypatch.setattr(bridge, "submit", route("submit")); monkeypatch.setattr(bridge, "set_flow_params", route("set")); monkeypatch.setattr(bridge, "stop_or_escalate", route("stop")); monkeypatch.setattr(bridge, "design_summary", route("summary")); monkeypatch.setattr(bridge, "query", route("query")); monkeypatch.setattr(bridge, "query_openroad_knowledge", route("knowledge"))
+    args = {ToolName.GET_DESIGN_SUMMARY:{}, ToolName.QUERY_TIMING:{"run_id":"run-1"}, ToolName.QUERY_CONGESTION:{"run_id":"run-1"}, ToolName.QUERY_DRC:{"run_id":"run-1"}, ToolName.QUERY_POWER:{"run_id":"run-1"}, ToolName.QUERY_STAGE_METRICS:{"run_id":"run-1"}, ToolName.QUERY_ARTIFACT_EXCERPT:{"run_id":"run-1","artifact_id":"artifact-1","max_bytes":1}, ToolName.QUERY_OPENROAD_KNOWLEDGE:{"query":"Explain DRT-0349","purpose":"error_explanation","top_k":3}, ToolName.SET_FLOW_PARAMS:{"values":{"core_utilization_pct":1}}, ToolName.RUN_STAGE:{"stage":"route"}, ToolName.RUN_FULL_FLOW:{}, ToolName.COMPARE_RUNS:{"left_run_id":"run-1","right_run_id":"run-2","metrics":["setup_wns_ns"]}, ToolName.STOP_OR_ESCALATE:{"run_id":"run-1","reason":"bounded stop"}}
+    expected = {ToolName.GET_DESIGN_SUMMARY:"summary", ToolName.QUERY_OPENROAD_KNOWLEDGE:"knowledge", ToolName.SET_FLOW_PARAMS:"set", ToolName.RUN_STAGE:"submit", ToolName.RUN_FULL_FLOW:"submit", ToolName.STOP_OR_ESCALATE:"stop"}
     for index, tool in enumerate(TUTORIAL_L1_TOOLS):
         bridge.execute(goal, state, SemanticToolCall(f"call-surface-{index}", goal.goal_id, state.state_id, tool, args[tool], "planner"))
         assert called.pop() == expected.get(tool, "query")

@@ -11,9 +11,25 @@ from importlib import import_module
 
 from .common_evaluator import evaluate_orfs_run, write_immutable_evaluation
 from .orfs_protected_evaluator import ORFSProtectedEvaluator
+from .stage_diagnostics import (
+    analyze_domain, diagnose_runtime, diagnose_terminal_failure,
+    metric_facts_from_runtime,
+)
+from .artifact_graph import build_cross_artifact_index
+from .convergence import classify_convergence
+from .posteda_bench import diagnose_posteda_public_case
+from .closer_alignment import audit_closer_protocol_alignment
 
 
-__all__ = ("evaluate_orfs_run", "write_immutable_evaluation", "ORFSProtectedEvaluator")
+__all__ = (
+    "evaluate_orfs_run", "write_immutable_evaluation", "ORFSProtectedEvaluator",
+    "analyze_domain", "diagnose_runtime", "diagnose_terminal_failure",
+    "metric_facts_from_runtime",
+    "build_cross_artifact_index",
+    "classify_convergence",
+    "diagnose_posteda_public_case",
+    "audit_closer_protocol_alignment",
+)
 
 _LEGACY_MODULES = (
     "diagnosis", "pipeline", "reporter", "knowledge_base", "evolve_agent",

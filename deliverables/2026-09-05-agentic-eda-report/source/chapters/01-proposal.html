@@ -1,0 +1,32 @@
+<div class="callout note"><strong>阅读定位：</strong>本章对用户提供的两页 ASP-DAC 2027 proposal 作语义拆解。除明确标为“建议”的设计外，要求来源均为 PDF 的 Abstract 和 Outline；不是根据仓库现状反向缩小教程要求。</div>
+<h2>1. 这份 tutorial 不是在教“让 LLM 生成芯片”</h2>
+<p>它的核心对象是<strong>物理设计流程和优化引擎</strong>。第一步让用户用自然语言与 OpenROAD 可靠交互，第二步用工具反馈闭环优化，第三步利用开源代码把搜索范围从流程参数扩展到引擎实现，最后用剩余 QoR 差距指导算法演化。</p>
+<blockquote>从“会用 EDA 工具”，走到“能在受保护评价下尝试改进 EDA 工具”。</blockquote>
+<div class="flow"><div class="node"><strong>表达目标</strong>自然语言 → 结构化意图与约束</div><span class="arrow">→</span><div class="node"><strong>可靠执行</strong>工具调用 → 设计状态与证据</div><span class="arrow">→</span><div class="node"><strong>闭环优化</strong>参数/机制候选 → 实测反馈</div><span class="arrow">→</span><div class="node"><strong>源码演化</strong>受限改动 → 构建 → 固定评价</div></div>
+<h2>2. 按 proposal 的六个环节拆成验收问题</h2>
+<div class="table-wrap"><table><thead><tr><th>原文环节</th><th>参与者应学会什么</th><th>应该拿出什么证据</th></tr></thead><tbody>
+<tr><td>1. What makes EDA agentic?</td><td>理解目标、工具、状态、反馈、验证和记忆之间的关系。</td><td>一条完整记录：目标如何约束工具，结果怎样改变后续动作。</td></tr>
+<tr><td>2. Tool-using agent</td><td>知道 OpenROAD 能力如何变成结构化工具，如何可靠返回设计事实。</td><td>有效请求、被拒请求、原始报告、结构化返回和权限检查。</td></tr>
+<tr><td>3. 第一个 hands-on</td><td>自己提出自然语言请求、查询 timing/设计信息、运行阶段并观察反馈。</td><td>自然语言原文、Goal、SemanticToolCall、Runtime run/attempt、证据引用。</td></tr>
+<tr><td>4. Black-box → white-box</td><td>理解参数搜索与修改引擎内部机制的差别。</td><td>明确搜索域、允许修改的源文件，以及固定不变的评价条件。</td></tr>
+<tr><td>5. 第二个 hands-on</td><td>看懂一次源码候选如何构建、运行、评价，以及为什么保留或拒绝。</td><td>源码差分、基线 commit、候选二进制哈希、构建日志、完整评价和失败记录。</td></tr>
+<tr><td>6. Goal-driven evolution</td><td>理解为何未满足的目标、阶段证据和机制假设要共同指导下一步。</td><td>目标差距 → 阶段定位 → 机制假设 → 候选 → 最终 QoR 的可核验链。</td></tr>
+</tbody></table></div>
+<p><strong>重要区别：</strong>proposal 提到黑盒方法可搜索参数、脚本和约束，是对方法空间的描述；你们平台具体允许哪些改变，仍由冻结协议和用户授权决定。不能为了跟上原文就放开受保护的 SDC。</p>
+<h2>3. L1—L4 是能力分类，不是顺序流水线</h2>
+<div class="table-wrap"><table><thead><tr><th>用户分类</th><th>建议定义</th><th>在 proposal 中的位置</th></tr></thead><tbody>
+<tr><td>L1</td><td>面向人的目标澄清、查询、行动解释、授权和反馈交互。算法不必放在 UI 内。</td><td>1—3 的主干，并贯穿后续实验。</td></tr>
+<tr><td>L2</td><td>在明确参数搜索空间内，复用上游优化策略提出候选。</td><td>2—4 的黑盒流程优化部分。</td></tr>
+<tr><td>L3</td><td>在允许的设计状态/checkpoint 上组合有限变换，改变设计而不改引擎源码。</td><td>你们增加的有用中间层；原文没有单列为必需级别。</td></tr>
+<tr><td>L4</td><td>对选定引擎源码做受限改动，产生候选构建并独立评价。</td><td>4—6 的关键要求。</td></tr>
+</tbody></table></div>
+<p>不能定义“L2 三轮没有改善，就必然进入 L3；L3 再不行就进入 L4”。停滞可能来自预算不足、噪声、搜索域或信息缺失；它不自动证明引擎实现就是瓶颈。升级需要证据、适用的插件、权限和独立预算。</p>
+<h2>4. 全平台 Spec-to-GDS 为什么仍然成立？</h2>
+<p><span class="badge plan">建议范围</span>平台可以提供 spec、RTL、已有实现 checkpoint 三类入口。它们经过不同的前置检查，最终汇入共同的执行与评价基础设施。教程从已验证 RTL 开始，是降低教学变量的选择，不是产品架构的能力上限。</p>
+<div class="grid"><article class="card"><h3>平台愿景</h3><p>经典模块的受控改造：规格澄清 → 前端生成/复用 → 验证 → 后端实现 → 优化 → 教学级交付。需要说明支持的模块族、接口、工艺和验证条件。</p></article><article class="card"><h3>教程聚焦</h3><p>三小时不可能讲透所有前端、验证和物理设计算法。前端可作为入口演示；专业深度集中在工具闭环、可信评价、参数搜索与源码演化。</p></article></div>
+<h2>5. 怎样判断“完成 tutorial”，而不是只完成了演示网页？</h2>
+<ol><li><strong>能够复现交互：</strong>同一问题的不同说法不会偷偷改变约束；未知信息会被追问或标记。</li><li><strong>能够验证执行：</strong>参与者能看到真实 run、attempt、产物和终态，而非只有模型描述。</li><li><strong>能够观察反馈影响：</strong>至少展示一次根据新证据继续、停止、拒绝、修订或恢复。</li><li><strong>能够完成源码闭环：</strong>至少一个锁定原生项目的受限源码候选完成构建与评价；成功或失败均可成为教学材料，但必须有完整链。</li><li><strong>能够解释评价边界：</strong>为什么某次流程成功却不合格；为什么局部收益不是最终收益；为什么 smoke 不是统计优势。</li></ol>
+<div class="callout warn"><strong>现有内部文档的适用范围要纠正：</strong><code>L1_L2_TUTORIAL_PROPOSAL_ACCEPTANCE.md</code>明确只审 L1/L2。它可以说明这一子范围的有界能力，不可以被转述成“完整 proposal 已满足”。此处不修改旧记录，只界定它能支持的结论。</div>
+<h2>6. 你汇报时可以这样回答“我们到底要干什么”</h2>
+<blockquote>我们搭建的不是一个本地自研优化器合集，而是一个外部研究能力可以可靠协作的平台。用户先确认设计目标，专业插件提出设计或优化候选，Runtime 负责真实执行，受保护评价器判断结果。教程先展示自然语言如何触发可靠工具闭环，再展示如何在固定评价条件下改进 OpenROAD 的内部算法。目前前一条链已有有界证据，后一条链仍是明确的后续建设目标。</blockquote>
+<p>继续阅读：<a href="02-architecture.html">确认 spec 后的第一步，到底由谁做？</a></p>
