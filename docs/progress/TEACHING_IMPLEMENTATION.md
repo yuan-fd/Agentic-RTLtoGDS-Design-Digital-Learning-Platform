@@ -44,6 +44,9 @@ Updated: 2026-09-11
   verification package, then submitted through the shared RTL verification
   route; RTLScout and Direct LLM candidates have a common comparison read
   model with measured QoR metadata and a selectable trend metric.
+- Direct LLM registration is intentionally separate from verification: a
+  candidate remains `not_evaluated` until the shared Runtime lint/simulation/
+  formal gates record evidence.
 - Native BO/GP campaign creation is exposed at `/api/v2/closed-loops`; A2
   campaign status/list operations remain bound to the L1 Workbench session.
 - Rule Batch submits 1–6 independent Runtime candidates with a shared batch
