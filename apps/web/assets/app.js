@@ -1264,7 +1264,10 @@ async function submitFlow() {
   const button = $("#submitFlow"); if (button) button.disabled = true;
   message("#flowMessage", ui("Creating a Runtime experiment…", "正在创建 Runtime 实验……"));
   try {
-    const result = await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
+    const dseMode = $("#dseMode")?.value || "baseline";
+    const result = dseMode === "bo_gp"
+      ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
+      : await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
       platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk",
       teaching_mode: mode, teaching_context: context, execute: true});
     state.activeSessionId = result.task_spec?.task_id || null;
