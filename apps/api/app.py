@@ -3948,7 +3948,16 @@ class ApiState:
                              item.get("check_kind") in {"simulation", "formal", "equivalence"}
                              and item.get("status") == "passed" for item in checks)
                          else "not_evaluated"})
+        metric_meta = {
+            "area_um2": {"unit": "um²", "direction": "minimize"},
+            "power_W": {"unit": "W", "direction": "minimize"},
+            "setup_wns_ns": {"unit": "ns", "direction": "maximize"},
+            "hold_wns_ns": {"unit": "ns", "direction": "maximize"},
+            "yosys_cells": {"unit": "cells", "direction": "minimize"},
+            "yosys_wires": {"unit": "wires", "direction": "minimize"},
+        }
         return {"spec_id": spec_id, "candidates": rows,
+                "metric_metadata": metric_meta,
                 "generators": sorted({row["generator"] for row in rows}),
                 "comparison_authority": "RTLFrontendStore checks; Runtime evidence required"}
 
