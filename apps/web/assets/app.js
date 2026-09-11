@@ -1324,8 +1324,10 @@ function teachingContext() {
       return null;
     }
   }
-  context.dse_mode = $("#dseMode")?.value || "baseline";
-  context.candidate_count = $("#candidateCount")?.value || "3";
+  if (mode !== "guided") {
+    context.dse_mode = $("#dseMode")?.value || "baseline";
+    context.candidate_count = $("#candidateCount")?.value || "3";
+  }
   if (mode === "challenge") {
     context.hypothesis = $("#teachingHypothesis")?.value.trim() || "";
     if (!context.hypothesis) { message("#flowMessage", ui("Challenge mode needs a hypothesis.", "挑战模式需要填写假设。"), true); return null; }
