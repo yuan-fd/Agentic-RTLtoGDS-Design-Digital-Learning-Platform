@@ -5183,6 +5183,14 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=session.user_id, include_legacy=session.legacy_access),
                         HTTPStatus.CREATED)
                     return
+                match = re.fullmatch(r"/api/rtl/specs/([^/]+)/verify", path)
+                if match:
+                    payload = self._read_json()
+                    self._json(state.submit_rtl_verification(
+                        unquote(match.group(1)), owner_id=session.user_id,
+                        include_legacy=session.legacy_access,
+                        candidate_id=payload.get("candidate_id")), HTTPStatus.CREATED)
+                    return
                 if path == "/api/v2/external-optimizer-loops":
                     self._json(state.start_external_optimizer_loop(
                         self._read_json(), owner_id=session.user_id,
