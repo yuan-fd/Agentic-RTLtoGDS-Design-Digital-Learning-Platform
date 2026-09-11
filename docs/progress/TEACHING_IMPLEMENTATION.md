@@ -61,6 +61,8 @@ Updated: 2026-09-11
 - Focused dashboard/doctor/web tests: `19 passed` across the executed test
   selections.
 - `node --check apps/web/assets/app.js` and Python compile checks passed.
+- Frontend binding and comparison checks: `11 passed` across the web clarity,
+  RTL comparison, and teaching dashboard selections.
 
 ## Current next slice
 
