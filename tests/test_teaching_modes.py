@@ -26,3 +26,12 @@ def test_teaching_request_rejects_non_text_context(context):
 def test_open_exploration_can_record_a_hypothesis():
     assert validate_teaching_request("open", {"hypothesis": "Less density helps routing"})
     assert next(item for item in TEACHING_MODES if item["id"] == "open")["custom_objective"]
+
+
+def test_dse_strategy_and_candidate_budget_are_bounded():
+    value = validate_teaching_request("open", {"dse_mode": "batch", "candidate_count": "3"})
+    assert value["dse_mode"] == "batch"
+    with pytest.raises(ValueError, match="dse_mode"):
+        validate_teaching_request("open", {"dse_mode": "random"})
+    with pytest.raises(ValueError, match="candidate_count"):
+        validate_teaching_request("open", {"candidate_count": "7"})
