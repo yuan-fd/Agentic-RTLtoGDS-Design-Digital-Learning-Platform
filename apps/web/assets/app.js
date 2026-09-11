@@ -987,7 +987,8 @@ async function selectRun(id) {
   await loadRtlGeneratorComparison();
   const run = detail.run;
   const task = run.task_spec || {};
-  $("#runHeading").innerHTML = `<div><b>${esc(runDisplayName(run.run_id))} · ${esc(designModule(task.design_id))}</b><span>${esc(task.parameters?.target_stage || ui("extension task", "扩展任务"))} · ${esc(formatDate(run.created_at))}</span></div><span class="status ${esc(run.status)}">${esc(humanStatus(run.status))}</span>`;
+  const summary = state.runs.find(item => item.run_id === run.run_id) || {};
+  $("#runHeading").innerHTML = `<div><b>${esc(runDisplayName(run.run_id))} · ${esc(designModule(task.design_id))}</b><span>${esc(task.parameters?.target_stage || ui("extension task", "扩展任务"))} · ${esc(formatDate(run.created_at))}</span><small>${esc(summary.agent_phase || humanStatus(run.status))} · ${esc(summary.agent_action || "")}</small></div><span class="status ${esc(run.status)}">${esc(humanStatus(run.status))}</span>`;
   const values = new Map();
   (detail.events || []).forEach(event => {
     const name = event.payload?.tool_stage;
