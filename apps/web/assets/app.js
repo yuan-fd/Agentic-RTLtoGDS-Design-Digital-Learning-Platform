@@ -766,7 +766,7 @@ async function loadRuns(preferred = null) {
     state.runs = dashboard.runs || [];
     const selectedDesignId = state.selectedDesign?.id;
     const physicalRuns = state.runs.filter(run => selectedDesignId && run.design_id === selectedDesignId && (["orfs", "taiwei-pin-3d", "implcraft"].includes(run.plugin_id) || ["edacraft-tcadcraft", "edacraft-momcraft", "edacraft-cktcraft"].includes(run.plugin_id)));
-    $("#runSelect").innerHTML = `<option value="">${selectedDesignId ? ui("Choose a design task", "选择该设计的任务") : ui("Select a design first", "请先选择设计")}</option>` + physicalRuns.map((run, index) => `<option value="${esc(run.run_id)}">${ui("Task", "任务")} ${String(index + 1).padStart(2, "0")} · ${esc(humanStatus(run.status))}</option>`).join("");
+    $("#runSelect").innerHTML = `<option value="">${selectedDesignId ? ui("Choose a design task", "选择该设计的任务") : ui("Select a design first", "请先选择设计")}</option>` + physicalRuns.map((run, index) => `<option value="${esc(run.run_id)}">${ui("Task", "任务")} ${String(index + 1).padStart(2, "0")} · ${esc(humanStatus(run.status))}${run.dse_mode ? ` · ${esc(run.dse_mode)}` : ""}${run.candidate_count ? ` (${esc(run.candidate_count)})` : ""}</option>`).join("");
     const preferredPhysical = physicalRuns.find(run => run.run_id === preferred)?.run_id;
     const selectedPhysical = physicalRuns.find(run => run.run_id === state.selectedRun?.run?.run_id)?.run_id;
     const id = preferredPhysical || selectedPhysical;

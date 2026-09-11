@@ -2997,6 +2997,8 @@ class ApiState:
                                       or labels.get("l1_experiment_id")
                                       or labels.get("v2_pipeline_id"))
             item["mode"] = labels.get("teaching_mode") or labels.get("optimizer_kind")
+            item["dse_mode"] = labels.get("teaching_dse_mode")
+            item["candidate_count"] = labels.get("teaching_candidate_count")
             item["agent_phase"] = labels.get("agent_phase") or labels.get("stage")
         active = {"queued", "preparing", "running", "retry_wait", "cancel_requested"}
         return {
