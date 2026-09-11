@@ -37,6 +37,9 @@ Updated: 2026-09-11
   refreshes the Runtime-backed run list.
 - The browser path uses the main API's existing `/api/craft/plans` execution
   route; the standalone L1 server remains an internal vertical-slice harness.
+- Open Lab can copy a Runtime run into an independent task and apply bounded
+  `place_density`, `core_utilization_pct`, or `minimum_die_size_um` overrides;
+  source runs remain immutable and provenance is recorded.
 
 ## Evidence
 
