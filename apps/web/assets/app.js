@@ -1279,8 +1279,8 @@ async function copySelectedRunToOpen() {
   const runId = state.selectedRun?.run?.run_id;
   if (!runId) return message("#flowMessage", ui("Select a completed run first.", "请先选择一个已完成的运行。"), true);
   try {
-    const raw = window.prompt(ui("Optional place density (0.1–0.95):", "可选布局密度（0.1–0.95）："), "");
-    const parameters = raw?.trim() ? {place_density: Number(raw)} : {};
+    const raw = $("#openDensity")?.value.trim() || "";
+    const parameters = raw ? {place_density: Number(raw)} : {};
     await post("/api/teaching/open/copy", {run_id: runId, parameters});
     message("#flowMessage", ui("Copied into an independent Open Lab run.", "已复制为独立的 Open Lab 实验。"));
     await loadRuns();
@@ -1304,6 +1304,7 @@ function updateTeachingMode() {
   const challenge = mode === "challenge";
   $("#teachingObjectiveField")?.toggleAttribute("hidden", mode === "guided");
   $("#teachingHypothesisField")?.toggleAttribute("hidden", !challenge);
+  $("#openDensityField")?.toggleAttribute("hidden", mode === "guided");
   const notes = {
     guided: ui("Guided mode uses the managed example and protected defaults.", "引导模式使用托管示例和受保护默认值。"),
     open: ui("Open Lab accepts a registered design and bounded objective.", "开放实验室允许登记设计和受控目标。"),
