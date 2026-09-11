@@ -1365,10 +1365,22 @@ async function a2Action(action, payload = {}) {
     return result;
   } catch (error) { message("#a2Message", error.message, true); }
 }
+function renderA2Questions(draft) {
+  const questions = (draft?.questions || []).filter(item => item.blocking);
+  const box = $("#a2Questions"); const answer = $("#a2Answer");
+  if (!box) return;
+  box.innerHTML = questions.map(item => `<label><span>${esc(item.prompt)}</span><input data-a2-question="${esc(item.question_id)}" data-a2-field="${esc(item.field)}" required></label>`).join("");
+  if (answer) answer.hidden = !questions.length;
+}
+async function saveA2Answers() {
+  const answers = $$('[data-a2-question]').map(input => ({question_id: input.dataset.a2Question, field: input.dataset.a2Field, value: input.value}));
+  const result = await a2Action("answers", {answers});
+  if (result) { renderA2Questions(result.draft); $("#a2Answer").hidden = true; }
+}
 async function startA2Session() {
   try {
     const result = await post("/api/teaching/sessions", {text: $("#a2SessionText").value, teaching_mode: "guided", teaching_context: {dse_mode: "a2_orfo"}});
-    state.workbenchSessionId = result.session.session_id;
+    state.workbenchSessionId = result.session.session_id; renderA2Questions(result.draft);
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
     message("#a2Message", ui(`L1 session ${state.workbenchSessionId} created.`, `已创建 L1 Session：${state.workbenchSessionId}。`));
   } catch (error) { message("#a2Message", error.message, true); }
@@ -1851,6 +1863,7 @@ $("#a2Start")?.addEventListener("click", startA2Session);
 $("#a2Execute")?.addEventListener("click", () => a2Action("execute", {decision_summary: "Student confirmed the approved L1 baseline step."}));
 $("#a2Escalate")?.addEventListener("click", () => a2Action("l2-escalate", {decision_summary: "Student reviewed the recorded L1 evidence and requests A2."}));
 $("#a2Advance")?.addEventListener("click", () => a2Action("l2-advance", {pipeline_id: $("#a2Pipeline").value}));
+$("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.
