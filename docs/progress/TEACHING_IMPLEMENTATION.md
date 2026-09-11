@@ -22,6 +22,9 @@ Updated: 2026-09-11
 - Mode-specific request validation now rejects custom Guided fields, rejects
   hypotheses in Open Lab, and requires objective plus hypothesis for Challenge;
   accepted context is carried as TaskSpec labels.
+- Guided/Open/Challenge validation is covered by focused contract tests; the
+  existing L1 API remains backward compatible because omitted mode defaults to
+  Guided.
 
 ## Evidence
 
