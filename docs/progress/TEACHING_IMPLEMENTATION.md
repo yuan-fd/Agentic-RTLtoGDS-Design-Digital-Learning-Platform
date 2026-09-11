@@ -13,6 +13,8 @@ Updated: 2026-09-11
   /api/teaching/dashboard` reports runs, counts, authority and polling advice.
 - Web run listing now consumes the compact dashboard projection while retaining
   the existing Runtime detail/artifact endpoints.
+- Experiment identity (`experiment_id`), teaching mode and agent phase are
+  projected from existing TaskSpec labels; no parallel database was added.
 
 ## Evidence
 
@@ -26,6 +28,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Define and test the minimal Experiment projection over existing Runtime runs;
-do not create a parallel database or rename internal legacy state until real
-callers and migration edges are proven.
+Next: add explicit Guided/Open/Challenge mode validation at experiment
+creation, reusing the existing typed TaskSpec and budget gates.
