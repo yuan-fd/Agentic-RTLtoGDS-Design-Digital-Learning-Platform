@@ -1258,7 +1258,24 @@ async function restoreHistoricalExternalLoop() {
 }
 
 async function submitFlow() {
-  await restoreHistoricalExternalLoop();
+  const context = teachingContext();
+  if (context === null) return;
+  const mode = $("#teachingMode")?.value || "guided";
+  const button = $("#submitFlow"); if (button) button.disabled = true;
+  message("#flowMessage", ui("Creating a Runtime experiment…", "正在创建 Runtime 实验……"));
+  try {
+    let session = await post("/api/l1/sessions", {text: "Run the managed teaching experiment.", teaching_mode: mode, teaching_context: context});
+    if (session.status === "clarification_required") {
+      const q = (session.questions || [])[0];
+      session = await post(`/api/l1/sessions/${encodeURIComponent(session.session_id)}/answers`, {answers: [{question_id: q.question_id, field: q.field, value: context.objective || "one bounded run"}]});
+    }
+    const result = await post(`/api/l1/sessions/${encodeURIComponent(session.session_id)}/execute`, {decision_summary: "User approved the teaching experiment from the web dashboard.", wait: true});
+    state.activeSessionId = session.session_id;
+    message("#flowMessage", ui("Experiment completed; evidence is ready below.", "实验完成，证据已准备好。"));
+    await loadRuns();
+    if (result.runtime?.run?.run_id) selectRun(result.runtime.run.run_id);
+  } catch (error) { message("#flowMessage", error.message, true); }
+  finally { if (button) button.disabled = false; }
 }
 
 function backendMode(mode) {
@@ -1276,7 +1293,7 @@ function updateTeachingMode() {
   const mode = $("#teachingMode")?.value || "guided";
   state.teachingMode = mode;
   const challenge = mode === "challenge";
-  $("#teachingObjectiveField")?.toggleAttribute("hidden", !challenge);
+  $("#teachingObjectiveField")?.toggleAttribute("hidden", mode === "guided");
   $("#teachingHypothesisField")?.toggleAttribute("hidden", !challenge);
   const notes = {
     guided: ui("Guided mode uses the managed example and protected defaults.", "引导模式使用托管示例和受保护默认值。"),
@@ -1290,13 +1307,16 @@ function teachingContext() {
   const mode = $("#teachingMode")?.value || "guided";
   const context = {};
   if (mode !== "guided" && state.selectedDesign?.id) context.design_id = state.selectedDesign.id;
-  if (mode === "challenge") {
+  if (mode !== "guided") {
     context.objective = $("#teachingObjective")?.value.trim() || "";
-    context.hypothesis = $("#teachingHypothesis")?.value.trim() || "";
-    if (!context.objective || !context.hypothesis) {
-      message("#flowMessage", ui("Challenge mode needs an objective and hypothesis.", "挑战模式需要填写目标和假设。"), true);
+    if (!context.objective) {
+      message("#flowMessage", ui("Open exploration needs an objective.", "开放探索需要填写实验目标。"), true);
       return null;
     }
+  }
+  if (mode === "challenge") {
+    context.hypothesis = $("#teachingHypothesis")?.value.trim() || "";
+    if (!context.hypothesis) { message("#flowMessage", ui("Challenge mode needs a hypothesis.", "挑战模式需要填写假设。"), true); return null; }
   }
   return context;
 }
