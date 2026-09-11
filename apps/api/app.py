@@ -3042,6 +3042,16 @@ class ApiState:
             item["candidate_count"] = labels.get("teaching_candidate_count")
             item["agent_phase"] = labels.get("agent_phase") or labels.get("stage")
         active = {"queued", "preparing", "running", "retry_wait", "cancel_requested"}
+        batches = {}
+        for item in runs:
+            run = self.runtime_store.get_run(item["run_id"])
+            batch_id = (run.task_spec.labels or {}).get("teaching_batch_id") if run else None
+            if batch_id:
+                batch = batches.setdefault(batch_id, {"batch_id": batch_id, "total": 0, "active": 0, "succeeded": 0, "failed": 0})
+                batch["total"] += 1
+                if item["status"] in active: batch["active"] += 1
+                if item["status"] == "succeeded": batch["succeeded"] += 1
+                if item["status"] == "failed": batch["failed"] += 1
         return {
             "schema_version": 1,
             "runs": runs,
@@ -3052,6 +3062,7 @@ class ApiState:
                 "failed": sum(item["status"] == "failed" for item in runs),
             },
             "polling": {"recommended_seconds": 2 if any(item["status"] in active for item in runs) else 5},
+            "batches": list(batches.values()),
             "authority": "WorkflowRuntime",
         }
 
