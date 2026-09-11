@@ -760,6 +760,17 @@ async function submitRtlscout() {
   finally { updateRtlscoutControls(); }
 }
 
+async function registerDirectLlmCandidate() {
+  const spec = state.specSession?.frozenSpec;
+  const source = $("#directLlmSource")?.value || "";
+  if (!spec) return message("#directLlmMessage", ui("Freeze SpecIR first.", "请先冻结 SpecIR。"), true);
+  if (!source.trim()) return message("#directLlmMessage", ui("Paste RTL source first.", "请先粘贴 RTL 源码。"), true);
+  try {
+    const result = await post(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/direct-llm-candidate`, {rtl_source: source});
+    message("#directLlmMessage", ui(`Candidate ${result.candidate_id} registered; run verification next.`, `候选 ${result.candidate_id} 已登记，请继续运行验证。`));
+  } catch (error) { message("#directLlmMessage", error.message, true); }
+}
+
 async function loadRuns(preferred = null) {
   try {
     const dashboard = await api("/api/teaching/dashboard");
@@ -1757,6 +1768,7 @@ $("#createSpec").addEventListener("click", createSpec);
 $("#continueSpec").addEventListener("click", continueSpec);
 $("#approveSpecRtl").addEventListener("click", approveSpecRtl);
 $("#runRtlscout").addEventListener("click", submitRtlscout);
+$("#registerDirectLlm")?.addEventListener("click", registerDirectLlmCandidate);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
