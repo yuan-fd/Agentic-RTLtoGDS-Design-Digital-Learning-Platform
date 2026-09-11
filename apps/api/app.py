@@ -3843,6 +3843,33 @@ class ApiState:
                                                      include_legacy=include_legacy)
         return result
 
+    def start_rule_batch(self, payload: dict[str, Any], *, owner_id: str | None = None,
+                         include_legacy: bool = False) -> dict[str, Any]:
+        count = int(payload.get("candidate_count") or 3)
+        if not 1 <= count <= 6:
+            raise ValueError("candidate_count must be between 1 and 6")
+        design_id = str(payload.get("design_id") or "").strip()
+        base = self.craft_plan({**payload, "owner_id": owner_id,
+                                "include_legacy": include_legacy,
+                                "teaching_mode": "open",
+                                "teaching_context": {"dse_mode": "batch", "candidate_count": str(count)}})
+        template = TaskSpec.from_dict(base["task_spec"]) if hasattr(TaskSpec, "from_dict") else None
+        if template is None:
+            raise ValueError("batch template is unavailable")
+        batch_id = f"teaching-batch-{uuid.uuid4().hex}"
+        runs = []
+        for index in range(count):
+            density = 0.35 + (0.10 * index / max(count - 1, 1))
+            task = dataclasses.replace(template, task_id=f"{batch_id}-{index + 1}",
+                parameters={**template.parameters, "place_density": round(density, 4)},
+                labels={**template.labels, "teaching_batch_id": batch_id,
+                        "teaching_batch_index": str(index + 1)})
+            run = self.runtime.submit(task, capability="eda.rtl_to_gds")
+            runs.append(self.get_runtime_run(run.run_id, owner_id=owner_id,
+                                             include_legacy=include_legacy))
+        return {"batch_id": batch_id, "candidate_count": count, "runs": runs,
+                "strategy": "rule_batch", "execution_started": False}
+
 
     def create_spec_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         owner_id = _optional_string(payload.get("owner_id"))
@@ -5164,6 +5191,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     payload = self._read_json()
                     self._json(state.copy_teaching_run(
                         str(payload.get("run_id") or ""), parameters=payload.get("parameters"), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                if path == "/api/teaching/dse/batch":
+                    self._json(state.start_rule_batch(
+                        scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
 
