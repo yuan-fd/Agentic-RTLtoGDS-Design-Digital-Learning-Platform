@@ -2986,6 +2986,17 @@ class ApiState:
         """
         runs = self.list_runtime_runs(limit=limit, owner_id=owner_id,
                                       include_legacy=include_legacy)["runs"]
+        # Runtime already carries the stable project/design identity.  Labels
+        # are the only safe bridge for older L1/campaign records; do not create
+        # a second experiment database while migration is in progress.
+        for item in runs:
+            run = self.runtime_store.get_run(item["run_id"])
+            labels = dict(run.task_spec.labels or {}) if run is not None else {}
+            item["experiment_id"] = (labels.get("experiment_id")
+                                      or labels.get("l1_experiment_id")
+                                      or labels.get("v2_pipeline_id"))
+            item["mode"] = labels.get("teaching_mode") or labels.get("optimizer_kind")
+            item["agent_phase"] = labels.get("agent_phase") or labels.get("stage")
         active = {"queued", "preparing", "running", "retry_wait", "cancel_requested"}
         return {
             "schema_version": 1,
