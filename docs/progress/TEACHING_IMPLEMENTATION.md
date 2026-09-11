@@ -17,6 +17,8 @@ Updated: 2026-09-11
   projected from existing TaskSpec labels; no parallel database was added.
 - Bounded teaching mode contract and catalog: `guided`, `open`, `challenge`;
   exposed at `GET /api/teaching/modes`.
+- L1 session creation accepts the bounded `teaching_mode` value and carries it
+  into Runtime TaskSpec labels for Dashboard projection; default is `guided`.
 
 ## Evidence
 
@@ -30,5 +32,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Next: pass the selected mode through the existing L1 experiment creation
-request and apply mode-specific custom-design/objective/hypothesis gates.
+Next: apply mode-specific custom-design/objective/hypothesis gates while
+keeping guided defaults and existing L1 clarification behavior intact.
