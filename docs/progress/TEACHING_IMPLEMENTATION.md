@@ -19,6 +19,9 @@ Updated: 2026-09-11
   exposed at `GET /api/teaching/modes`.
 - L1 session creation accepts the bounded `teaching_mode` value and carries it
   into Runtime TaskSpec labels for Dashboard projection; default is `guided`.
+- Mode-specific request validation now rejects custom Guided fields, rejects
+  hypotheses in Open Lab, and requires objective plus hypothesis for Challenge;
+  accepted context is carried as TaskSpec labels.
 
 ## Evidence
 
@@ -32,5 +35,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Next: apply mode-specific custom-design/objective/hypothesis gates while
-keeping guided defaults and existing L1 clarification behavior intact.
+Next: expose the mode catalog and context controls in the simplified Web
+workspace, then add the first Open Lab copy-from-run flow.

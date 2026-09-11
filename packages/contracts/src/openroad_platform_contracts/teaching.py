@@ -17,6 +17,22 @@ def validate_teaching_mode(value: str) -> TeachingMode:
     except ValueError as exc:
         raise ValueError("teaching mode must be guided, open, or challenge") from exc
 
+def validate_teaching_request(mode: str, context: dict | None = None) -> dict[str, str]:
+    selected = validate_teaching_mode(mode)
+    values = dict(context or {})
+    unknown = set(values) - {"design_id", "objective", "hypothesis"}
+    if unknown:
+        raise ValueError(f"unknown teaching context fields: {', '.join(sorted(unknown))}")
+    result = {key: str(value).strip() for key, value in values.items()
+              if value is not None and str(value).strip()}
+    if selected is TeachingMode.GUIDED and result:
+        raise ValueError("guided mode does not accept custom design or experiment fields")
+    if selected is TeachingMode.OPEN and "hypothesis" in result:
+        raise ValueError("open mode accepts a design and objective; use challenge for a hypothesis")
+    if selected is TeachingMode.CHALLENGE and any(not result.get(key) for key in ("objective", "hypothesis")):
+        raise ValueError("challenge mode requires objective and hypothesis")
+    return result
+
 
 TEACHING_MODES = (
     {"id": TeachingMode.GUIDED.value, "label": "Guided Lab", "custom_design": False,

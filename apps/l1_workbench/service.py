@@ -5,7 +5,8 @@ from pathlib import Path
 from dataclasses import replace
 from typing import Any
 
-from openroad_platform_contracts import PluginManifest, RTLToGDSRequest, TaskSpec, validate_teaching_mode
+from openroad_platform_contracts import (PluginManifest, RTLToGDSRequest, TaskSpec,
+    validate_teaching_mode, validate_teaching_request)
 from openroad_platform_contracts.agent_control import DEFAULT_L1_TOOLS, AgentBudget, DesignState, GoalPreference, QoRConstraint, SemanticToolCall, ToolName
 from openroad_platform_contracts.l1_goal_draft import ClarificationAnswer, ClarificationField, ClarificationQuestion
 from openroad_platform_contracts.l1_policy import TrustedPolicyIdentity
@@ -82,6 +83,7 @@ class WorkbenchService:
             raise ValueError("model_provider must be tutorial or codex")
         self.model_provider = model_provider
         self._teaching_modes: dict[str, str] = {}
+        self._teaching_contexts: dict[str, dict[str, str]] = {}
         self._codex_provider = None
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         repository = Path(__file__).resolve().parents[2]
@@ -284,14 +286,16 @@ class WorkbenchService:
                             "managed_mux_default_corner_baseline"),
         ) if self.profile else _Provider())
 
-    def start(self, text, *, teaching_mode="guided"):
+    def start(self, text, *, teaching_mode="guided", teaching_context=None):
         mode = validate_teaching_mode(teaching_mode).value
+        context = validate_teaching_request(mode, teaching_context)
         provider = self._goal_provider()
         session = self.sessions.start(
             text, provider, self.policy(),
             required_questions=self.required_goal_questions,
         )
         self._teaching_modes[session.session_id] = mode
+        self._teaching_contexts[session.session_id] = context
         if session.goal_id:
             goal = self._goal(session.trace_id, session.goal_id)
             self._save(session.session_id, DesignState(
@@ -306,7 +310,8 @@ class WorkbenchService:
             goal=self._goal(session.trace_id,session.goal_id)
             self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},goal.budget,evidence=(goal.rtl_artifact,)),None)
         return session
-    def _bridge(self, goal, *, wait=True, target_stage="finish", teaching_mode=None):
+    def _bridge(self, goal, *, wait=True, target_stage="finish", teaching_mode=None,
+                teaching_context=None):
         """Build an immutable base TaskSpec; Runtime remains the run authority."""
         if self.backend == "orfs":
             if target_stage not in goal.allowed_stages: raise ValueError("stage is outside the finalized Goal")
@@ -316,6 +321,8 @@ class WorkbenchService:
                        "stage_timeout_seconds":3600,"timeout_seconds":7200}
             labels = {"surface":"l1-workbench","mode":"baseline",
                       "teaching_mode": teaching_mode or "guided"}
+            for key, value in (teaching_context or {}).items():
+                labels[f"teaching_{key}"] = value
             if self.reference_design is not None:
                 baseline = dict(self.reference_design.native_baseline_overrides)
                 options.update({
@@ -352,7 +359,7 @@ class WorkbenchService:
         )
     def execute(self,sid,summary,*,wait=True):
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
-        bridge=self._bridge(goal,wait=wait, teaching_mode=self._teaching_modes.get(sid))
+        bridge=self._bridge(goal,wait=wait, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid))
         loop=L1DurableLoop(self.loop_store,bridge,self.trace); call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
@@ -366,7 +373,7 @@ class WorkbenchService:
     def set_flow_params(self,sid,values,summary):
         """Persist one Policy-approved parameter proposal; it does not run EDA."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
-        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
         call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.SET_FLOW_PARAMS,{"values":dict(values)},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
@@ -378,7 +385,7 @@ class WorkbenchService:
     def run_candidate(self,sid,proposal_id,summary,*,wait=True):
         """Consume exactly one durable ParameterPlan in a Runtime candidate run."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
-        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
         call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{"proposal_id":proposal_id},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)

@@ -44,7 +44,7 @@ from .experiment_graph import (
     ExperimentNode,
     ExperimentNodeKind,
 )
-from .teaching import TeachingMode, TEACHING_MODES, validate_teaching_mode
+from .teaching import TeachingMode, TEACHING_MODES, validate_teaching_mode, validate_teaching_request
 from .rtl_frontend import PortSpec, RTLCandidate, SpecIR, VerificationPackage
 from .agent_control import (
     AgentBudget,

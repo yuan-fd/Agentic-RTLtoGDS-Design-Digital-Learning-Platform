@@ -24,7 +24,7 @@ def main():
   def do_POST(self):
    try:
     x=json.loads(self.rfile.read(int(self.headers.get("Content-Length",0)))); parts=self.path.strip("/").split("/")
-    if self.path=="/api/l1/sessions": s=svc.start(x["text"], teaching_mode=x.get("teaching_mode", "guided")); return self.reply(s.to_dict())
+    if self.path=="/api/l1/sessions": s=svc.start(x["text"], teaching_mode=x.get("teaching_mode", "guided"), teaching_context=x.get("teaching_context")); return self.reply(s.to_dict())
     sid=parts[3]
     if parts[-1]=="answers": return self.reply(svc.answer(sid,x["answers"]).to_dict())
     if parts[-1]=="execute": p,state=svc.execute(sid,x["decision_summary"],wait=x.get("wait",True));return self.reply({"plan":p,"state":state.to_dict(),"runtime":svc.runtime.describe(p["run_id"])})
