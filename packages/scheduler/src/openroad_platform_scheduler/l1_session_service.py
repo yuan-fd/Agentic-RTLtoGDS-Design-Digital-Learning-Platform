@@ -53,6 +53,11 @@ class L1SessionStore:
                 session_id TEXT PRIMARY KEY, trace_id TEXT NOT NULL UNIQUE, project_id TEXT NOT NULL,
                 status TEXT NOT NULL, draft_json TEXT NOT NULL, policy_json TEXT NOT NULL,
                 goal_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(l1_session)")}
+            if "teaching_mode" not in columns:
+                connection.execute("ALTER TABLE l1_session ADD COLUMN teaching_mode TEXT NOT NULL DEFAULT 'guided'")
+            if "teaching_context_json" not in columns:
+                connection.execute("ALTER TABLE l1_session ADD COLUMN teaching_context_json TEXT NOT NULL DEFAULT '{}'")
 
     def _connect(self):
         connection = sqlite3.connect(self.database)
@@ -62,7 +67,7 @@ class L1SessionStore:
     def create(self, session_id: str, trace_id: str, draft: GoalDraft, policy: TrustedGoalPolicy) -> L1Session:
         draft.validate(); policy.validate(); now = _now()
         with self._connect() as connection:
-            connection.execute("INSERT INTO l1_session VALUES(?,?,?,?,?,?,?,?,?)", (
+            connection.execute("INSERT INTO l1_session (session_id,trace_id,project_id,status,draft_json,policy_json,goal_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)", (
                 session_id, trace_id, policy.project_id, L1SessionStatus.CREATING.value,
                 json.dumps(draft.to_dict(), sort_keys=True), json.dumps(_policy_to_dict(policy), sort_keys=True),
                 None, now, now))
@@ -82,6 +87,17 @@ class L1SessionStore:
             row = connection.execute("SELECT draft_json,policy_json FROM l1_session WHERE session_id=?", (session_id,)).fetchone()
         if row is None: raise KeyError("unknown L1 session")
         return GoalDraft.from_dict(json.loads(row["draft_json"])), _policy_from_dict(json.loads(row["policy_json"]))
+
+    def set_teaching(self, session_id: str, mode: str, context: dict[str, str]) -> None:
+        with self._connect() as connection:
+            if connection.execute("UPDATE l1_session SET teaching_mode=?, teaching_context_json=?, updated_at=? WHERE session_id=?", (mode, json.dumps(context, sort_keys=True), _now(), session_id)).rowcount != 1:
+                raise KeyError("unknown L1 session")
+
+    def teaching(self, session_id: str) -> tuple[str, dict[str, str]]:
+        with self._connect() as connection:
+            row = connection.execute("SELECT teaching_mode, teaching_context_json FROM l1_session WHERE session_id=?", (session_id,)).fetchone()
+        if row is None: raise KeyError("unknown L1 session")
+        return row["teaching_mode"] or "guided", json.loads(row["teaching_context_json"] or "{}")
 
     def update(self, session_id: str, draft: GoalDraft, status: L1SessionStatus, goal=None) -> L1Session:
         draft.validate(); now = _now(); goal_json = json.dumps(goal.to_dict(), sort_keys=True) if goal else None

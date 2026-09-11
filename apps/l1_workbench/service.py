@@ -82,8 +82,6 @@ class WorkbenchService:
         if model_provider not in {"tutorial", "codex"}:
             raise ValueError("model_provider must be tutorial or codex")
         self.model_provider = model_provider
-        self._teaching_modes: dict[str, str] = {}
-        self._teaching_contexts: dict[str, dict[str, str]] = {}
         self._codex_provider = None
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         repository = Path(__file__).resolve().parents[2]
@@ -289,13 +287,14 @@ class WorkbenchService:
     def start(self, text, *, teaching_mode="guided", teaching_context=None):
         mode = validate_teaching_mode(teaching_mode).value
         context = validate_teaching_request(mode, teaching_context)
+        if context.get("design_id") and context["design_id"] != self.design_id:
+            raise ValueError("teaching design does not match the bound design")
         provider = self._goal_provider()
         session = self.sessions.start(
             text, provider, self.policy(),
             required_questions=self.required_goal_questions,
         )
-        self._teaching_modes[session.session_id] = mode
-        self._teaching_contexts[session.session_id] = context
+        self.sessions.store.set_teaching(session.session_id, mode, context)
         if session.goal_id:
             goal = self._goal(session.trace_id, session.goal_id)
             self._save(session.session_id, DesignState(
@@ -310,9 +309,14 @@ class WorkbenchService:
             goal=self._goal(session.trace_id,session.goal_id)
             self._save(sid,DesignState(f"state-{uuid.uuid4().hex}",session.goal_id,0,"running",None,{},goal.budget,evidence=(goal.rtl_artifact,)),None)
         return session
+
+    def _teaching(self, sid):
+        return self.sessions.store.teaching(sid)
     def _bridge(self, goal, *, wait=True, target_stage="finish", teaching_mode=None,
                 teaching_context=None):
         """Build an immutable base TaskSpec; Runtime remains the run authority."""
+        if teaching_mode is None:
+            teaching_mode, teaching_context = "guided", {}
         if self.backend == "orfs":
             if target_stage not in goal.allowed_stages: raise ValueError("stage is outside the finalized Goal")
             options = {"platform_name":self.platform_name,"target_stage":target_stage,
@@ -346,7 +350,7 @@ class WorkbenchService:
             task=self.factory.build(RTLToGDSRequest(rtl_path=str(self.rtl),project_id=goal.project_id,design_id=goal.design_id,top=self.top,task_id=f"l1-orfs-{uuid.uuid4().hex}",labels=labels,options=options))
             factory=self.factory
         else:
-            task=TaskSpec(f"l1-workbench-{uuid.uuid4().hex}",goal.project_id,goal.design_id,plugin_id="l1-runtime-smoke",inputs={"kind":"bounded_l1_tool","bounded_mode":"normal" if wait else "cancellable"},expected_artifacts=("report",),timeout_seconds=30)
+            task=TaskSpec(f"l1-workbench-{uuid.uuid4().hex}",goal.project_id,goal.design_id,plugin_id="l1-runtime-smoke",inputs={"kind":"bounded_l1_tool","bounded_mode":"normal" if wait else "cancellable"},labels={"teaching_mode": teaching_mode, **{f"teaching_{k}": v for k,v in teaching_context.items()}},expected_artifacts=("report",),timeout_seconds=30)
             class Factory:
                 capability="eda.rtl_to_gds"
                 def validate_task(self,t): t.validate()
@@ -359,7 +363,8 @@ class WorkbenchService:
         )
     def execute(self,sid,summary,*,wait=True):
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state, _=self._load(sid)
-        bridge=self._bridge(goal,wait=wait, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid))
+        mode, context = self._teaching(sid)
+        bridge=self._bridge(goal,wait=wait, teaching_mode=mode, teaching_context=context)
         loop=L1DurableLoop(self.loop_store,bridge,self.trace); call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
@@ -373,7 +378,8 @@ class WorkbenchService:
     def set_flow_params(self,sid,values,summary):
         """Persist one Policy-approved parameter proposal; it does not run EDA."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
-        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        mode, context = self._teaching(sid)
+        bridge=self._bridge(goal, teaching_mode=mode, teaching_context=context); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
         call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.SET_FLOW_PARAMS,{"values":dict(values)},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)
@@ -385,7 +391,8 @@ class WorkbenchService:
     def run_candidate(self,sid,proposal_id,summary,*,wait=True):
         """Consume exactly one durable ParameterPlan in a Runtime candidate run."""
         session=self.sessions.store.get(sid); goal=self._goal(session.trace_id,session.goal_id); state,_=self._load(sid)
-        bridge=self._bridge(goal, teaching_mode=self._teaching_modes.get(sid), teaching_context=self._teaching_contexts.get(sid)); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
+        mode, context = self._teaching(sid)
+        bridge=self._bridge(goal, teaching_mode=mode, teaching_context=context); loop=L1DurableLoop(self.loop_store,bridge,self.trace)
         call=SemanticToolCall(f"call-{uuid.uuid4().hex}",goal.goal_id,state.state_id,ToolName.RUN_FULL_FLOW,{"proposal_id":proposal_id},"l1-workbench")
         trusted=self.policy(); identity=TrustedPolicyIdentity(trusted.policy_id,trusted.policy_version,trusted.issuer,trusted.provenance)
         plan=loop.plan_validate_execute(session.trace_id,goal,state,call,identity,planner_summary=summary)

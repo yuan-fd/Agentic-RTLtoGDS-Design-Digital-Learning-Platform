@@ -19,16 +19,21 @@ def validate_teaching_mode(value: str) -> TeachingMode:
 
 def validate_teaching_request(mode: str, context: dict | None = None) -> dict[str, str]:
     selected = validate_teaching_mode(mode)
-    values = dict(context or {})
+    if context is None:
+        values = {}
+    elif not isinstance(context, dict):
+        raise ValueError("teaching context must be an object")
+    else:
+        values = context
     unknown = set(values) - {"design_id", "objective", "hypothesis"}
     if unknown:
         raise ValueError(f"unknown teaching context fields: {', '.join(sorted(unknown))}")
-    result = {key: str(value).strip() for key, value in values.items()
-              if value is not None and str(value).strip()}
+    if any(value is not None and not isinstance(value, str) for value in values.values()):
+        raise ValueError("teaching context values must be strings")
+    result = {key: value.strip() for key, value in values.items()
+              if value is not None and value.strip()}
     if selected is TeachingMode.GUIDED and result:
         raise ValueError("guided mode does not accept custom design or experiment fields")
-    if selected is TeachingMode.OPEN and "hypothesis" in result:
-        raise ValueError("open mode accepts a design and objective; use challenge for a hypothesis")
     if selected is TeachingMode.CHALLENGE and any(not result.get(key) for key in ("objective", "hypothesis")):
         raise ValueError("challenge mode requires objective and hypothesis")
     return result
@@ -36,9 +41,9 @@ def validate_teaching_request(mode: str, context: dict | None = None) -> dict[st
 
 TEACHING_MODES = (
     {"id": TeachingMode.GUIDED.value, "label": "Guided Lab", "custom_design": False,
-     "custom_objective": False, "requires_hypothesis": False},
+     "custom_objective": True, "requires_hypothesis": False},
     {"id": TeachingMode.OPEN.value, "label": "Open Lab", "custom_design": True,
-     "custom_objective": False, "requires_hypothesis": False},
+     "custom_objective": True, "requires_hypothesis": False},
     {"id": TeachingMode.CHALLENGE.value, "label": "Challenge", "custom_design": True,
      "custom_objective": True, "requires_hypothesis": True},
 )
