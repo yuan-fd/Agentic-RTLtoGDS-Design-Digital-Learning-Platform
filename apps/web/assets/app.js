@@ -767,7 +767,18 @@ async function registerDirectLlmCandidate() {
   if (!source.trim()) return message("#directLlmMessage", ui("Paste RTL source first.", "请先粘贴 RTL 源码。"), true);
   try {
     const result = await post(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/direct-llm-candidate`, {rtl_source: source});
+    state.directLlmCandidateId = result.candidate_id;
+    $("#verifyDirectLlm").disabled = false;
     message("#directLlmMessage", ui(`Candidate ${result.candidate_id} registered; run verification next.`, `候选 ${result.candidate_id} 已登记，请继续运行验证。`));
+  } catch (error) { message("#directLlmMessage", error.message, true); }
+}
+
+async function verifyDirectLlmCandidate() {
+  const spec = state.specSession?.frozenSpec;
+  if (!spec || !state.directLlmCandidateId) return;
+  try {
+    const result = await post(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/verify`, {candidate_id: state.directLlmCandidateId});
+    message("#directLlmMessage", ui(`Verification run ${result.run?.run?.run_id || "created"} submitted.`, `验证运行已提交：${result.run?.run?.run_id || "created"}。`));
   } catch (error) { message("#directLlmMessage", error.message, true); }
 }
 
@@ -1769,6 +1780,7 @@ $("#continueSpec").addEventListener("click", continueSpec);
 $("#approveSpecRtl").addEventListener("click", approveSpecRtl);
 $("#runRtlscout").addEventListener("click", submitRtlscout);
 $("#registerDirectLlm")?.addEventListener("click", registerDirectLlmCandidate);
+$("#verifyDirectLlm")?.addEventListener("click", verifyDirectLlmCandidate);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
