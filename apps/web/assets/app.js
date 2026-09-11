@@ -779,7 +779,7 @@ async function loadRtlGeneratorComparison() {
   if (!spec) return;
   try {
     const view = await api(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/comparison`);
-    $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)} · ${item.qor.length} measured records</small><span class="optimization-badge">${item.checks.length} checks</span></div>`).join("") || `<div class="empty-row">No candidates yet.</div>`;
+    $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => { const metric = item.qor.at(-1) || {}; const summary = Object.entries(metric).slice(0, 3).map(([key, value]) => `${key}=${value}`).join(" · "); return `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)} · ${item.qor.length} measured records${summary ? ` · ${esc(summary)}` : ""}</small><span class="optimization-badge">${item.checks.length} checks</span></div>`; }).join("") || `<div class="empty-row">No candidates yet.</div>`;
   } catch (error) { $("#rtlGeneratorComparison").textContent = error.message; }
 }
 
