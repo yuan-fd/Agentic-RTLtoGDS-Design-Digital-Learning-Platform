@@ -1,6 +1,11 @@
 # P0 Product-boundary freeze
 
-Status: proposed for independent merge-gate review
+Status: historical snapshot; product-menu restrictions superseded 2026-09-11
+
+Current authority: `docs/LLM_TEACHING_PLATFORM_SPEC.md` and the approved teaching
+plan enable Direct LLM, baseline/batch and BO/GP. Runtime, verified RTL lineage
+and protected evaluation remain required. The snapshot below records the prior
+boundary; it does not prohibit these teaching paths.
 Date: 2026-09-01
 
 ## Intent

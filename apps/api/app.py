@@ -31,6 +31,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parents[2]
 WEB_ROOT = ROOT / "apps" / "web"
 PACKAGE_ROOTS = (
+    ROOT,
     ROOT / "packages" / "contracts" / "src",
     ROOT / "packages" / "execution" / "src",
     ROOT / "packages" / "scheduler" / "src",
@@ -206,6 +207,7 @@ class ApiState:
         auth_db_path: Path | None = None,
         runtime_workspace_root: Path | None = None,
         load_taiwei_plugin: bool = True,
+        workbench_config: dict[str, Any] | None = None,
     ):
         self.db_path = db_path.expanduser().resolve()
         self.upload_root = upload_root.expanduser().resolve()
@@ -266,6 +268,12 @@ class ApiState:
                                                     self.tenant_learning_store)
         self.agent_traces = AgentTraceStore(state_root / "agent-traces.db")
         self.auth = AuthStore(auth_db_path or state_root / "web-auth.db")
+        self.teaching_sessions = None
+        if workbench_config is not None:
+            from apps.l1_workbench.service import WorkbenchService
+            from apps.api.services.teaching_sessions import TeachingSessions
+            self.teaching_sessions = TeachingSessions(
+                WorkbenchService(**workbench_config), self.auth)
         # This is an internal/paid-service deployment: model selection is an
         # operator decision, never a browser or API payload option.
         self.server_spec_model = "gpt-5.6-terra"
@@ -273,12 +281,6 @@ class ApiState:
         self.server_spec_daily_limit = int(os.environ.get(
             "OPENROAD_PLATFORM_SERVER_SPEC_DAILY_LIMIT", "20"
         ))
-        # A2-ORFO remains session-bound to the separately managed Workbench.
-        # Expose its configured URL as discovery metadata; do not proxy or
-        # manufacture an unbound campaign in the main Runtime database.
-        self.l1_workbench_url = os.environ.get(
-            "OPENROAD_PLATFORM_L1_WORKBENCH_URL", ""
-        ).strip().rstrip("/")
         self._server_spec_lock = threading.Lock()
         self.designs = DesignService(
             design_root or ROOT / "var" / "designs",
@@ -3117,18 +3119,8 @@ class ApiState:
         return {"schema_version": 1, "campaigns": campaigns,
                 "authority": "WorkflowRuntime + durable BO/GP checkpoints",
                 "a2_authority": "L1 Workbench session-bound API",
-                "a2": {"available": bool(self.l1_workbench_url),
-                        "workbench_url": self.l1_workbench_url or None,
-                        "required_flow": ["start session", "l2-escalate",
-                                           "l2-configure", "l2-advance"]}}
-
-    def start_teaching_bo_campaign(self, payload: dict[str, Any], *,
-                                   owner_id: str | None = None,
-                                   include_legacy: bool = False) -> dict[str, Any]:
-        """Teaching-surface adapter for the frozen BO/GP product protocol."""
-        implementation = getattr(self, "start_" + "bayesian_closed_loop")
-        return implementation(payload, owner_id=owner_id,
-                              include_legacy=include_legacy)
+                "a2": {"available": self.teaching_sessions is not None,
+                       "session_api": "/api/teaching/sessions"}}
 
     def copy_teaching_run(self, run_id: str, *, parameters: dict[str, Any] | None = None,
                           owner_id: str | None = None,
@@ -5106,6 +5098,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=list_owner,
                         include_legacy=session.legacy_access or developer_all,
                     ))
+                elif (match := re.fullmatch(r"/api/teaching/sessions/([^/]+)", path)):
+                    if state.teaching_sessions is None:
+                        raise ValueError("Teaching workbench is not configured")
+                    self._json(state.teaching_sessions.get(
+                        unquote(match.group(1)), session.user_id))
                 elif re.fullmatch(r"/api/runtime/runs/[^/]+/artifacts/[^/]+/excerpt", path):
                     parts = path.split("/")
                     values = parse_qs(parsed.query)
@@ -5288,6 +5285,20 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         str(payload.get("run_id") or ""), parameters=payload.get("parameters"), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
+                if path == "/api/teaching/sessions":
+                    if state.teaching_sessions is None:
+                        raise ValueError("Teaching workbench is not configured")
+                    self._json(state.teaching_sessions.create(
+                        self._read_json(), session.user_id), HTTPStatus.CREATED)
+                    return
+                match = re.fullmatch(r"/api/teaching/sessions/([^/]+)/([^/]+)", path)
+                if match:
+                    if state.teaching_sessions is None:
+                        raise ValueError("Teaching workbench is not configured")
+                    self._json(state.teaching_sessions.act(
+                        unquote(match.group(1)), match.group(2),
+                        self._read_json(), session.user_id))
+                    return
                 if path == "/api/teaching/dse/batch":
                     self._json(state.start_rule_batch(
                         scoped(self._read_json()), owner_id=session.user_id,
@@ -5360,7 +5371,7 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
                 if path == "/api/v2/closed-loops":
-                    self._json(state.start_teaching_bo_campaign(
+                    self._json(state.start_bayesian_closed_loop(
                         scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
@@ -5561,6 +5572,9 @@ def main(argv: list[str] | None = None) -> int:
                                     local_state / "optimization.db")),
     )
     parser.add_argument("--auth-db", type=Path, default=ROOT / "var" / "web-auth.db")
+    parser.add_argument("--workbench-config", type=Path,
+                        default=os.environ.get("OPENROAD_PLATFORM_WORKBENCH_CONFIG"),
+                        help="operator JSON with WorkbenchService root and toolchain settings")
     parser.add_argument(
         "--orfs-root",
         type=Path,
@@ -5576,6 +5590,8 @@ def main(argv: list[str] | None = None) -> int:
         runtime_db_path=args.runtime_db,
         optimization_db_path=args.optimization_db,
         auth_db_path=args.auth_db,
+        workbench_config=(json.loads(args.workbench_config.read_text())
+                          if args.workbench_config else None),
     )
     server = build_server(args.host, args.port, state)
     print(f"OpenROAD Platform: http://{args.host}:{server.server_port}")

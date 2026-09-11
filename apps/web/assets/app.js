@@ -1354,6 +1354,26 @@ async function copySelectedRunToOpen() {
   } catch (error) { message("#flowMessage", error.message, true); }
 }
 
+async function a2Action(action, payload = {}) {
+  if (!state.workbenchSessionId) return message("#a2Message", ui("Start an L1 session first.", "请先启动 L1 Session。"), true);
+  try {
+    const result = await post(`/api/teaching/sessions/${encodeURIComponent(state.workbenchSessionId)}/${action}`, payload);
+    if (result.pipeline_id) $("#a2Pipeline").value = result.pipeline_id;
+    message("#a2Message", ui(`A2 session updated: ${action}.`, `A2 Session 已更新：${action}。`));
+    $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
+    $("#a2Advance").disabled = !$("#a2Pipeline").value;
+    return result;
+  } catch (error) { message("#a2Message", error.message, true); }
+}
+async function startA2Session() {
+  try {
+    const result = await post("/api/teaching/sessions", {text: $("#a2SessionText").value, teaching_mode: "guided", teaching_context: {dse_mode: "a2_orfo"}});
+    state.workbenchSessionId = result.session.session_id;
+    $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
+    message("#a2Message", ui(`L1 session ${state.workbenchSessionId} created.`, `已创建 L1 Session：${state.workbenchSessionId}。`));
+  } catch (error) { message("#a2Message", error.message, true); }
+}
+
 function backendMode(mode) {
   state.backendMode = mode;
   const two = $("#backend-pane-2d");
@@ -1827,6 +1847,10 @@ $("#rtlTrendMetric")?.addEventListener("change", loadRtlGeneratorComparison);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
+$("#a2Start")?.addEventListener("click", startA2Session);
+$("#a2Execute")?.addEventListener("click", () => a2Action("execute", {decision_summary: "Student confirmed the approved L1 baseline step."}));
+$("#a2Escalate")?.addEventListener("click", () => a2Action("l2-escalate", {decision_summary: "Student reviewed the recorded L1 evidence and requests A2."}));
+$("#a2Advance")?.addEventListener("click", () => a2Action("l2-advance", {pipeline_id: $("#a2Pipeline").value}));
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.

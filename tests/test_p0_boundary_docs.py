@@ -21,7 +21,9 @@ def test_governance_documents_distinguish_current_l2_from_p0_snapshot() -> None:
     assert "POST /api/v2/closed-loops" in boundary
     assert "external-optimizer-loops" not in boundary
     assert 'elif path == "/api/v2/closed-loops":' in api
-    assert "state.start_bayesian_closed_loop(" not in api
+    # The approved teaching plan supersedes the historical BO menu prohibition.
+    assert "state.start_bayesian_closed_loop(" in api
+    assert "LLM_TEACHING_PLATFORM_SPEC.md" in boundary
     assert "legacy external optimizer writes are retired" in api
     assert 'if path == "/api/designs/import":' in api
     for later_only in ("5,083", "optimizer_plugins.py", "state_tuning.py",

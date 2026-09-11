@@ -808,6 +808,24 @@ class WorkbenchService:
                 self._save(sid,successor,plan_id)
         return session
     def events(self,sid,after=-1): return [e.to_dict() for e in self.sessions.events(sid,after_sequence=after)]
+    def snapshot(self, sid):
+        """Project a session, its Runtime evidence and bound campaigns for Web."""
+        session = self.sessions.store.get(sid)
+        draft, _ = self.sessions.store.draft_and_policy(sid)
+        mode, context = self._teaching(sid)
+        view = {"session": session.to_dict(), "draft": draft.to_dict(),
+                "teaching_mode": mode, "teaching_context": context,
+                "state": None, "runtime": None, "campaigns": [],
+                "teaching": self.teaching(sid)}
+        if session.goal_id:
+            state, plan_id = self._load(sid)
+            view["state"] = state.to_dict()
+            if plan_id:
+                plan = self.loop_store.get(plan_id)
+                if plan.get("run_id"):
+                    view["runtime"] = self.runtime.describe(plan["run_id"])
+            view["campaigns"] = self.l2_list(sid)
+        return view
     def teaching(self,sid):
         """Read-only per-event teaching replay derived only from stored facts."""
         return teaching_replay(self.events(sid))

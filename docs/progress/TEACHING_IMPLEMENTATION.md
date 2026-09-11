@@ -69,3 +69,14 @@ Updated: 2026-09-11
 Next: validate the connected route in a browser and with a bounded smoke, then
 connect Rule Batch and A2 campaign actions to the teaching UI without
 weakening their native protocols.
+
+## BO teaching route correction
+
+Problem: commit `263fc78` used a no-op wrapper and dynamic method-name lookup
+to evade a historical source-string assertion. That did not establish a
+product boundary. Evidence: the wrapper forwarded the payload unchanged.
+Option A was to retain the wrapper; Option B removes it and updates the
+historical assertion to the approved teaching authority. Recommendation and
+implementation: B. The HTTP handler again calls the native service directly;
+verified-lineage and protocol validation stay in that service. The P0 snapshot
+is retained and labelled historical. Rollback: revert the correction commit.

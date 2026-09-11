@@ -239,6 +239,15 @@
           <div class="run-controls"><button class="button primary" id="submitFlow" data-i18n="backend.run.action">Run teaching experiment</button><button class="button" id="copyOpenRun" type="button">Copy selected run to Open Lab</button><button class="button" type="button" data-route="projects" data-i18n="backend.run.compare">Compare recorded runs</button></div><p class="message" id="flowMessage" aria-live="polite"></p>
           <div id="batchProgress" class="field-note" hidden></div>
           <div id="a2Workbench" class="field-note" hidden></div>
+          <div class="a2-controls" id="a2Controls">
+            <label><span>A2 teaching session</span><input id="a2SessionText" value="Explore the approved A2-ORFO design space."></label>
+            <button class="button" id="a2Start" type="button">Start L1 session</button>
+            <button class="button" id="a2Execute" type="button" disabled>Run approved L1 step</button>
+            <button class="button" id="a2Escalate" type="button" disabled>Authorize A2</button>
+            <label><span>Pipeline ID</span><input id="a2Pipeline" placeholder="from authorization"></label>
+            <button class="button" id="a2Advance" type="button" disabled>Advance A2 (schedule)</button>
+            <p class="message" id="a2Message" aria-live="polite"></p>
+          </div>
           <div class="run-heading" id="runHeading"><div><b data-i18n="backend.run.empty">No run selected</b><span data-i18n="backend.run.empty.help">Queued, active, and completed records appear here.</span></div></div>
           <div class="flow-progress"><div><span id="flowProgressBar"></span></div><b id="flowProgressText">0 / 6</b></div>
           <div class="stage-rail" id="stageRail"></div>
