@@ -3052,8 +3052,10 @@ class ApiState:
             run = self.runtime_store.get_run(item["run_id"])
             batch_id = (run.task_spec.labels or {}).get("teaching_batch_id") if run else None
             if batch_id:
-                batch = batches.setdefault(batch_id, {"batch_id": batch_id, "total": 0, "active": 0, "succeeded": 0, "failed": 0})
+                batch = batches.setdefault(batch_id, {"batch_id": batch_id, "total": 0, "candidates": 0, "baseline": 0, "active": 0, "succeeded": 0, "failed": 0})
                 batch["total"] += 1
+                batch["baseline"] += int((run.task_spec.labels or {}).get("teaching_batch_role") == "baseline")
+                batch["candidates"] += int((run.task_spec.labels or {}).get("teaching_batch_role") == "candidate")
                 if item["status"] in active: batch["active"] += 1
                 if item["status"] == "succeeded": batch["succeeded"] += 1
                 if item["status"] == "failed": batch["failed"] += 1
@@ -3880,17 +3882,25 @@ class ApiState:
         baseline_density = _number(payload, "place_density", 0.45)
         if not 0.1 <= baseline_density <= 0.95:
             raise ValueError("place_density must be between 0.1 and 0.95")
+        baseline_task = dataclasses.replace(template, task_id=f"{batch_id}-baseline",
+            parameters={**template.parameters, "place_density": round(baseline_density, 4)},
+            labels={**template.labels, "teaching_batch_id": batch_id,
+                    "teaching_batch_role": "baseline"})
+        baseline_run = self.runtime.submit(baseline_task, capability="eda.rtl_to_gds")
+        baseline = self.get_runtime_run(baseline_run.run_id, owner_id=owner_id,
+                                         include_legacy=include_legacy)
         for index in range(count):
             offset = (index - (count - 1) / 2) * 0.05
             density = min(0.95, max(0.1, baseline_density + offset))
             task = dataclasses.replace(template, task_id=f"{batch_id}-{index + 1}",
                 parameters={**template.parameters, "place_density": round(density, 4)},
                 labels={**template.labels, "teaching_batch_id": batch_id,
+                        "teaching_batch_role": "candidate",
                         "teaching_batch_index": str(index + 1)})
             run = self.runtime.submit(task, capability="eda.rtl_to_gds")
             runs.append(self.get_runtime_run(run.run_id, owner_id=owner_id,
                                              include_legacy=include_legacy))
-        return {"batch_id": batch_id, "candidate_count": count, "runs": runs,
+        return {"batch_id": batch_id, "candidate_count": count, "baseline": baseline, "runs": runs,
                 "strategy": "rule_batch", "execution_started": False}
 
 
