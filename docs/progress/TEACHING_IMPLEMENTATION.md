@@ -40,6 +40,12 @@ Updated: 2026-09-11
 - Open Lab can copy a Runtime run into an independent task and apply bounded
   `place_density`, `core_utilization_pct`, or `minimum_die_size_um` overrides;
   source runs remain immutable and provenance is recorded.
+- Direct LLM RTL output can be registered as `direct-llm-v1` against a frozen
+  verification package, then submitted through the shared RTL verification
+  route; RTLScout and Direct LLM candidates have a common comparison read
+  model with measured QoR metadata and a selectable trend metric.
+- Native BO/GP campaign creation is exposed at `/api/v2/closed-loops`; A2
+  campaign status/list operations remain bound to the L1 Workbench session.
 
 ## Evidence
 
@@ -54,4 +60,5 @@ Updated: 2026-09-11
 ## Current next slice
 
 Next: validate the connected route in a browser and with a bounded smoke, then
-implement the first Open Lab copy-from-run flow.
+connect Rule Batch and A2 campaign actions to the teaching UI without
+weakening their native protocols.
