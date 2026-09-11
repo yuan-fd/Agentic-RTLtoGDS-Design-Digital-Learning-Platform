@@ -1275,6 +1275,16 @@ async function submitFlow() {
   finally { if (button) button.disabled = false; }
 }
 
+async function copySelectedRunToOpen() {
+  const runId = state.selectedRun?.run?.run_id;
+  if (!runId) return message("#flowMessage", ui("Select a completed run first.", "请先选择一个已完成的运行。"), true);
+  try {
+    await post("/api/teaching/open/copy", {run_id: runId});
+    message("#flowMessage", ui("Copied into an independent Open Lab run.", "已复制为独立的 Open Lab 实验。"));
+    await loadRuns();
+  } catch (error) { message("#flowMessage", error.message, true); }
+}
+
 function backendMode(mode) {
   state.backendMode = mode;
   const two = $("#backend-pane-2d");
@@ -1739,6 +1749,7 @@ $("#approveSpecRtl").addEventListener("click", approveSpecRtl);
 $("#runRtlscout").addEventListener("click", submitRtlscout);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
+$("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.

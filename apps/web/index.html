@@ -227,7 +227,7 @@
 
         <section class="task-panel">
           <header class="task-panel-head result-panel-head"><span>③</span><div><b data-i18n="backend.run.title">Run RTL-to-GDS and monitor stages</b><small data-i18n="backend.run.subtitle">Follow progress, recovery, metrics, and generated files for the selected design.</small></div><div class="worker-indicator" id="workerIndicator"><i></i><span id="workerState">Checking service…</span></div><label><span data-i18n="backend.run.select">Design task</span><select id="runSelect"><option value="">Choose a design task</option></select></label></header>
-          <div class="run-controls"><button class="button primary" id="submitFlow" data-i18n="backend.run.action">View historical L2 records</button><button class="button" type="button" data-route="projects" data-i18n="backend.run.compare">Compare recorded runs</button></div><p class="message" id="flowMessage" aria-live="polite"></p>
+          <div class="run-controls"><button class="button primary" id="submitFlow" data-i18n="backend.run.action">Run teaching experiment</button><button class="button" id="copyOpenRun" type="button">Copy selected run to Open Lab</button><button class="button" type="button" data-route="projects" data-i18n="backend.run.compare">Compare recorded runs</button></div><p class="message" id="flowMessage" aria-live="polite"></p>
           <div class="run-heading" id="runHeading"><div><b data-i18n="backend.run.empty">No run selected</b><span data-i18n="backend.run.empty.help">Queued, active, and completed records appear here.</span></div></div>
           <div class="flow-progress"><div><span id="flowProgressBar"></span></div><b id="flowProgressText">0 / 6</b></div>
           <div class="stage-rail" id="stageRail"></div>

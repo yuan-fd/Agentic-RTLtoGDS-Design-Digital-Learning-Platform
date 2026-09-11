@@ -3012,6 +3012,20 @@ class ApiState:
             "authority": "WorkflowRuntime",
         }
 
+    def copy_teaching_run(self, run_id: str, *, owner_id: str | None = None,
+                          include_legacy: bool = False) -> dict[str, Any]:
+        """Create an independent Open Lab run from a registered Runtime task."""
+        source = self._authorize_runtime(run_id, owner_id, include_legacy=include_legacy)
+        task = source.task_spec
+        labels = {**dict(task.labels or {}), "teaching_mode": "open",
+                  "teaching_source_run_id": run_id}
+        copied = dataclasses.replace(task, task_id=f"teaching-copy-{uuid.uuid4().hex}",
+                                     labels=labels)
+        run = self.runtime.submit(copied, capability="eda.rtl_to_gds")
+        return {"source_run_id": run_id, "run": self.get_runtime_run(
+            run.run_id, owner_id=owner_id, include_legacy=include_legacy),
+            "execution_started": False}
+
     def get_runtime_run(self, run_id: str, *, owner_id: str | None = None,
                         include_legacy: bool = False) -> dict[str, Any]:
         self._authorize_runtime(run_id, owner_id, include_legacy=include_legacy)
@@ -5048,6 +5062,13 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                             "cost, step, revision, or execution controls"
                         )
                     return scoped({})
+
+                if path == "/api/teaching/open/copy":
+                    payload = self._read_json()
+                    self._json(state.copy_teaching_run(
+                        str(payload.get("run_id") or ""), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
 
                 if path == "/api/spec/sessions":
                     self._json(state.create_spec_session(scoped(self._read_json())), HTTPStatus.CREATED)
