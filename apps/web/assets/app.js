@@ -780,8 +780,10 @@ async function loadRtlGeneratorComparison() {
   try {
     const view = await api(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/comparison`);
     const meta = view.metric_metadata || {};
+    const selector = $("#rtlTrendMetric");
+    if (selector) { const selected = selector.value; selector.innerHTML = `<option value="">Automatic</option>` + Object.entries(meta).map(([key, info]) => `<option value="${esc(key)}">${esc(key)}${info.unit ? ` (${esc(info.unit)})` : ""}</option>`).join(""); selector.value = selected; }
     $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => { const metric = item.qor.at(-1) || {}; const summary = Object.entries(metric).slice(0, 6).map(([key, value]) => { const info = meta[key] || {}; return `<span>${esc(key)}${info.unit ? ` (${esc(info.unit)})` : ""}: <b>${esc(value)}</b>${info.direction ? ` · ${esc(info.direction)}` : ""}</span>`; }).join(""); return `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)} · ${item.qor.length} measured records</small><div class="comparison-metrics">${summary || "No measured QoR yet."}</div><span class="optimization-badge">${item.checks.length} checks</span></div>`; }).join("") || `<div class="empty-row">No candidates yet.</div>`;
-    const metricKey = Object.keys(meta)[0];
+    const metricKey = selector?.value || Object.keys(meta)[0];
     const points = metricKey ? (view.candidates || []).flatMap(item => item.qor.map(metric => ({value: metric[metricKey], generator: item.generator})).filter(point => typeof point.value === "number")) : [];
     const max = Math.max(...points.map(point => Math.abs(point.value)), 1);
     $("#rtlComparisonTrend").innerHTML = points.length ? `<text x="4" y="12" fill="currentColor" font-size="10">${esc(metricKey)} ${meta[metricKey]?.unit || ""}</text>` + points.slice(-24).map((point, index) => `<rect x="${index * 26}" y="${92 - Math.min(76, Math.abs(point.value) / max * 76)}" width="16" height="${Math.min(76, Math.abs(point.value) / max * 76)}" fill="${point.generator === "direct-llm-v1" ? "#2563eb" : "#16a34a"}"/><title>${esc(point.generator)}: ${point.value}</title>`).join("") : "";
@@ -1797,6 +1799,7 @@ $("#approveSpecRtl").addEventListener("click", approveSpecRtl);
 $("#runRtlscout").addEventListener("click", submitRtlscout);
 $("#registerDirectLlm")?.addEventListener("click", registerDirectLlmCandidate);
 $("#verifyDirectLlm")?.addEventListener("click", verifyDirectLlmCandidate);
+$("#rtlTrendMetric")?.addEventListener("change", loadRtlGeneratorComparison);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
