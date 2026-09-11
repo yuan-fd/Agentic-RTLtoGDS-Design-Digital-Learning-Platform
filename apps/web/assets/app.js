@@ -761,7 +761,8 @@ async function submitRtlscout() {
 
 async function loadRuns(preferred = null) {
   try {
-    state.runs = (await api("/api/runtime/runs")).runs || [];
+    const dashboard = await api("/api/teaching/dashboard");
+    state.runs = dashboard.runs || [];
     const selectedDesignId = state.selectedDesign?.id;
     const physicalRuns = state.runs.filter(run => selectedDesignId && run.design_id === selectedDesignId && (["orfs", "taiwei-pin-3d", "implcraft"].includes(run.plugin_id) || ["edacraft-tcadcraft", "edacraft-momcraft", "edacraft-cktcraft"].includes(run.plugin_id)));
     $("#runSelect").innerHTML = `<option value="">${selectedDesignId ? ui("Choose a design task", "选择该设计的任务") : ui("Select a design first", "请先选择设计")}</option>` + physicalRuns.map((run, index) => `<option value="${esc(run.run_id)}">${ui("Task", "任务")} ${String(index + 1).padStart(2, "0")} · ${esc(humanStatus(run.status))}</option>`).join("");
