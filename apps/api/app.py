@@ -47,6 +47,7 @@ from openroad_platform_contracts import (  # noqa: E402
     SemanticToolCall, ToolName,
     LearningContext, LearningObservation, PortSpec, RTLCandidate, SpecIR, TaskSpec,
     VerificationPackage,
+    TEACHING_MODES, validate_teaching_mode,
 )
 from openroad_platform_analysis import (  # noqa: E402
     EvidenceKnowledgeRecordV2, EvidenceRAG, RuntimeEvidenceExporter,
@@ -4763,6 +4764,8 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         include_legacy=session.legacy_access if session else False,
                         public=session is None,
                     ))
+                elif path == "/api/teaching/modes":
+                    self._json({"modes": TEACHING_MODES, "default": "guided"})
                 elif path in {"/", "/index.html"}:
                     self._file(WEB_ROOT / "index.html", "text/html; charset=utf-8")
                 elif path == "/assets/app.css":

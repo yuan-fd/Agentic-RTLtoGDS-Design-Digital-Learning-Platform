@@ -15,6 +15,8 @@ Updated: 2026-09-11
   the existing Runtime detail/artifact endpoints.
 - Experiment identity (`experiment_id`), teaching mode and agent phase are
   projected from existing TaskSpec labels; no parallel database was added.
+- Bounded teaching mode contract and catalog: `guided`, `open`, `challenge`;
+  exposed at `GET /api/teaching/modes`.
 
 ## Evidence
 
@@ -28,5 +30,5 @@ Updated: 2026-09-11
 
 ## Current next slice
 
-Next: add explicit Guided/Open/Challenge mode validation at experiment
-creation, reusing the existing typed TaskSpec and budget gates.
+Next: pass the selected mode through the existing L1 experiment creation
+request and apply mode-specific custom-design/objective/hypothesis gates.
