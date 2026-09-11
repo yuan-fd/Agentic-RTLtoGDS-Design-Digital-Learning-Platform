@@ -2977,6 +2977,29 @@ class ApiState:
                                               include_legacy=include_legacy)
                           and (not design_id or run.task_spec.design_id == design_id)]}
 
+    def teaching_dashboard(self, *, owner_id: str | None = None,
+                           include_legacy: bool = False, limit: int = 50) -> dict[str, Any]:
+        """Return the compact read model used by the teaching workbench.
+
+        The projection deliberately contains run facts only; detail endpoints
+        remain responsible for artifacts and raw evidence.
+        """
+        runs = self.list_runtime_runs(limit=limit, owner_id=owner_id,
+                                      include_legacy=include_legacy)["runs"]
+        active = {"queued", "preparing", "running", "retry_wait", "cancel_requested"}
+        return {
+            "schema_version": 1,
+            "runs": runs,
+            "summary": {
+                "total": len(runs),
+                "active": sum(item["status"] in active for item in runs),
+                "succeeded": sum(item["status"] == "succeeded" for item in runs),
+                "failed": sum(item["status"] == "failed" for item in runs),
+            },
+            "polling": {"recommended_seconds": 2 if any(item["status"] in active for item in runs) else 5},
+            "authority": "WorkflowRuntime",
+        }
+
     def get_runtime_run(self, run_id: str, *, owner_id: str | None = None,
                         include_legacy: bool = False) -> dict[str, Any]:
         self._authorize_runtime(run_id, owner_id, include_legacy=include_legacy)
@@ -4821,6 +4844,12 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=list_owner,
                         include_legacy=session.legacy_access or developer_all,
                         design_id=design_id,
+                    ))
+                elif path == "/api/teaching/dashboard":
+                    self._json(state.teaching_dashboard(
+                        owner_id=list_owner,
+                        include_legacy=session.legacy_access or developer_all,
+                        limit=min(100, max(1, int((parse_qs(parsed.query).get("limit") or [50])[0]))),
                     ))
                 elif re.fullmatch(r"/api/runtime/runs/[^/]+/artifacts/[^/]+/excerpt", path):
                     parts = path.split("/")

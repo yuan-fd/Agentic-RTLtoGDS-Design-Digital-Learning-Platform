@@ -1,0 +1,14 @@
+from apps.api.app import ApiState
+
+
+def test_teaching_dashboard_is_a_compact_runtime_projection():
+    state = object.__new__(ApiState)
+    state.list_runtime_runs = lambda **kwargs: {"runs": [
+        {"run_id": "queued-1", "status": "queued"},
+        {"run_id": "done-1", "status": "succeeded"},
+        {"run_id": "bad-1", "status": "failed"},
+    ]}
+    result = state.teaching_dashboard(owner_id="student")
+    assert result["authority"] == "WorkflowRuntime"
+    assert result["summary"] == {"total": 3, "active": 1, "succeeded": 1, "failed": 1}
+    assert result["polling"]["recommended_seconds"] == 2
