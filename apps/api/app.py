@@ -896,6 +896,47 @@ class ApiState:
                 "testbench_sha256": digest, "execution_started": False,
                 "authority": "RTLScout-v2 is the sole RTL candidate producer"}
 
+    def submit_direct_llm_candidate(self, spec_id: str, payload: dict[str, Any], *,
+                                    owner_id: str | None = None,
+                                    include_legacy: bool = False) -> dict[str, Any]:
+        """Register a Direct LLM RTL candidate for the shared verification path.
+
+        The source is inert data at this boundary. It cannot declare success;
+        callers must submit the returned candidate to the existing RTL verify,
+        simulation, and PPA gates.
+        """
+        lineage = self.rtl_frontend.lineage(spec_id)
+        owner = self.auth.owner_of("rtl_spec", spec_id)
+        if owner_id and owner not in {owner_id, None} and not include_legacy:
+            raise KeyError(spec_id)
+        source = str(payload.get("rtl_source") or "")
+        if not source.strip() or len(source.encode("utf-8")) > 2 * 1024 * 1024:
+            raise ValueError("rtl_source must be non-empty and at most 2 MiB")
+        spec = SpecIR.from_dict(lineage["spec"])
+        verification_id = str(payload.get("verification_id") or "")
+        if not verification_id:
+            packages = lineage.get("verification_packages") or ()
+            verification_id = str(packages[-1].get("verification_id") if packages else "")
+        if not verification_id:
+            raise ValueError("Direct LLM candidate requires a frozen verification package")
+        digest = _sha256_text(source)
+        destination = self.rtl_candidate_root / f"direct-llm-{digest}.sv"
+        if not destination.exists():
+            destination.write_text(source, encoding="utf-8")
+        candidate = RTLCandidate(
+            candidate_id=f"candidate-{uuid.uuid4().hex}", spec_id=spec.spec_id,
+            verification_id=verification_id,
+            rtl_artifact_ref=f"artifact:rtl-candidate:{digest}",
+            generator="direct-llm-v1",
+            provenance={"rtl_sha256": digest, "specir_input": True,
+                        "source": "operator-submitted-llm-output"},
+        )
+        self.rtl_frontend.add_candidate(candidate)
+        return {"candidate_id": candidate.candidate_id, "spec_id": spec_id,
+                "verification_id": verification_id, "rtl_sha256": digest,
+                "generator": candidate.generator,
+                "authority": "candidate registered; Runtime verification is still required"}
+
     def submit_automated_rtlscout(self, spec_id: str, payload: dict[str, Any], *,
                                   owner_id: str | None = None,
                                   include_legacy: bool = False) -> dict[str, Any]:
@@ -5127,6 +5168,13 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     self._json(state.run_automated_rtl_pipeline(
                         unquote(match.group(1)), autonomous_rtl_request(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                match = re.fullmatch(r"/api/rtl/specs/([^/]+)/direct-llm-candidate", path)
+                if match:
+                    self._json(state.submit_direct_llm_candidate(
+                        unquote(match.group(1)), scoped(self._read_json()),
+                        owner_id=session.user_id, include_legacy=session.legacy_access),
+                        HTTPStatus.CREATED)
                     return
                 if path == "/api/v2/external-optimizer-loops":
                     self._json(state.start_external_optimizer_loop(
