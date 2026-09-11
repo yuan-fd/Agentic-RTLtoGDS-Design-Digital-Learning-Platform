@@ -779,7 +779,7 @@ async function loadRtlGeneratorComparison() {
   if (!spec) return;
   try {
     const view = await api(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/comparison`);
-    $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)}</small><span class="optimization-badge">${item.checks.length} checks</span></div>`).join("") || `<div class="empty-row">No candidates yet.</div>`;
+    $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)} · ${item.qor.length} measured records</small><span class="optimization-badge">${item.checks.length} checks</span></div>`).join("") || `<div class="empty-row">No candidates yet.</div>`;
   } catch (error) { $("#rtlGeneratorComparison").textContent = error.message; }
 }
 
