@@ -762,6 +762,7 @@ footer { min-height: 56px; padding: 14px 24px; display: flex; justify-content: s
 .optimization-row code { padding: 2px 5px; background: var(--surface-subtle); color: var(--heading); font-size: 10px; }
 .comparison-metrics { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: 10px; }
 .comparison-metrics span { color: var(--muted); }
+.comparison-trend { width: 100%; min-height: 100px; margin-top: 10px; border-top: 1px solid var(--line); }
 .optimization-badge { padding: 3px 6px; border-radius: 999px; background: #edf2ff; color: #315aa8 !important; font-size: 9px !important; font-weight: 750; text-transform: uppercase; white-space: nowrap; }
 .optimization-badge.active { background: #e9f8ef; color: #18794e !important; }
 .optimization-badge.retired, .optimization-badge.failed { background: #fff0ef; color: #bd3b34 !important; }
