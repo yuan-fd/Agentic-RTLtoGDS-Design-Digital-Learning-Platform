@@ -36,6 +36,8 @@ def main():
     if parts[-1]=="l2-escalate": return self.reply(svc.l2_escalate(sid))
     if parts[-1]=="l2-configure": return self.reply(svc.l2_configure(sid,x["pipeline_id"],objective=x.get("objective","ECP"),initialization_seed=x.get("initialization_seed",401),screening_seed=x.get("screening_seed",401),confirmation_seeds=x.get("confirmation_seeds")))
     if parts[-1]=="l2-advance": return self.reply(svc.l2_advance(sid,x["pipeline_id"],execute=False,max_parallel=x.get("max_parallel",1)))
+    if parts[-1]=="l2-status": return self.reply(svc.l2_status(sid,x["pipeline_id"]))
+    if parts[-1]=="l2-list": return self.reply({"pipelines": svc.l2_list(sid)})
     if parts[-1]=="queries": return self.reply(svc.query(sid,x["kind"],x["decision_summary"],limit=x.get("limit",20)))
     if parts[-1]=="knowledge": return self.reply(svc.query_openroad_knowledge(sid,x["query"],x["decision_summary"],purpose=x.get("purpose","knowledge"),top_k=x.get("top_k",5)))
     if parts[-1]=="artifacts": return self.reply(svc.artifact_excerpt(sid,x["kind"],x["decision_summary"],max_bytes=x.get("max_bytes",4096)))
