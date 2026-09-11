@@ -3929,6 +3929,26 @@ class ApiState:
             ) else "evidence_available",
         }
 
+    def rtl_candidate_comparison(self, spec_id: str, *, owner_id: str | None = None,
+                                 include_legacy: bool = False) -> dict[str, Any]:
+        lineage = self.get_rtl_lineage(spec_id, owner_id=owner_id,
+                                       include_legacy=include_legacy)
+        rows = []
+        for candidate in lineage.get("candidates", []):
+            checks = [item for item in lineage.get("checks", [])
+                      if item.get("candidate_id") == candidate.get("candidate_id")]
+            rows.append({"candidate_id": candidate["candidate_id"],
+                         "generator": candidate.get("generator"),
+                         "verification_id": candidate.get("verification_id"),
+                         "checks": checks,
+                         "functional_status": "passed" if any(
+                             item.get("check_kind") in {"simulation", "formal", "equivalence"}
+                             and item.get("status") == "passed" for item in checks)
+                         else "not_evaluated"})
+        return {"spec_id": spec_id, "candidates": rows,
+                "generators": sorted({row["generator"] for row in rows}),
+                "comparison_authority": "RTLFrontendStore checks; Runtime evidence required"}
+
     def generate_testbench_draft(self, spec_id: str, *, owner_id: str | None = None,
                                  include_legacy: bool = False) -> dict[str, Any]:
         """Return an AI draft only; freezing and approval remain a later action."""
@@ -4899,6 +4919,10 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         unquote(path.split("/")[4]), owner_id=direct_owner,
                         include_legacy=session.legacy_access,
                     ))
+                elif re.fullmatch(r"/api/rtl/specs/[^/]+/comparison", path):
+                    self._json(state.rtl_candidate_comparison(
+                        unquote(path.split("/")[4]), owner_id=direct_owner,
+                        include_legacy=session.legacy_access))
                 elif re.fullmatch(r"/api/designs/[^/]+/schematic\.svg", path):
                     design_id = unquote(path.split("/")[3])
                     self._text(state.designs.schematic(
