@@ -770,7 +770,17 @@ async function registerDirectLlmCandidate() {
     state.directLlmCandidateId = result.candidate_id;
     $("#verifyDirectLlm").disabled = false;
     message("#directLlmMessage", ui(`Candidate ${result.candidate_id} registered; run verification next.`, `候选 ${result.candidate_id} 已登记，请继续运行验证。`));
+    await loadRtlGeneratorComparison();
   } catch (error) { message("#directLlmMessage", error.message, true); }
+}
+
+async function loadRtlGeneratorComparison() {
+  const spec = state.specSession?.frozenSpec;
+  if (!spec) return;
+  try {
+    const view = await api(`/api/rtl/specs/${encodeURIComponent(spec.spec_id)}/comparison`);
+    $("#rtlGeneratorComparison").innerHTML = (view.candidates || []).map(item => `<div class="optimization-row"><b>${esc(item.generator)}</b><small>${esc(item.candidate_id)} · ${esc(item.functional_status)}</small><span class="optimization-badge">${item.checks.length} checks</span></div>`).join("") || `<div class="empty-row">No candidates yet.</div>`;
+  } catch (error) { $("#rtlGeneratorComparison").textContent = error.message; }
 }
 
 async function verifyDirectLlmCandidate() {
