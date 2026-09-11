@@ -3735,6 +3735,12 @@ class ApiState:
         owner_id = _optional_string(payload.get("owner_id"))
         include_legacy = payload.get("include_legacy") is True
         design_id = str(payload.get("design_id") or "").strip()
+        teaching_mode = validate_teaching_mode(payload.get("teaching_mode", "guided")).value
+        teaching_context = payload.get("teaching_context") or {}
+        if not isinstance(teaching_context, dict):
+            raise ValueError("teaching_context must be an object")
+        if teaching_mode == "challenge" and not teaching_context.get("hypothesis"):
+            raise ValueError("challenge mode requires a hypothesis")
         design = self._owned_design(design_id, owner_id, include_legacy=include_legacy)
         plan = build_craft_flow_plan(
             self.designs.rtl_path(design_id, owner_id=owner_id,
@@ -3752,6 +3758,8 @@ class ApiState:
         backend = str(payload.get("backend") or "openroad-orfs")
         task = craft_plan_to_task(plan, backend,
                                   commercial_tool_chain=str(payload.get("commercial_tool_chain") or "synopsys"))
+        task = dataclasses.replace(task, labels={**task.labels, "teaching_mode": teaching_mode,
+                                                  **{f"teaching_{key}": str(value) for key, value in teaching_context.items()}})
         if owner_id:
             task = dataclasses.replace(task, labels={**task.labels, "owner_id": owner_id})
         result = {"flow_plan": plan.to_dict(), "capability_matrix": craft_capability_matrix(plan),
