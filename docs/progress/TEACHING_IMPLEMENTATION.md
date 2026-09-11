@@ -29,6 +29,9 @@ Updated: 2026-09-11
   objective/hypothesis fields with client-side validation; legacy historical
   DSE submission remains read-only until the formal experiment creation route
   is wired.
+- The managed launcher now starts four Runtime worker slots by default
+  (`WORKER_COUNT`, bounded to 1–16); each slot has its own heartbeat/lock while
+  Runtime lease claiming remains the concurrency authority.
 
 ## Evidence
 

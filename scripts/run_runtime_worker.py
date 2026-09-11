@@ -83,11 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     parser.add_argument("--once", action="store_true",
                         help="Execute at most one ready Runtime stage, then exit")
+    parser.add_argument("--worker-slot", default="0",
+                        help="Distinct slot name when several workers share one queue")
     args = parser.parse_args(argv)
     if args.poll_seconds <= 0:
         parser.error("--poll-seconds must be positive")
     if args.heartbeat is None:
-        args.heartbeat = args.runtime_db.expanduser().resolve().parent / "runtime-worker.heartbeat.json"
+        args.heartbeat = args.runtime_db.expanduser().resolve().parent / f"runtime-worker-{args.worker_slot}.heartbeat.json"
 
     lock_path = args.heartbeat.with_suffix(".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
