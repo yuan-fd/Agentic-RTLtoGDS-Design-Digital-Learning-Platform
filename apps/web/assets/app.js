@@ -1264,14 +1264,11 @@ async function submitFlow() {
   const button = $("#submitFlow"); if (button) button.disabled = true;
   message("#flowMessage", ui("Creating a Runtime experiment…", "正在创建 Runtime 实验……"));
   try {
-    let session = await post("/api/l1/sessions", {text: "Run the managed teaching experiment.", teaching_mode: mode, teaching_context: context});
-    if (session.status === "clarification_required") {
-      const q = (session.questions || [])[0];
-      session = await post(`/api/l1/sessions/${encodeURIComponent(session.session_id)}/answers`, {answers: [{question_id: q.question_id, field: q.field, value: context.objective || "one bounded run"}]});
-    }
-    const result = await post(`/api/l1/sessions/${encodeURIComponent(session.session_id)}/execute`, {decision_summary: "User approved the teaching experiment from the web dashboard.", wait: true});
-    state.activeSessionId = session.session_id;
-    message("#flowMessage", ui("Experiment completed; evidence is ready below.", "实验完成，证据已准备好。"));
+    const result = await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
+      platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk",
+      teaching_mode: mode, teaching_context: context, execute: true});
+    state.activeSessionId = result.task_spec?.task_id || null;
+    message("#flowMessage", ui("Experiment submitted; evidence is ready below.", "实验已提交，证据将在下方更新。"));
     await loadRuns();
     if (result.runtime?.run?.run_id) selectRun(result.runtime.run.run_id);
   } catch (error) { message("#flowMessage", error.message, true); }
