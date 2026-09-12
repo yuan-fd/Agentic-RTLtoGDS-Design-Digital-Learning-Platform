@@ -132,6 +132,8 @@ a { color: inherit; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .eda-assistant-panel { border-top: 3px solid var(--accent); }
 .assistant-status { color: var(--green); font: 600 12px var(--mono); }
+.mcp-status { color: #667085; font-size: .78rem; margin-left: .5rem; }
+.mcp-status.ready { color: var(--green); }
 .assistant-body { padding: 18px 20px 20px; }
 .assistant-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .assistant-prompts button { padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; color: var(--heading); font-size: 12px; text-align: left; }

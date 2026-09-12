@@ -520,6 +520,7 @@ async function loadPlatform() {
     state.extensions = buildExtensions(platform);
     renderWorkerHealth(health);
     if (state.requestedExtension) selectExtension(state.requestedExtension);
+    loadMcpStatus();
   } catch (error) {
     $("#healthDot").className = "bad";
     $("#healthText").textContent = ui("API unavailable", "API 不可用");
@@ -527,6 +528,21 @@ async function loadPlatform() {
   }
   if (state.healthPoll) clearTimeout(state.healthPoll);
   state.healthPoll = setTimeout(loadHealth, 5000);
+}
+
+async function loadMcpStatus() {
+  const node = $("#mcpStatus");
+  if (!node) return;
+  try {
+    const result = await api("/api/teaching/mcp/status");
+    const ready = result.status === "ready";
+    node.textContent = ready ? "MCP 已连接" : "MCP 不可用";
+    node.classList.toggle("ready", ready);
+    node.title = ready ? `${result.server?.name || "OpenROAD-MCP"} ${result.server?.version || ""} · ${result.tool_count || 0} tools` : (result.diagnostic || "");
+  } catch (_) {
+    node.textContent = "MCP 未连接";
+    node.classList.remove("ready");
+  }
 }
 
 async function loadHealth() {

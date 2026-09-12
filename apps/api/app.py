@@ -3209,6 +3209,37 @@ class ApiState:
         payload["wait"] = self._wait_summary(run_id)
         return payload
 
+    def mcp_status(self) -> dict[str, Any]:
+        """Report the server-owned OpenROAD-MCP capability without accepting paths.
+
+        This is a read-only diagnostic. Interactive commands are deliberately
+        not routed through this endpoint; formal work remains Runtime-owned.
+        """
+        configured = os.environ.get("OPENROAD_MCP_REPO", "").strip()
+        candidates = [Path(configured)] if configured else []
+        candidates.extend((
+            ROOT / "var" / "external-sources" / "openroad-mcp",
+            Path("/tmp/openroad-mcp-review"),
+        ))
+        repo = next((item.expanduser().resolve() for item in candidates
+                     if (item / "typescript" / "dist" / "main.js").is_file()), None)
+        if repo is None:
+            return {"status": "unavailable", "diagnostic": "server-owned OpenROAD-MCP build not found"}
+        probe = ROOT / "scripts" / "probe_openroad_mcp.py"
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(probe), "--repo", str(repo), "--mode", "repo", "--timeout", "5"],
+                cwd=str(ROOT), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=8, check=False,
+            )
+            if completed.returncode != 0:
+                return {"status": "unavailable", "repo": str(repo),
+                        "diagnostic": completed.stderr[-1000:].strip() or "probe failed"}
+            result = json.loads(completed.stdout)
+            return {"status": "ready", "repo": str(repo), **result}
+        except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+            return {"status": "unavailable", "repo": str(repo), "diagnostic": str(exc)}
+
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
                             include_legacy: bool = False) -> dict[str, Any]:
         view = self.get_runtime_run(run_id, owner_id=owner_id, include_legacy=include_legacy)
@@ -5239,6 +5270,8 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         include_legacy=session.legacy_access or developer_all,
                         limit=min(100, max(1, int((parse_qs(parsed.query).get("limit") or [50])[0]))),
                     ))
+                elif path == "/api/teaching/mcp/status":
+                    self._json(state.mcp_status())
                 elif path == "/api/teaching/dse/campaigns":
                     self._json(state.teaching_campaigns(
                         owner_id=list_owner,
