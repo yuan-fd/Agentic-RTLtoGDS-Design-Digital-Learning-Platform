@@ -208,12 +208,15 @@ async function askEdaAssistant() {
   status.textContent = ui("Thinking…", "处理中…");
   response.innerHTML = `<div class="assistant-empty">${esc(ui("Preparing a bounded teaching step…", "正在准备一个受控的教学步骤……"))}</div>`;
   try {
+    const selectedRun = state.selectedRun?.run;
+    const runContext = selectedRun ? {run_id: selectedRun.run_id, run_status: selectedRun.status, target_stage: state.selectedRun?.task?.parameters?.target_stage || "finish"} : {run_status: "none"};
     const session = await post("/api/l1/sessions", {
       text,
       teaching_mode: state.teachingMode || "guided",
-      teaching_context: state.selectedDesign ? {design_id: state.selectedDesign.id} : {},
+      teaching_context: {...(state.selectedDesign ? {design_id: state.selectedDesign.id} : {}), ...runContext},
     });
-    const summary = session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。");
+    const localStatus = selectedRun ? `${ui("Current run", "当前任务")}: ${humanStatus(selectedRun.status)} · ${ui("target", "目标阶段")} ${runContext.target_stage}` : ui("No run is selected yet.", "当前还没有选择运行任务。");
+    const summary = `${localStatus}. ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
     const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
     response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
     status.textContent = ui("Ready", "就绪");
