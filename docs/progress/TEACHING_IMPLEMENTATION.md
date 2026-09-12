@@ -123,3 +123,14 @@ is retained and labelled historical. Rollback: revert the correction commit.
   changed from 0.55 to 0.60. Its evidence and metric deltas are recorded in
   `docs/evidence/IBEX_TEACHING_PARAMETER_COMPARISON_20260912.md`; the browser
   still needs an end-to-end live-service verification of both runs.
+
+## OpenROAD-MCP intake
+
+- The official OpenROAD-MCP repository was reviewed and locally built at the
+  pinned commit `9dc80d3706fbcd8144cccb639fa21af7b933cbf5` (npm `1.1.0`).
+- On the platform host, its TypeScript build and stdio `initialize` /
+  `tools/list` probe passed after rebuilding the native `node-pty` module.
+- Intake evidence is recorded in
+  `docs/evidence/OPENROAD_MCP_INTAKE_20260913.md`; the integration architecture
+  is recorded in ADR-002. Direct unauthenticated HTTP exposure remains out of
+  scope.
