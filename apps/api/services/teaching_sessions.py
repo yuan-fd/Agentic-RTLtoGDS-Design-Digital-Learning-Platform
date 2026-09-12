@@ -35,6 +35,8 @@ class TeachingSessions:
         return {
             "session_id": sid,
             "evidence_count": len(evidence),
+            "evidence": [{"ref": item.get("ref"), "sha256": item.get("sha256")}
+                         for item in evidence if isinstance(item, dict) and item.get("ref")],
             "promotion": {
                 "status": "eligible_for_review" if observed and succeeded and evidence else "not_eligible",
                 "requirements": {"observed_runtime": observed,

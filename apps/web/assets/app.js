@@ -848,7 +848,8 @@ async function loadRuns(preferred = null) {
           try { learning = await api(`/api/teaching/sessions/${encodeURIComponent(sid)}/learning`); } catch (_) { /* keep history usable */ }
           const evidence = item.state?.evidence?.length || learning?.evidence_count || 0;
           const promotion = learning?.promotion?.status || "not_evaluated";
-          return `<div class="campaign-detail-row"><b>${esc(item.teaching_mode || "guided")}</b><span>${esc(item.session?.status || "unknown")}</span><small>${esc(sid)} · ${evidence} evidence pointers · ${esc(promotion)}</small></div>`;
+          const refs = (learning?.evidence || []).slice(0, 3).map(pointer => pointer.ref).join(", ");
+          return `<div class="campaign-detail-row"><b>${esc(item.teaching_mode || "guided")}</b><span>${esc(item.session?.status || "unknown")}</span><small>${esc(sid)} · ${evidence} evidence pointers · ${esc(promotion)}${refs ? ` · ${esc(refs)}` : ""}</small></div>`;
         }));
         historyBox.innerHTML = `<div class="dse-comparison-head"><b>${ui("My teaching history", "我的教学历史")}</b><span>${history.length} sessions</span></div>` + (historyRows.join("") || `<div class="empty-row">${ui("No teaching sessions yet.", "尚无教学 Session。")}</div>`);
       } catch (_) { historyBox.innerHTML = ""; }
