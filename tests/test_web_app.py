@@ -86,6 +86,17 @@ def test_health_reports_fresh_durable_dse_controller(tmp_path):
     assert health["dse_controller_active_pipeline"] == "pipeline-live"
 
 
+def test_mcp_history_is_owner_scoped_and_expires(tmp_path):
+    state = make_state(tmp_path)
+    state._mcp_history_db.parent.mkdir(parents=True, exist_ok=True)
+    import sqlite3
+    old = "2000-01-01T00:00:00+00:00"
+    with sqlite3.connect(state._mcp_history_db) as connection:
+        connection.execute("INSERT INTO mcp_queries VALUES (?,?,?,?,?)", ("old", "alice", "help", "{}", old))
+    assert state.mcp_history("bob")["records"] == []
+    assert state.mcp_history("alice")["records"] == []
+
+
 
 
 

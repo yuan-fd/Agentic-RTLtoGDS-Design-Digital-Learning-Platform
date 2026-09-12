@@ -3280,9 +3280,11 @@ class ApiState:
 
     def mcp_history(self, owner_id: str) -> dict[str, Any]:
         with sqlite3.connect(self._mcp_history_db) as connection:
+            cutoff = (datetime.now(timezone.utc).timestamp() - 3600)
+            connection.execute("DELETE FROM mcp_queries WHERE created_at < ?", (datetime.fromtimestamp(cutoff, timezone.utc).isoformat(),))
             rows = connection.execute("SELECT query_id, command, result_json, created_at FROM mcp_queries WHERE owner_id=? ORDER BY created_at DESC LIMIT 20", (owner_id,)).fetchall()
         records = [{"query_id": row[0], "command": row[1], "result": json.loads(row[2]), "created_at": row[3]} for row in rows]
-        return {"records": records, "limit": 20,
+        return {"records": records, "limit": 20, "idle_expiry_seconds": 3600,
                 "authority": "Ephemeral exploration history; not Runtime evidence"}
 
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
