@@ -212,14 +212,16 @@ async function askEdaAssistant() {
     const runContext = selectedRun ? {run_id: selectedRun.run_id, run_status: selectedRun.status, target_stage: state.selectedRun?.task?.parameters?.target_stage || "finish"} : {run_status: "none"};
     const evidence = (state.selectedRun?.stages || []).flatMap(stage => stage.attempts || []).at(-1);
     const metricContext = Object.fromEntries((evidence?.metrics || []).map(item => [item.name || item.key, item.value]));
+    const failure = evidence?.failure || state.selectedRun?.run?.failure;
     const session = await post("/api/l1/sessions", {
       text,
       teaching_mode: state.teachingMode || "guided",
-      teaching_context: {...(state.selectedDesign ? {design_id: state.selectedDesign.id} : {}), ...runContext, report_metrics: metricContext},
+      teaching_context: {...(state.selectedDesign ? {design_id: state.selectedDesign.id} : {}), ...runContext, report_metrics: metricContext, failure: failure ? {category: failure.category, message: failure.message} : null},
     });
     const localStatus = selectedRun ? `${ui("Current run", "当前任务")}: ${humanStatus(selectedRun.status)} · ${ui("target", "目标阶段")} ${runContext.target_stage}` : ui("No run is selected yet.", "当前还没有选择运行任务。");
     const evidenceText = Object.keys(metricContext).length ? ui(` Evidence available: ${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join(", ")}.`, ` 已有真实指标：${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join("、")}。`) : ui(" No report metrics are attached to this run yet.", " 当前任务还没有附带报告指标。");
-    const summary = `${localStatus}.${evidenceText} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
+    const failureText = failure ? ui(` Failure recorded: ${failure.category || "unknown"} — ${failure.message || "no message"}.`, ` 已记录失败：${failure.category || "未知类别"}——${failure.message || "没有附加说明"}。`) : "";
+    const summary = `${localStatus}.${evidenceText}${failureText} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
     const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
     response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
     status.textContent = ui("Ready", "就绪");
