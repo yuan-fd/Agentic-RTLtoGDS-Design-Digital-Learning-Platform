@@ -144,6 +144,8 @@
 - [ ] 用户只能看到自己的 MCP Session、历史和输出。
 - [ ] Session 有数量限制、空闲回收和异常终止处理。
 - [ ] ORFS 报告图片和指标能显示在现有 Dashboard。
+
+已加入 PNG/JPEG/SVG 到现有 `layout_view` 投影的适配与回归测试；仍需带真实图片产物的页面端回放验收。
 - [x] 不直接暴露官方无认证 HTTP transport。
 
 #### Task 9：探索升级正式实验
