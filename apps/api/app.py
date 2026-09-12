@@ -3287,6 +3287,35 @@ class ApiState:
         return {"records": records, "limit": 20, "idle_expiry_seconds": 3600,
                 "authority": "Ephemeral exploration history; not Runtime evidence"}
 
+    def mcp_upgrade_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Turn a prior MCP observation into a reviewable Runtime plan.
+
+        This endpoint never starts a process.  The caller must subsequently use
+        the normal Runtime submission path after reviewing and confirming it.
+        """
+        owner_id = str(payload.get("owner_id") or "anonymous")
+        query_id = str(payload.get("query_id") or "").strip()
+        if not query_id:
+            raise ValueError("query_id is required")
+        with sqlite3.connect(self._mcp_history_db) as connection:
+            row = connection.execute(
+                "SELECT command, result_json, created_at FROM mcp_queries WHERE query_id=? AND owner_id=?",
+                (query_id, owner_id),
+            ).fetchone()
+        if row is None:
+            raise ValueError("MCP query not found or not owned by this user")
+        try:
+            observation = json.loads(row[1])
+        except ValueError as exc:
+            raise ValueError("stored MCP observation is invalid") from exc
+        return {
+            "status": "review_required",
+            "query_id": query_id,
+            "plan": {"plugin_id": "orfs", "inputs": {}, "source": "mcp-exploration"},
+            "observation": observation,
+            "authority": "Proposed Runtime plan; not executed and not evidence",
+        }
+
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
                             include_legacy: bool = False) -> dict[str, Any]:
         view = self.get_runtime_run(run_id, owner_id=owner_id, include_legacy=include_legacy)
@@ -5566,6 +5595,9 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/teaching/mcp/query":
                     self._json(state.mcp_query(scoped(self._read_json())))
+                    return
+                if path == "/api/teaching/mcp/upgrade-plan":
+                    self._json(state.mcp_upgrade_plan(scoped(self._read_json())))
                     return
                 if path == "/api/teaching/reference-comparison":
                     payload = {**scoped(self._read_json()), "run_role": "comparison"}
