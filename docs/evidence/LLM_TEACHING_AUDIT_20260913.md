@@ -2,7 +2,7 @@
 
 ## Current score
 
-**8.0 / 10 (implementation readiness)**
+**8.1 / 10 (implementation readiness)**
 
 The score measures verified platform behavior, not planned features. It remains reduced for missing browser end-to-end evidence, incomplete MCP image/session projection, and missing fresh multi-user load evidence.
 
@@ -20,6 +20,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 - MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed.
 - Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`).
+- Authenticated Playwright browser reached the teaching command-check endpoint and received an accepted guided Ibex action.
 
 ## Partial or pending
 
