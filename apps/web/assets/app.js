@@ -12,6 +12,7 @@ const state = {
   specSession: null, developerView: false,
   backendMode: "2d", activeClosedLoop: null, closedLoopPoll: null,
   teachingMode: "guided",
+  a2ProposalId: null,
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
 const ZH = {
@@ -1419,6 +1420,10 @@ async function a2Action(action, payload = {}) {
   if (!state.workbenchSessionId) return message("#a2Message", ui("Start an L1 session first.", "请先启动 L1 Session。"), true);
   try {
     const result = await post(`/api/teaching/sessions/${encodeURIComponent(state.workbenchSessionId)}/${action}`, payload);
+    if (action === "m1-proposal") {
+      state.a2ProposalId = result.proposal_id || null;
+      message("#a2Message", ui("Candidate proposal recorded; review it before running.", "候选参数提案已记录，请审核后运行。"));
+    }
     const latest = result.campaigns?.at(-1);
     if (result.pipeline_id || latest?.pipeline_id) $("#a2Pipeline").value = result.pipeline_id || latest.pipeline_id;
     if (latest) {
@@ -1428,6 +1433,8 @@ async function a2Action(action, payload = {}) {
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
     $("#a2Configure").disabled = !$("#a2Pipeline").value;
     $("#a2Advance").disabled = !$("#a2Pipeline").value;
+    $("#a2Propose").disabled = false;
+    $("#a2RunCandidate").disabled = !state.a2ProposalId;
     if (action === "l2-advance" || action === "l2-configure") pollA2Session();
     return result;
   } catch (error) { message("#a2Message", error.message, true); }
@@ -1934,6 +1941,8 @@ $("#a2Execute")?.addEventListener("click", () => a2Action("execute", {decision_s
 $("#a2Escalate")?.addEventListener("click", () => a2Action("l2-escalate", {decision_summary: "Student reviewed the recorded L1 evidence and requests A2."}));
 $("#a2Configure")?.addEventListener("click", () => a2Action("l2-configure", {pipeline_id: $("#a2Pipeline").value, objective: "ECP"}));
 $("#a2Advance")?.addEventListener("click", () => a2Action("l2-advance", {pipeline_id: $("#a2Pipeline").value}));
+$("#a2Propose")?.addEventListener("click", () => a2Action("m1-proposal"));
+$("#a2RunCandidate")?.addEventListener("click", () => a2Action("candidates", {proposal_id: state.a2ProposalId, decision_summary: "Student reviewed the proposed parameters and requests a measured candidate run."}));
 $("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 $("#dseMode")?.addEventListener("change", updateTeachingMode);
