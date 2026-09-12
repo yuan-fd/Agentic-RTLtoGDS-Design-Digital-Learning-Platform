@@ -1397,6 +1397,20 @@ async function copySelectedRunToOpen() {
   } catch (error) { message("#flowMessage", error.message, true); }
 }
 
+let a2PollTimer = null;
+function stopA2Polling() { if (a2PollTimer) clearTimeout(a2PollTimer); a2PollTimer = null; }
+async function pollA2Session() {
+  if (!state.workbenchSessionId) return;
+  try {
+    const view = await api(`/api/teaching/sessions/${encodeURIComponent(state.workbenchSessionId)}`);
+    const campaign = view.campaigns?.at(-1); const status = campaign?.state?.status;
+    if (campaign?.pipeline_id) $("#a2Pipeline").value = campaign.pipeline_id;
+    if (campaign && !["completed", "failed", "diagnosis_required", "authorized"].includes(status)) {
+      a2PollTimer = setTimeout(pollA2Session, 2000);
+    } else stopA2Polling();
+  } catch (_) { stopA2Polling(); }
+}
+
 async function a2Action(action, payload = {}) {
   if (!state.workbenchSessionId) return message("#a2Message", ui("Start an L1 session first.", "请先启动 L1 Session。"), true);
   try {
@@ -1410,6 +1424,7 @@ async function a2Action(action, payload = {}) {
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
     $("#a2Configure").disabled = !$("#a2Pipeline").value;
     $("#a2Advance").disabled = !$("#a2Pipeline").value;
+    if (action === "l2-advance" || action === "l2-configure") pollA2Session();
     return result;
   } catch (error) { message("#a2Message", error.message, true); }
 }
