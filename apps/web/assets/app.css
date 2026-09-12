@@ -118,6 +118,10 @@ a { color: inherit; }
 .lesson-block b { display: block; margin-bottom: 6px; color: var(--heading); font-size: 12px; }
 .lesson-block p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .lesson-command { margin: 0; padding: 12px; overflow: auto; background: #17202e; color: #f1f5f9; font: 12px/1.6 var(--mono); white-space: pre-wrap; }
+.lesson-practice { margin-top: 14px; padding: 12px; border: 1px solid var(--line); background: #fff; }
+.lesson-practice label { max-width: 680px; }
+.lesson-practice textarea { min-height: 48px; font: 12px/1.5 var(--mono); }
+.lesson-practice .button { margin-top: 9px; }
 .lesson-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 @media (max-width: 700px) { .ibex-course { grid-template-columns: 1fr; } .ibex-course-nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; } .ibex-course-nav b { display: none; } .ibex-course-nav button { min-width: 125px; border-left: 0; border-bottom: 3px solid transparent; } .ibex-course-nav button.active { border-bottom-color: var(--accent); } .lesson-grid { grid-template-columns: 1fr; } }
 .button { min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 14px; font-size: 11px; font-weight: 550; text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
