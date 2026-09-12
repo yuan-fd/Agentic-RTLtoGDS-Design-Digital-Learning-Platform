@@ -18,9 +18,9 @@ os.environ["OPENROAD_PLATFORM_NO_AUTH"] = "1"
 from apps.api.app import ApiState, build_server  # noqa: E402
 
 
-def post(base: str, payload: dict) -> dict:
+def post(base: str, path: str, payload: dict) -> dict:
     request = urllib.request.Request(
-        f"{base}/api/teaching/sessions", data=json.dumps(payload).encode(),
+        f"{base}{path}", data=json.dumps(payload).encode(),
         method="POST", headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(request, timeout=10) as response:
@@ -51,14 +51,15 @@ def main() -> int:
         try:
             with ThreadPoolExecutor(max_workers=8) as pool:
                 created = list(pool.map(
-                    lambda i: post(base, {"text": f"concurrency smoke {i}", "teaching_mode": "guided"}),
+                    lambda i: post(base, "/api/teaching/sessions", {"text": f"concurrency smoke {i}", "teaching_mode": "guided"}),
                     range(8),
                 ))
                 ids = [item["session"]["session_id"] for item in created]
                 snapshots = list(pool.map(lambda sid: get(base, sid), ids))
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=5)
-    if len(set(ids)) != 8 or any((item.get("session") or {}).get("session_id") not in ids for item in snapshots):
+    if (len(set(ids)) != 8 or
+            any((item.get("session") or {}).get("session_id") not in ids for item in snapshots)):
         raise RuntimeError("teaching HTTP concurrency smoke returned inconsistent sessions")
     print(json.dumps({"accepted": True, "concurrent_sessions": 8,
                       "snapshot_reads": len(snapshots)}, sort_keys=True))
