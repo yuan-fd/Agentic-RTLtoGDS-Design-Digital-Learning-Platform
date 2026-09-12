@@ -1,6 +1,7 @@
 import pytest
 
 from openroad_platform_contracts import TeachingMode, validate_teaching_mode, TEACHING_MODES, validate_teaching_request
+from apps.api.app import check_teaching_command
 
 
 def test_teaching_modes_are_bounded_and_normalized():
@@ -35,3 +36,9 @@ def test_dse_strategy_and_candidate_budget_are_bounded():
         validate_teaching_request("open", {"dse_mode": "random"})
     with pytest.raises(ValueError, match="candidate_count"):
         validate_teaching_request("open", {"candidate_count": "7"})
+
+
+def test_lesson_command_check_is_read_only_and_bounded():
+    assert check_teaching_command({"lesson": 1, "command": "make DESIGN_CONFIG=ibex"})["accepted"]
+    rejected = check_teaching_command({"lesson": 1, "command": "make DESIGN_CONFIG=ibex && rm -rf /"})
+    assert not rejected["accepted"]
