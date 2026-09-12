@@ -553,6 +553,7 @@ async function loadPlatform() {
     renderWorkerHealth(health);
     if (state.requestedExtension) selectExtension(state.requestedExtension);
     loadMcpStatus();
+    loadMcpHistory();
   } catch (error) {
     $("#healthDot").className = "bad";
     $("#healthText").textContent = ui("API unavailable", "API 不可用");
