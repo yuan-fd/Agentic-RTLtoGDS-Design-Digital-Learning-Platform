@@ -842,10 +842,15 @@ async function loadRuns(preferred = null) {
     if (historyBox) {
       try {
         const history = (await api("/api/teaching/sessions")).sessions || [];
-        historyBox.innerHTML = `<div class="dse-comparison-head"><b>${ui("My teaching history", "我的教学历史")}</b><span>${history.length} sessions</span></div>` + (history.slice(0, 6).map(item => {
-          const evidence = item.state?.evidence?.length || 0;
-          return `<div class="campaign-detail-row"><b>${esc(item.teaching_mode || "guided")}</b><span>${esc(item.session?.status || "unknown")}</span><small>${esc(item.session?.session_id || "")} · ${evidence} evidence pointers</small></div>`;
-        }).join("") || `<div class="empty-row">${ui("No teaching sessions yet.", "尚无教学 Session。")}</div>`);
+        const historyRows = await Promise.all(history.slice(0, 6).map(async item => {
+          const sid = item.session?.session_id || "";
+          let learning = null;
+          try { learning = await api(`/api/teaching/sessions/${encodeURIComponent(sid)}/learning`); } catch (_) { /* keep history usable */ }
+          const evidence = item.state?.evidence?.length || learning?.evidence_count || 0;
+          const promotion = learning?.promotion?.status || "not_evaluated";
+          return `<div class="campaign-detail-row"><b>${esc(item.teaching_mode || "guided")}</b><span>${esc(item.session?.status || "unknown")}</span><small>${esc(sid)} · ${evidence} evidence pointers · ${esc(promotion)}</small></div>`;
+        }));
+        historyBox.innerHTML = `<div class="dse-comparison-head"><b>${ui("My teaching history", "我的教学历史")}</b><span>${history.length} sessions</span></div>` + (historyRows.join("") || `<div class="empty-row">${ui("No teaching sessions yet.", "尚无教学 Session。")}</div>`);
       } catch (_) { historyBox.innerHTML = ""; }
     }
     const a2 = campaignIndex?.a2;
