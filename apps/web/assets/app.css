@@ -150,6 +150,14 @@ a { color: inherit; }
 .mcp-explorer-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .mcp-explorer-head small { color: var(--muted); font-size: 11px; }
 .mcp-explorer input { min-height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 4px; font: 13px var(--mono); color: var(--ink); }
+.mcp-images { margin-top: 12px; }
+.mcp-images .assistant-compose { flex-wrap: wrap; }
+.mcp-images input { min-width: 110px; flex: 1 1 120px; }
+.mcp-image-list { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 10px; }
+.mcp-image-item { font: 12px var(--mono); }
+.mcp-image-preview { margin: 14px 0 0; max-width: 560px; border: 1px solid var(--line); background: var(--paper); }
+.mcp-image-preview img { display: block; width: 100%; max-height: 520px; object-fit: contain; background: #f7f9fc; }
+.mcp-image-preview figcaption { padding: 8px 10px; color: var(--muted); font-size: 11px; }
 .mcp-query-result { margin: 12px 0 0; max-height: 260px; overflow: auto; padding: 12px; border: 1px solid var(--line); background: #101820; color: #d7e3ef; font: 12px/1.5 var(--mono); white-space: pre-wrap; }
 .mcp-history { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .mcp-history code { color: var(--accent); }
