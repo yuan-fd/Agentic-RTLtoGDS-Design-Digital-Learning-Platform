@@ -22,10 +22,14 @@ for slot in $(seq 1 "$WORKER_COUNT"); do
   python3 "$ROOT/scripts/run_runtime_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
     --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --worker-slot "$slot" &
   worker_pids+=("$!")
+  # JobStore initializes the shared SQLite schema on first start. Give each
+  # process a short, bounded handoff so API/controller startup cannot race it.
+  sleep 1
 done
 python3 "$ROOT/scripts/run_dse_controller_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
   --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --optimization-db "$OPTIMIZATION_DB" &
 worker_pids+=("$!")
+sleep 1
 cleanup() {
   for pid in "${worker_pids[@]}"; do kill "$pid" 2>/dev/null || true; done
   for pid in "${worker_pids[@]}"; do wait "$pid" 2>/dev/null || true; done
