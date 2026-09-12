@@ -11,6 +11,7 @@ import mimetypes
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -268,8 +269,10 @@ class ApiState:
                                                     self.tenant_learning_store)
         self.agent_traces = AgentTraceStore(state_root / "agent-traces.db")
         self.auth = AuthStore(auth_db_path or state_root / "web-auth.db")
-        self._mcp_history: dict[str, list[dict[str, Any]]] = {}
-        self._mcp_history_lock = threading.Lock()
+        self._mcp_history_db = state_root / "mcp-history.db"
+        with sqlite3.connect(self._mcp_history_db) as connection:
+            connection.execute("CREATE TABLE IF NOT EXISTS mcp_queries (query_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, command TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL)")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_mcp_queries_owner_time ON mcp_queries(owner_id, created_at)")
         self.teaching_sessions = None
         if workbench_config is not None:
             from apps.l1_workbench.service import WorkbenchService
@@ -3269,16 +3272,16 @@ class ApiState:
         owner_id = str(payload.get("owner_id") or "anonymous")
         record = {"query_id": uuid.uuid4().hex, "command": command,
                   "result": result, "created_at": datetime.now(timezone.utc).isoformat()}
-        with self._mcp_history_lock:
-            history = self._mcp_history.setdefault(owner_id, [])
-            history.append(record)
-            del history[:-20]
+        with sqlite3.connect(self._mcp_history_db) as connection:
+            connection.execute("INSERT INTO mcp_queries VALUES (?,?,?,?,?)", (record["query_id"], owner_id, command, json.dumps(result, ensure_ascii=False), record["created_at"]))
+            connection.execute("DELETE FROM mcp_queries WHERE owner_id=? AND query_id NOT IN (SELECT query_id FROM mcp_queries WHERE owner_id=? ORDER BY created_at DESC LIMIT 20)", (owner_id, owner_id))
         return {"exploration": result, "query_id": record["query_id"],
                 "authority": "OpenROAD-MCP live query; not Runtime evidence"}
 
     def mcp_history(self, owner_id: str) -> dict[str, Any]:
-        with self._mcp_history_lock:
-            records = list(self._mcp_history.get(owner_id, []))
+        with sqlite3.connect(self._mcp_history_db) as connection:
+            rows = connection.execute("SELECT query_id, command, result_json, created_at FROM mcp_queries WHERE owner_id=? ORDER BY created_at DESC LIMIT 20", (owner_id,)).fetchall()
+        records = [{"query_id": row[0], "command": row[1], "result": json.loads(row[2]), "created_at": row[3]} for row in rows]
         return {"records": records, "limit": 20,
                 "authority": "Ephemeral exploration history; not Runtime evidence"}
 
