@@ -8,4 +8,4 @@ The new `scripts/run_p12_v2_acceptance.py` entrypoint successfully completed:
 - RTLScout-v2 Runtime invocation;
 - multiple candidate evaluations with lint and simulation pass evidence (4/4 checks, 6-transistor AND implementation).
 
-The acceptance run did not reach a terminal success because a later bounded RTLScout revision received an external provider/API error. The failure was recorded by the Runtime adapter as `rtl_validation_failed`; no candidate was promoted to ORFS/GDS. This is an external execution blocker, not evidence of a successful P12 flow.
+The bounded acceptance run reached a terminal stop at the mutation-quality gate: the minimal combinational AND design produced zero executable mutants, so its mutation score was 0 against the generic 0.8 threshold. No candidate was promoted to ORFS/GDS. A separate retry also encountered an external provider/API error during revision. These are recorded failures, not evidence of a successful P12 flow.
