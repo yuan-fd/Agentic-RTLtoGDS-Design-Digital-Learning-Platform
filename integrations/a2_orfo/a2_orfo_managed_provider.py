@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import uuid
 from pathlib import Path
@@ -143,15 +144,25 @@ class ManagedCodexProvider:
             root = Path(raw)
             schema_path, output_path = root / "schema.json", root / "output.json"
             _write(schema_path, schema)
+            command = [str(self.executable), "exec", "--ephemeral", "--ignore-rules",
+                       "--skip-git-repo-check", "--sandbox", "read-only", "--model",
+                       EXECUTED_MODEL, "--output-schema", str(schema_path),
+                       "--output-last-message", str(output_path), "--color", "never", "-"]
             completed = subprocess.run(
-                [str(self.executable), "exec", "--ephemeral", "--ignore-rules",
-                 "--skip-git-repo-check", "--sandbox", "read-only", "--model",
-                 EXECUTED_MODEL, "--output-schema", str(schema_path),
-                 "--output-last-message", str(output_path), "--color", "never", "-"],
-                input=prompt, cwd=root, env=environment, text=True,
+                command, input=prompt, cwd=root, env=environment, text=True,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 timeout=self.timeout_seconds, check=False,
             )
+            # Capacity errors are provider-level and transient. Retry once with
+            # the identical pinned model and prompt; all other failures remain
+            # fail-closed and are surfaced immediately.
+            if completed.returncode != 0 and "at capacity" in (completed.stderr or "").lower():
+                time.sleep(2)
+                completed = subprocess.run(
+                    command, input=prompt, cwd=root, env=environment, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    timeout=self.timeout_seconds, check=False,
+                )
             if completed.returncode != 0 or not output_path.is_file():
                 detail = "\n".join((completed.stderr or completed.stdout).splitlines()[-12:])
                 raise RuntimeError(detail or "managed Codex provider returned no result")
