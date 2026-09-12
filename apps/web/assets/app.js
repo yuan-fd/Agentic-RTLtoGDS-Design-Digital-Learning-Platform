@@ -15,6 +15,23 @@ const state = {
   a2ProposalId: null,
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
+const IBEX_LESSONS = [
+  {title: "认识 Ibex 设计", purpose: "先建立地图：知道顶层模块、时钟和配置文件分别在哪里。", command: "find designs -maxdepth 2 -type f | sort | head", explain: "find 找文件；-maxdepth 限制搜索层级；sort 让结果稳定，方便比较。", observe: "找到设计配置、RTL 源文件和约束文件。先看懂文件，再运行工具。"},
+  {title: "跑第一次 baseline", purpose: "使用平台已经验证过的默认配置，得到一份可以比较的真实基线。", command: "make DESIGN_CONFIG=./designs/ibex/config.mk", explain: "make 调用流程；DESIGN_CONFIG 指定设计；config.mk 保存设计和工艺配置。", observe: "流程应依次经过综合、布局规划、布局、CTS 和布线，并产生报告目录。"},
+  {title: "看懂结果", purpose: "不只看成功或失败，要找到面积、时序、拥塞和 DRC 的证据。", command: "less reports/ibex/2_floorplan.rpt\nless reports/ibex/6_report.rpt", explain: "less 只读查看报告；floorplan 报告看布局；最终报告看时序和面积。", observe: "记录面积、最差时序裕量、拥塞和 DRC 数量。它们共同说明结果是否可用。"},
+  {title: "改参数并比较", purpose: "只改一个因素，再和 baseline 对比，才能知道参数真正带来的影响。", command: "make DESIGN_CONFIG=./designs/ibex/config.mk CORE_UTILIZATION=50", explain: "CORE_UTILIZATION 表示核心利用率。一次只改变一个参数，其他条件保持不变。", observe: "比较两次运行的面积、时序和拥塞；不要只看单个最好的数字。"},
+];
+let ibexLessonIndex = 0;
+function renderIbexLesson(index = ibexLessonIndex) {
+  const root = $("#ibexLesson"); if (!root) return;
+  ibexLessonIndex = Math.max(0, Math.min(IBEX_LESSONS.length - 1, Number(index) || 0));
+  const lesson = IBEX_LESSONS[ibexLessonIndex];
+  $$('[data-lesson]').forEach(button => button.classList.toggle("active", Number(button.dataset.lesson) === ibexLessonIndex));
+  root.innerHTML = `<h3>${esc(lesson.title)}</h3><p class="lesson-purpose">${esc(lesson.purpose)}</p><div class="lesson-grid"><div class="lesson-block"><b>要输入的命令</b><pre class="lesson-command">${esc(lesson.command)}</pre></div><div class="lesson-block"><b>命令是什么意思</b><p>${esc(lesson.explain)}</p></div><div class="lesson-block"><b>你应该观察什么</b><p>${esc(lesson.observe)}</p></div><div class="lesson-block"><b>学习提示</b><p>先自己尝试；遇到不确定的地方，可以打开 EDA Console 询问助手。</p></div></div><div class="lesson-actions"><button class="button" type="button" id="lessonTry">我自己试试</button><button class="button" type="button" id="lessonAnswer">看答案</button><button class="button primary" type="button" id="lessonNext">${ibexLessonIndex === IBEX_LESSONS.length - 1 ? "回到第一步" : "下一步 →"}</button></div><p class="message" id="lessonMessage" aria-live="polite"></p>`;
+  $("#lessonTry").addEventListener("click", () => message("#lessonMessage", "请在 EDA Console 中输入或询问这一步的命令，完成后再回来继续。"));
+  $("#lessonAnswer").addEventListener("click", () => message("#lessonMessage", `参考命令：${lesson.command}`));
+  $("#lessonNext").addEventListener("click", () => renderIbexLesson((ibexLessonIndex + 1) % IBEX_LESSONS.length));
+}
 const ZH = {
   "nav.overview": "平台概览", "nav.frontend": "前端设计", "nav.backend": "后端实现",
   "nav.projects": "项目与结果", "nav.evolution": "自演化", "nav.tutorial": "使用教程",
@@ -1976,6 +1993,8 @@ $("#dseMode")?.addEventListener("change", updateTeachingMode);
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.
 $$('[data-locale]').forEach(button => button.addEventListener("click", () => { applyLocale(button.dataset.locale); if (!state.selectedRun) renderStageRail(new Map()); }));
+$$('[data-lesson]').forEach(button => button.addEventListener("click", () => renderIbexLesson(button.dataset.lesson)));
+renderIbexLesson(0);
 $("#refreshResults").addEventListener("click", loadResults);
 $("#developerScope").addEventListener("click", async () => {
   state.developerView = !state.developerView;

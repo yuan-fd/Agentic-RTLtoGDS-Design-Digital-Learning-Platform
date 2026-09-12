@@ -105,6 +105,21 @@ a { color: inherit; }
 .tutorial-card b { display: block; font-size: 16px; color: var(--heading); margin-bottom: 4px; }
 .tutorial-card p { margin: 0 0 6px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
 .tutorial-card .text-link { align-self: flex-start; }
+.ibex-course { display: grid; grid-template-columns: 210px 1fr; margin-top: 34px; border: 1px solid var(--line); background: #fff; }
+.ibex-course-nav { padding: 16px 0; border-right: 1px solid var(--line); background: var(--surface-subtle); }
+.ibex-course-nav b { display: block; padding: 0 16px 12px; color: var(--heading); font-size: 14px; }
+.ibex-course-nav button { width: 100%; padding: 10px 16px; border: 0; border-left: 3px solid transparent; background: transparent; color: var(--muted); text-align: left; font-size: 12px; }
+.ibex-course-nav button:hover, .ibex-course-nav button.active { border-left-color: var(--accent); background: #fff; color: var(--accent); font-weight: 650; }
+.ibex-lesson { min-height: 290px; padding: 24px; }
+.ibex-lesson h3 { margin: 0 0 6px; color: var(--heading); font-size: 20px; }
+.ibex-lesson .lesson-purpose { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+.lesson-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lesson-block { padding: 13px; border: 1px solid var(--line); background: var(--surface-subtle); }
+.lesson-block b { display: block; margin-bottom: 6px; color: var(--heading); font-size: 12px; }
+.lesson-block p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.lesson-command { margin: 0; padding: 12px; overflow: auto; background: #17202e; color: #f1f5f9; font: 12px/1.6 var(--mono); white-space: pre-wrap; }
+.lesson-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+@media (max-width: 700px) { .ibex-course { grid-template-columns: 1fr; } .ibex-course-nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; } .ibex-course-nav b { display: none; } .ibex-course-nav button { min-width: 125px; border-left: 0; border-bottom: 3px solid transparent; } .ibex-course-nav button.active { border-bottom-color: var(--accent); } .lesson-grid { grid-template-columns: 1fr; } }
 .button { min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 14px; font-size: 11px; font-weight: 550; text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
 .button:hover:not(:disabled) { border-color: #aeb7c2; background: var(--surface-subtle); }
 .button.primary { background: var(--accent); border-color: var(--accent); color: white; }
