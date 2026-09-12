@@ -498,7 +498,7 @@ class ApiState:
             "OPENROAD_PLATFORM_RUNTIME_WORKER_HEARTBEAT",
             self.local_state_root / "runtime-worker.heartbeat.json",
         ))
-        worker = _read_worker_heartbeat(heartbeat_path)
+        worker = _read_worker_heartbeats(heartbeat_path)
         dse_heartbeat_path = Path(os.environ.get(
             "OPENROAD_PLATFORM_DSE_CONTROLLER_HEARTBEAT",
             self.local_state_root / "dse-controller.heartbeat.json",
@@ -5098,6 +5098,20 @@ def _read_worker_heartbeat(path: Path, *, stale_after_seconds: float = 10.0) -> 
         }
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return offline
+
+
+def _read_worker_heartbeats(path: Path) -> dict[str, Any]:
+    """Read the aggregate worker heartbeat or any slot-specific heartbeat."""
+    candidates = [path]
+    if not os.environ.get("OPENROAD_PLATFORM_RUNTIME_WORKER_HEARTBEAT"):
+        candidates.extend(sorted(path.parent.glob("runtime-worker-*.heartbeat.json")))
+    readings = [_read_worker_heartbeat(item) for item in candidates]
+    ready = [item for item in readings if item.get("ready")]
+    if not ready:
+        return readings[0] if readings else {"ready": False, "status": "offline", "updated_at": None, "active_run": None}
+    active = next((item for item in ready if item.get("active_run")), ready[0])
+    return {"ready": True, "status": "running" if any(item.get("status") == "running" for item in ready) else "idle",
+            "updated_at": active.get("updated_at"), "active_run": active.get("active_run")}
 
 
 def _sha256(path: Path) -> str:
