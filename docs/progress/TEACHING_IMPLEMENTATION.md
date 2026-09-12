@@ -100,3 +100,9 @@ is retained and labelled historical. Rollback: revert the correction commit.
   for a retry is the r3 handoff state (`pipeline-ef2fd9f80e8940a1b796a68de5af9916`),
   which contains 75 measured observations; the r2 checkpoint contains none and
   must not be used as the historical dataset.
+
+- A later retry (`real-r13`) used the r3 checkpoint and reached the native
+  `SELECTION` policy stage after the provider retry change, then failed on a
+  subsequent long Codex request with the same capacity response. It remains a
+  partial real run, not a completed A2 acceptance; its Runtime database is
+  preserved under `var/evidence/a2-orfo-single-feedback-20260912-real-r13/`.
