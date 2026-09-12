@@ -131,9 +131,9 @@
 
 **验收标准**
 
-- [ ] 平台后端能以 stdio 方式启动服务器固定版本的 OpenROAD-MCP。
-- [ ] EDA Console 能查询 OpenROAD 版本、设计状态和只读报告。
-- [ ] 查询结果明确标记为实时探索，不冒充 Runtime 证据。
+- [x] 平台后端能以 stdio 方式启动服务器固定版本的 OpenROAD-MCP。
+- [x] EDA Console 能查询 OpenROAD 版本、设计状态和只读报告。
+- [x] 查询结果明确标记为实时探索，不冒充 Runtime 证据。
 
 #### Task 8：MCP Session 和图像投影
 
@@ -154,7 +154,7 @@
 
 ### Checkpoint 4：自由探索可控可复查
 
-- [ ] 用户能在网页中完成一次只读 OpenROAD 探索。
+- [x] 用户能在网页中完成一次只读 OpenROAD 探索。
 - [ ] 用户能看到命令、结果、图像和 Agent 状态。
 - [ ] 用户能把探索升级成正式 Runtime 实验。
 - [ ] 不同用户之间没有 Session、路径或证据泄漏。
