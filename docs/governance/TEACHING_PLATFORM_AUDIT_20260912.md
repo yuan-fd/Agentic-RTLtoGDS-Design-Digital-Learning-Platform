@@ -46,8 +46,9 @@ incomplete.
    verification package, then compare measured QoR in the shared read model.
 3. Exercise the configured Web server with multiple authenticated,
    owner-scoped sessions and record a bounded 5–10-user concurrency result.
-   The current smoke proves 8 concurrent Session creation, L1 execution
-   requests, and `observed` terminal snapshots in one isolated local workspace;
-   a credential-separated EDA load result is still required.
+   The current smoke proves 8 independently registered users with separate
+   cookies can create Sessions, submit L1 execution requests, and reach
+   `observed` snapshots in one isolated local workspace; a real EDA load result
+   is still required.
 4. Update this scorecard only from those new evidence records; do not promote
    replay or historical artifacts into current capability claims.
