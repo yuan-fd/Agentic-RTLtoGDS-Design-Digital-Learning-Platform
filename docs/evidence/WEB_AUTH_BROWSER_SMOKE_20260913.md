@@ -9,3 +9,5 @@ Observed DOM checks:
 - Ibex markers: 9
 
 Screenshot: [`web-authenticated-overview-20260913.png`](web-authenticated-overview-20260913.png). This is authenticated page boot/content evidence; a full Ibex execution from the browser remains pending.
+
+The same authenticated reload reached `/api/designs/examples`, `/api/extensions/rtlscout`, `/api/designs`, `/api/teaching/dashboard`, `/api/teaching/dse/campaigns`, `/api/v2/external-optimizer-loops`, `/api/agent/traces`, and `/api/teaching/mcp/status` with HTTP 200 responses.
