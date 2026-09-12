@@ -13,7 +13,7 @@ separately.
 
 | Area | Score | Current evidence | Remaining gap |
 | --- | ---: | --- | --- |
-| Runtime and environment | 9/10 | Doctor passes; Runtime owns runs, attempts, artifacts and leases; full suite passes (`857 passed, 1 deselected`). | Capacity and worker sizing still need a multi-user load acceptance. |
+| Runtime and environment | 9/10 | Doctor passes; Runtime owns runs, attempts, artifacts and leases; full suite passes (`857 passed, 1 deselected`). | Real EDA load and worker sizing still need a multi-user acceptance. |
 | Teaching modes and guided workflow | 9/10 | Guided/Open/Challenge routes, owner-scoped sessions, clarification, Runtime execution and history are implemented and tested. | Browser acceptance should be repeated against a deployed operator configuration. |
 | Dashboard and evidence projection | 8/10 | Unified dashboard, campaign detail, live A2 polling, evidence pointers and promotion gate are present. | A2 live UI needs a successful fresh campaign to display a complete trajectory. |
 | RTL generation | 8/10 | Native RTLScout SpecIR→RTL→verification→ORFS/GDS evidence is active; Direct LLM registration and shared verification/comparison are implemented. | A fresh dual-path Direct LLM vs RTLScout QoR acceptance is still missing. |
@@ -45,6 +45,8 @@ incomplete.
 2. Run a fresh Direct LLM and RTLScout pair from one frozen SpecIR and
    verification package, then compare measured QoR in the shared read model.
 3. Exercise the configured Web server with multiple owner-scoped sessions and
-   record a bounded 5–10-user concurrency result.
+   record a bounded 5–10-user concurrency result. The current smoke proves 8
+   concurrent Session creation, L1 execution requests, and `observed` terminal
+   snapshots on the smoke backend; a real EDA load result is still required.
 4. Update this scorecard only from those new evidence records; do not promote
    replay or historical artifacts into current capability claims.
