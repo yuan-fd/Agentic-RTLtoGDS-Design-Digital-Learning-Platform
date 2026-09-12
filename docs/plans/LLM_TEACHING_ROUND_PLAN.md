@@ -142,7 +142,7 @@
 - [ ] 用户只能看到自己的 MCP Session、历史和输出。
 - [ ] Session 有数量限制、空闲回收和异常终止处理。
 - [ ] ORFS 报告图片和指标能显示在现有 Dashboard。
-- [ ] 不直接暴露官方无认证 HTTP transport。
+- [x] 不直接暴露官方无认证 HTTP transport。
 
 #### Task 9：探索升级正式实验
 
@@ -155,7 +155,7 @@
 ### Checkpoint 4：自由探索可控可复查
 
 - [x] 用户能在网页中完成一次只读 OpenROAD 探索。
-- [ ] 用户能看到命令、结果、图像和 Agent 状态。
+- [x] 用户能看到命令、结果和 Agent 状态；图像仍由正式 Runtime 产物投影。
 - [ ] 用户能把探索升级成正式 Runtime 实验。
 - [ ] 不同用户之间没有 Session、路径或证据泄漏。
 
