@@ -39,6 +39,7 @@ def test_dse_strategy_and_candidate_budget_are_bounded():
 
 
 def test_lesson_command_check_is_read_only_and_bounded():
-    assert check_teaching_command({"lesson": 1, "command": "make DESIGN_CONFIG=ibex"})["accepted"]
+    result = check_teaching_command({"lesson": 1, "command": "make DESIGN_CONFIG=ibex"})
+    assert result["accepted"] and result["action"] == "run_baseline"
     rejected = check_teaching_command({"lesson": 1, "command": "make DESIGN_CONFIG=ibex && rm -rf /"})
     assert not rejected["accepted"]

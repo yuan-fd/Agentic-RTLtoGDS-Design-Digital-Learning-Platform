@@ -34,7 +34,18 @@ function renderIbexLesson(index = ibexLessonIndex) {
     if (!input) return message("#lessonMessage", "请先输入一条命令。", true);
     try {
       const result = await post("/api/teaching/command-check", {command: input, lesson: ibexLessonIndex});
-      message("#lessonMessage", result.accepted ? "命令结构符合这一步的练习要求。执行前仍请确认设计和路径。" : `还需要检查：${(result.missing || []).join("、") || result.reason}。这一步先不要执行。`, !result.accepted);
+      if (result.accepted) {
+        $("#lessonMessage").classList.remove("error");
+        $("#lessonMessage").innerHTML = `命令结构符合这一步的练习要求。<button class="text-link" type="button" id="lessonUseAction">打开受控操作 →</button>`;
+        $("#lessonUseAction").addEventListener("click", () => {
+          route("backend");
+          setTimeout(() => {
+            if (result.action === "run_baseline") { $("#dseMode").value = "baseline"; $("#submitFlow")?.focus(); }
+            else if (result.action === "run_single_parameter_comparison") { $("#dseMode").value = "batch"; $("#submitFlow")?.focus(); }
+            else $("#assistantPrompt").value = `请解释课程动作：${result.action}`;
+          }, 0);
+        });
+      } else message("#lessonMessage", `还需要检查：${(result.missing || []).join("、") || result.reason}。这一步先不要执行。`, true);
     } catch (error) { message("#lessonMessage", error.message, true); }
   });
   $("#lessonAsk").addEventListener("click", () => {

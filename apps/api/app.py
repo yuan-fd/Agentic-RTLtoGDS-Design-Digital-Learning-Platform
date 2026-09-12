@@ -4853,7 +4853,9 @@ def check_teaching_command(payload: dict[str, Any]) -> dict[str, Any]:
     expected = (("find", "design"), ("make", "design_config"), ("less", "report"), ("make", "utilization"))
     required = expected[max(0, min(lesson, len(expected) - 1))]
     missing = [token for token in required if token not in command.lower()]
+    actions = ("inspect_design", "run_baseline", "inspect_report", "run_single_parameter_comparison")
     return {"accepted": not missing, "missing": missing,
+            "action": actions[max(0, min(lesson, len(actions) - 1))] if not missing else None,
             "reason": "command shape matches this lesson" if not missing else "required lesson tokens are missing"}
 
 
