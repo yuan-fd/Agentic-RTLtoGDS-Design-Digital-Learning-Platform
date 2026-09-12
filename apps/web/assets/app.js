@@ -13,6 +13,7 @@ const state = {
   backendMode: "2d", activeClosedLoop: null, closedLoopPoll: null,
   teachingMode: "guided",
   a2ProposalId: null,
+  pendingExperiment: null,
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
 const IBEX_LESSONS = [
@@ -250,10 +251,21 @@ async function askEdaAssistant() {
     const failureText = failure ? ui(` Failure recorded: ${failure.category || "unknown"} — ${failure.message || "no message"}.`, ` 已记录失败：${failure.category || "未知类别"}——${failure.message || "没有附加说明"}。`) : "";
     const guidance = explainReportEvidence(metricContext, failure);
     const experiment = parseExperimentIntent(text);
+    state.pendingExperiment = experiment;
     const experimentText = experiment ? ` ${experiment.summary}` : "";
     const summary = `${localStatus}.${evidenceText}${failureText} ${guidance}${experimentText} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
     const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
-    response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
+    response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p>${experiment ? `<button class="button small" type="button" id="useExperimentPlan">转到批量实验设置</button>` : ""}<div class="assistant-next">${esc(next)}</div></div>`;
+    $("#useExperimentPlan")?.addEventListener("click", () => {
+      const count = Math.min(6, Math.max(1, experiment.candidates.length));
+      $("#dseMode").value = "batch";
+      $("#candidateCount").value = String(count);
+      updateTeachingMode();
+      $("#teachingObjective").value = `比较利用率：${experiment.candidates.map(value => `${value}%`).join("、")}`;
+      $("#teachingObjectiveField").hidden = false;
+      $("#optimizationDashboard")?.scrollIntoView({behavior: "smooth", block: "start"});
+      message("#flowMessage", ui("Batch settings prepared. Review them before running.", "批量实验设置已准备好，请检查后再运行。"));
+    });
     status.textContent = ui("Ready", "就绪");
   } catch (error) {
     response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Could not start the teaching session", "暂时无法开始教学会话"))}</b><p>${esc(error.message)}</p><div class="assistant-next">${esc(ui("You can still use the controlled run controls below.", "你仍然可以使用下面的受控运行按钮。"))}</div></div>`;
