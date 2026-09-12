@@ -85,3 +85,7 @@ is retained and labelled historical. Rollback: revert the correction commit.
   session routes and the backend page provides Start L1, execute, authorize A2,
   and schedule-next controls. A2 remains session/Goal bound; no state is copied
   into the main Runtime database. Commit `643b3e1`.
+- Added owner-scoped `GET /api/teaching/sessions/<id>/learning`, projecting an
+  evidence-gated `eligible_for_review` state from observed Runtime status,
+  successful terminal status, and evidence pointers. It never promotes data
+  automatically or writes public knowledge.
