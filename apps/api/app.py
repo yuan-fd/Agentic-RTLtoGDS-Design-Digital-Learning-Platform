@@ -5069,6 +5069,10 @@ def _artifact_presentation(artifact: dict[str, Any]) -> dict[str, str | None]:
     key = str(artifact.get("store_key") or "")
     name = Path(key).name
     kind = str(artifact.get("kind") or "other")
+    # Image reports from ORFS/MCP are projected into the existing Dashboard
+    # visual slot; the raw artifact URL and hash remain authoritative.
+    if kind == "other" and Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".svg"}:
+        kind = "layout_view"
     stage_patterns = (
         ("1_synth", "synth", "Synthesis", "逻辑综合"),
         ("2_floorplan", "floorplan", "Floorplan", "布局规划"),

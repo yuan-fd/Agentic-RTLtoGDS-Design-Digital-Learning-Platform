@@ -8,6 +8,7 @@ from shutil import which
 import pytest
 
 from apps.api.app import ApiState
+from apps.api.app import _artifact_presentation
 from openroad_platform_contracts import (
     ActionKind, ActionSpec, ObjectiveSpec,
     OptimizationStudy,
@@ -118,6 +119,12 @@ def test_mcp_upgrade_plan_is_owner_scoped_and_upgrade_run_requires_confirmation(
     result = state.mcp_upgrade_run({"query_id": "q1", "confirm": True, "place_density": 0.6}, owner_id="alice")
     assert called == {"reference_design": "ibex", "platform": "sky130hd", "run_role": "comparison", "place_density": 0.6}
     assert result["source_query_id"] == "q1"
+
+
+def test_image_artifacts_project_into_dashboard_visual_slot():
+    view = _artifact_presentation({"kind": "other", "store_key": "reports/floorplan.png"})
+    assert view["group"] == "visualization"
+    assert view["title_en"] == "Final 2D layout preview"
 
 
 
