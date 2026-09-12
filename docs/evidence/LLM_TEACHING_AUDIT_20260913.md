@@ -18,6 +18,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - Runtime and durable DSE worker startup, heartbeats, aggregate worker health, and standard startup script.
 - Full regression suite: 861 passed, 1 deselected.
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
+- MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed.
 
 ## Partial or pending
 
