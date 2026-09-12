@@ -2,7 +2,7 @@
 
 ## Current score
 
-**8.2 / 10 (implementation readiness)**
+**8.3 / 10 (implementation readiness)**
 
 The score measures verified platform behavior, not planned features. It remains reduced for missing browser end-to-end evidence, incomplete MCP image/session projection, and missing fresh multi-user load evidence.
 
@@ -19,7 +19,8 @@ The score measures verified platform behavior, not planned features. It remains 
 - Full regression suite: 864 passed, 1 deselected (2026-09-13, 425.36s).
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 - MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed. The confirmed web upgrade route reuses Runtime and keeps MCP observations separate from formal evidence.
-- Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`).
+- Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`); the result is archived in `TEACHING_HTTP_CONCURRENCY_20260913.md`.
+- MCP report-image listing and inline WebP preview are covered by a real smoke and automated regression (`tests/test_mcp_report_images.py`).
 - Authenticated Playwright browser reached the teaching command-check endpoint and received an accepted guided Ibex action.
 - Environment doctor passes with server-managed OpenROAD, Yosys, Verilator, Icarus, ORFS and optimizer dependencies (`teaching_platform_doctor.py --json`).
 
