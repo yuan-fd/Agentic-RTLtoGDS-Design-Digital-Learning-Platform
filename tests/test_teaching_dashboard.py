@@ -21,3 +21,23 @@ def test_teaching_dashboard_is_a_compact_runtime_projection():
     assert result["polling"]["recommended_seconds"] == 2
     assert result["runs"][0]["experiment_id"] == "exp-1"
     assert result["runs"][0]["agent_action"] == "waiting for Runtime worker"
+
+
+def test_teaching_campaign_detail_projects_runtime_batch_roles():
+    state = object.__new__(ApiState)
+    state.pipeline_checkpoints = type("P", (), {"list": lambda self, **kwargs: []})()
+    state.list_runtime_runs = lambda **kwargs: {"runs": [
+        {"run_id": "b", "status": "succeeded"},
+        {"run_id": "c", "status": "running"},
+    ]}
+    class Runtime:
+        @staticmethod
+        def get_run(run_id):
+            role = "baseline" if run_id == "b" else "candidate"
+            return type("Run", (), {"task_spec": type("Task", (), {"labels": {
+                "teaching_batch_id": "batch-1", "teaching_batch_role": role}})()})()
+    state.runtime_store = Runtime()
+    detail = state.teaching_campaign_detail("batch-1", owner_id="student")
+    assert detail["kind"] == "batch" and detail["status"] == "running"
+    assert [item["run_id"] for item in detail["baseline"]] == ["b"]
+    assert [item["run_id"] for item in detail["candidates"]] == ["c"]

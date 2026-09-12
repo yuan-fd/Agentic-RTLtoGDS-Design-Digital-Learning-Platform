@@ -3122,6 +3122,37 @@ class ApiState:
                 "a2": {"available": self.teaching_sessions is not None,
                        "session_api": "/api/teaching/sessions"}}
 
+    def teaching_campaign_detail(self, campaign_id: str, *, owner_id: str | None = None,
+                                 include_legacy: bool = False) -> dict[str, Any]:
+        """Return one evidence-backed campaign detail for the teaching UI."""
+        loops = self.pipeline_checkpoints.list(pipeline_kind="bo-gp-closed-loop-v2",
+                                                owner_id=owner_id, limit=100)
+        loop = next((item for item in loops if item["pipeline_id"] == campaign_id), None)
+        if loop is not None:
+            state = loop.get("state") or {}
+            return {"schema_version": 1, "campaign_id": campaign_id, "kind": "bo_gp",
+                    "status": state.get("status", "unknown"), "state": state,
+                    "budget": {key: state.get(key) for key in
+                               ("repetitions", "max_rounds", "round", "stall_window")},
+                    "authority": "durable BO/GP checkpoint"}
+        runs = self.list_runtime_runs(limit=500, owner_id=owner_id,
+                                      include_legacy=include_legacy)["runs"]
+        matched = [item for item in runs if (self.runtime_store.get_run(item["run_id"]) and
+                    (self.runtime_store.get_run(item["run_id"]).task_spec.labels or {}).get("teaching_batch_id") == campaign_id)]
+        if matched:
+            grouped = {"baseline": [], "candidate": []}
+            for item in matched:
+                run = self.runtime_store.get_run(item["run_id"])
+                role = (run.task_spec.labels or {}).get("teaching_batch_role", "candidate")
+                grouped.setdefault(role, []).append(item)
+            return {"schema_version": 1, "campaign_id": campaign_id, "kind": "batch",
+                    "status": ("running" if any(item["status"] in {"queued", "running", "preparing", "retry_wait"} for item in matched)
+                               else "succeeded" if all(item["status"] == "succeeded" for item in matched) else "mixed"),
+                    "baseline": grouped["baseline"], "candidates": grouped["candidate"],
+                    "budget": {"total": len(matched), "candidates": len(grouped["candidate"])},
+                    "authority": "WorkflowRuntime"}
+        raise KeyError(campaign_id)
+
     def copy_teaching_run(self, run_id: str, *, parameters: dict[str, Any] | None = None,
                           owner_id: str | None = None,
                           include_legacy: bool = False) -> dict[str, Any]:
@@ -5098,6 +5129,10 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=list_owner,
                         include_legacy=session.legacy_access or developer_all,
                     ))
+                elif (match := re.fullmatch(r"/api/teaching/dse/campaigns/([^/]+)", path)):
+                    self._json(state.teaching_campaign_detail(
+                        unquote(match.group(1)), owner_id=direct_owner,
+                        include_legacy=session.legacy_access))
                 elif (match := re.fullmatch(r"/api/teaching/sessions/([^/]+)", path)):
                     if state.teaching_sessions is None:
                         raise ValueError("Teaching workbench is not configured")
