@@ -49,6 +49,16 @@ function explainReportEvidence(metrics, failure) {
   if (!findings.length && Object.keys(metrics).length) findings.push(ui("The available recorded metrics do not show the common timing, DRC, or congestion warnings. Keep the report and artifacts as the evidence for this run.", "当前已有指标没有显示常见的时序、DRC 或拥塞警告。请保留这次报告和产物，作为本次运行的证据。"));
   return findings.join(" ");
 }
+function parseExperimentIntent(text) {
+  const values = [...text.matchAll(/(?:利用率|utilization|density)[^\d]*(\d{1,2})\s*%?/gi)].map(match => Number(match[1])).filter(value => value > 0 && value < 100);
+  if (values.length < 2) return null;
+  const candidates = [...new Set(values)].slice(0, 6);
+  return {
+    parameter: "utilization_pct",
+    candidates,
+    summary: ui(`Experiment plan: compare utilization at ${candidates.map(value => `${value}%`).join(", ")}. ${candidates.length > 6 ? "Only the first six candidates are kept." : "No run has started; review and confirm first."}`, `实验计划：比较利用率 ${candidates.map(value => `${value}%`).join("、")}。尚未启动任务，请先检查并确认。`),
+  };
+}
 const ZH = {
   "nav.overview": "平台概览", "nav.frontend": "前端设计", "nav.backend": "后端实现",
   "nav.projects": "项目与结果", "nav.evolution": "自演化", "nav.tutorial": "使用教程",
@@ -239,7 +249,9 @@ async function askEdaAssistant() {
     const evidenceText = Object.keys(metricContext).length ? ui(` Evidence available: ${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join(", ")}.`, ` 已有真实指标：${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join("、")}。`) : ui(" No report metrics are attached to this run yet.", " 当前任务还没有附带报告指标。");
     const failureText = failure ? ui(` Failure recorded: ${failure.category || "unknown"} — ${failure.message || "no message"}.`, ` 已记录失败：${failure.category || "未知类别"}——${failure.message || "没有附加说明"}。`) : "";
     const guidance = explainReportEvidence(metricContext, failure);
-    const summary = `${localStatus}.${evidenceText}${failureText} ${guidance} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
+    const experiment = parseExperimentIntent(text);
+    const experimentText = experiment ? ` ${experiment.summary}` : "";
+    const summary = `${localStatus}.${evidenceText}${failureText} ${guidance}${experimentText} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
     const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
     response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
     status.textContent = ui("Ready", "就绪");
