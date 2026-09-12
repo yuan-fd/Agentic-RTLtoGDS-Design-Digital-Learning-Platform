@@ -103,6 +103,21 @@ a { color: inherit; }
 .button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 .button.small { min-height: 30px; padding-inline: 10px; font-size: 11px; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
+.eda-assistant-panel { border-top: 3px solid var(--accent); }
+.assistant-status { color: var(--green); font: 600 12px var(--mono); }
+.assistant-body { padding: 18px 20px 20px; }
+.assistant-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.assistant-prompts button { padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 4px; background: #fff; color: var(--heading); font-size: 12px; text-align: left; }
+.assistant-prompts button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.assistant-compose { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
+.assistant-compose textarea { min-height: 70px; font: 13px/1.55 var(--sans); }
+.assistant-compose .button { min-height: 42px; }
+.assistant-response { margin-top: 14px; padding: 14px 16px; border-left: 3px solid var(--line-strong); background: var(--surface-subtle); color: var(--ink); font-size: 13px; }
+.assistant-empty { color: var(--muted); }
+.assistant-answer b { display: block; margin-bottom: 5px; color: var(--heading); }
+.assistant-answer p { margin: 4px 0; }
+.assistant-next { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--accent); font-weight: 600; }
+@media (max-width: 640px) { .assistant-compose { grid-template-columns: 1fr; } .assistant-compose .button { justify-self: start; } }
 .demo-notice { min-height: 16px; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 
 .showcase-section, .feature-section, .extension-detail-section, .evolution-content { background: var(--surface); border-block: 1px solid var(--line); }

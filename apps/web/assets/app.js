@@ -182,6 +182,30 @@ async function api(path, options = {}) {
 
 const post = (path, body) => api(path, {method: "POST", body: JSON.stringify(body)});
 
+async function askEdaAssistant() {
+  const input = $("#assistantPrompt");
+  const response = $("#assistantResponse");
+  const status = $("#assistantStatus");
+  const text = input?.value.trim();
+  if (!text) return;
+  status.textContent = ui("Thinking…", "处理中…");
+  response.innerHTML = `<div class="assistant-empty">${esc(ui("Preparing a bounded teaching step…", "正在准备一个受控的教学步骤……"))}</div>`;
+  try {
+    const session = await post("/api/l1/sessions", {
+      text,
+      teaching_mode: state.teachingMode || "guided",
+      teaching_context: state.selectedDesign ? {design_id: state.selectedDesign.id} : {},
+    });
+    const summary = session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。");
+    const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
+    response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
+    status.textContent = ui("Ready", "就绪");
+  } catch (error) {
+    response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Could not start the teaching session", "暂时无法开始教学会话"))}</b><p>${esc(error.message)}</p><div class="assistant-next">${esc(ui("You can still use the controlled run controls below.", "你仍然可以使用下面的受控运行按钮。"))}</div></div>`;
+    status.textContent = ui("Unavailable", "暂不可用");
+  }
+}
+
 function renderAuth() {
   const button = $("#accountButton");
   if (!button) {
@@ -1935,6 +1959,9 @@ $("#verifyDirectLlm")?.addEventListener("click", verifyDirectLlmCandidate);
 $("#rtlTrendMetric")?.addEventListener("change", loadRtlGeneratorComparison);
 $("#runSelect").addEventListener("change", event => selectRun(event.target.value));
 $("#submitFlow").addEventListener("click", submitFlow);
+$("#assistantAsk")?.addEventListener("click", askEdaAssistant);
+$("#assistantPrompt")?.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") askEdaAssistant(); });
+$$('[data-assistant-prompt]').forEach(button => button.addEventListener("click", () => { const input = $("#assistantPrompt"); if (input) { input.value = button.dataset.assistantPrompt || ""; input.focus(); } }));
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
 $("#a2Start")?.addEventListener("click", startA2Session);
 $("#a2Execute")?.addEventListener("click", () => a2Action("execute", {decision_summary: "Student confirmed the approved L1 baseline step."}));

@@ -261,6 +261,19 @@
           <div class="stage-rail" id="stageRail"></div>
         </section>
 
+        <section class="task-panel eda-assistant-panel" id="edaAssistantPanel">
+          <header class="task-panel-head"><span>✦</span><div><b>EDA 助手工作台</b><small>先用自然语言问清楚，再决定是否运行。助手只提出受控的下一步，不会直接执行危险命令。</small></div><span class="assistant-status" id="assistantStatus">就绪</span></header>
+          <div class="assistant-body">
+            <div class="assistant-prompts" aria-label="新手常见问题">
+              <button type="button" data-assistant-prompt="我刚开始学 OpenROAD，先告诉我这个设计现在处于哪一步，以及下一步该做什么。">我现在到哪一步了？</button>
+              <button type="button" data-assistant-prompt="帮我检查这个设计的时钟和基本约束是否足够运行一次 baseline。">约束够不够跑 baseline？</button>
+              <button type="button" data-assistant-prompt="为什么这次运行失败？请用简单的话告诉我最可能的原因和一个安全的修复建议。">运行失败怎么办？</button>
+            </div>
+            <div class="assistant-compose"><textarea id="assistantPrompt" rows="3" maxlength="1000" placeholder="例如：我想比较利用率对时序的影响，应该先做什么？"></textarea><button class="button primary" id="assistantAsk" type="button">询问助手</button></div>
+            <div class="assistant-response" id="assistantResponse" aria-live="polite"><div class="assistant-empty">选择一个问题，或输入你自己的问题。</div></div>
+          </div>
+        </section>
+
         <section class="task-panel">
           <header class="task-panel-head"><span>④</span><div><b data-i18n="backend.evidence.title">Layout, QoR, and implementation evidence</b><small data-i18n="backend.evidence.subtitle">Inspect generated views, timing, area, power, DRC, reports, and downloadable artifacts.</small></div></header>
           <div class="result-evidence" id="backendEvidence"><div class="empty"><h3 data-i18n="backend.evidence.empty">Design results will appear here.</h3><p data-i18n="backend.evidence.empty.help">Choose a completed task for the current design to load its layout and reports.</p></div></div>
