@@ -820,7 +820,9 @@ async function loadRuns(preferred = null) {
           const detail = await api(`/api/teaching/dse/campaigns/${encodeURIComponent(id)}`);
           const baseline = detail.baseline?.length ?? detail.state?.baseline_run_ids?.length ?? "—";
           const candidates = detail.candidates?.length ?? detail.state?.history?.length ?? detail.budget?.candidates ?? "—";
-          rows.push(`<div class="campaign-detail-row"><b>${esc(detail.kind || item.kind)}</b><span>${esc(detail.status || item.status || "unknown")}</span><small>${esc(id)} · baseline ${esc(baseline)} · candidates ${esc(candidates)}</small></div>`);
+          const evidence = detail.evidence || {};
+          const measured = evidence.succeeded ?? evidence.measured_points ?? 0;
+          rows.push(`<div class="campaign-detail-row"><b>${esc(detail.kind || item.kind)}</b><span>${esc(detail.status || item.status || "unknown")}</span><small>${esc(id)} · baseline ${esc(baseline)} · candidates ${esc(candidates)} · evidence ${esc(measured)} measured / ${esc(evidence.runs ?? evidence.history_points ?? "—")} recorded</small></div>`);
         } catch (_) { rows.push(`<div class="campaign-detail-row"><b>${esc(item.kind)}</b><span>${esc(item.status || "unknown")}</span><small>${esc(id)}</small></div>`); }
       }
       detailsBox.innerHTML = rows.join("");
