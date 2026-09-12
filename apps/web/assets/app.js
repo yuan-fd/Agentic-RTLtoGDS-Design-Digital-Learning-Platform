@@ -36,17 +36,20 @@ function renderIbexLesson(index = ibexLessonIndex) {
       const result = await post("/api/teaching/command-check", {command: input, lesson: ibexLessonIndex});
       if (result.accepted) {
         $("#lessonMessage").classList.remove("error");
-        const actionLabel = result.action === "run_baseline" ? "运行固定 Ibex baseline →" : "打开受控操作 →";
+        const actionLabel = result.action === "run_baseline" ? "运行固定 Ibex baseline →" : result.action === "run_single_parameter_comparison" ? "运行一次参数比较 →" : "打开受控操作 →";
         $("#lessonMessage").innerHTML = `命令结构符合这一步的练习要求。<button class="text-link" type="button" id="lessonUseAction">${actionLabel}</button>`;
         $("#lessonUseAction").addEventListener("click", () => {
           if (result.action === "run_baseline") {
             startIbexReferenceBaseline();
             return;
           }
+          if (result.action === "run_single_parameter_comparison") {
+            startIbexReferenceComparison();
+            return;
+          }
           route("backend");
           setTimeout(() => {
-            if (result.action === "run_single_parameter_comparison") { $("#dseMode").value = "batch"; $("#submitFlow")?.focus(); }
-            else $("#assistantPrompt").value = `请解释课程动作：${result.action}`;
+            $("#assistantPrompt").value = `请解释课程动作：${result.action}`;
           }, 0);
         });
       } else message("#lessonMessage", `还需要检查：${(result.missing || []).join("、") || result.reason}。这一步先不要执行。`, true);
@@ -76,6 +79,23 @@ async function startIbexReferenceBaseline() {
     }
     route("backend");
     message("#flowMessage", `固定 Ibex baseline 已提交（${runId || "等待 Runtime"}）。页面会显示真实阶段、日志和报告。`);
+  } catch (error) {
+    message("#lessonMessage", error.message, true);
+  }
+}
+
+async function startIbexReferenceComparison() {
+  try {
+    const result = await post("/api/teaching/reference-comparison", {
+      reference_design: "ibex", platform: "sky130hd", place_density: 0.60,
+    });
+    const runId = result.run?.run?.run_id;
+    if (runId) {
+      await loadRuns();
+      await selectRun(runId);
+    }
+    route("backend");
+    message("#flowMessage", `固定 Ibex 参数比较已提交（布局密度 0.60，${runId || "等待 Runtime"}）。`);
   } catch (error) {
     message("#lessonMessage", error.message, true);
   }

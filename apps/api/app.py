@@ -3968,6 +3968,19 @@ class ApiState:
             self.orfs_root, platform=platform, design=design_name,
         )
         overrides = dict(reference.native_baseline_overrides)
+        run_role = str(payload.get("run_role") or "baseline").strip()
+        if run_role not in {"baseline", "comparison"}:
+            raise ValueError("run_role must be baseline or comparison")
+        density = payload.get("place_density")
+        if density is not None:
+            try:
+                density = float(density)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("place_density must be numeric") from exc
+            if not 0.1 <= density <= 0.95:
+                raise ValueError("place_density must be between 0.1 and 0.95")
+        else:
+            density = float(overrides.get("place_density", .55))
         task = build_orfs_task(
             next(path for path in reference.rtl_files if path.stem == reference.top),
             project_id="openroad-platform",
@@ -3978,7 +3991,7 @@ class ApiState:
             target_stage="finish",
             clock_period_ns=reference.clock_period_ns,
             core_utilization_pct=float(overrides.get("core_utilization_pct", 50)),
-            place_density=float(overrides.get("place_density", .55)),
+            place_density=density,
             or_seed=int(payload.get("or_seed") or 101),
             stage_timeout_seconds=3600,
             timeout_seconds=7200,
@@ -3986,6 +3999,7 @@ class ApiState:
             labels={
                 "teaching_mode": "guided",
                 "teaching_reference_baseline": "true",
+                "teaching_run_role": run_role,
                 "reference_design": reference.design,
                 "design_bundle_sha256": reference.source_fingerprint,
                 "orfs_commit": reference.orfs_commit,
@@ -4007,7 +4021,7 @@ class ApiState:
             "top": reference.top,
             "design_bundle_sha256": reference.source_fingerprint,
             "orfs_commit": reference.orfs_commit,
-            "parameters": overrides,
+            "parameters": {**overrides, "place_density": density},
             "execution_started": False,
             "authority": "server-pinned reference and Runtime-backed outcomes",
         }
@@ -5452,6 +5466,12 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                 if path == "/api/teaching/reference-baseline":
                     self._json(state.start_teaching_reference_baseline(
                         scoped(self._read_json()), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                if path == "/api/teaching/reference-comparison":
+                    payload = {**scoped(self._read_json()), "run_role": "comparison"}
+                    self._json(state.start_teaching_reference_baseline(
+                        payload, owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
                 if path == "/api/teaching/command-check":
