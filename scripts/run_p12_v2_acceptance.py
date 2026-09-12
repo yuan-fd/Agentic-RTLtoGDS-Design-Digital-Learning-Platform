@@ -33,7 +33,9 @@ def main() -> int:
     spec_id = frozen["spec"]["spec_id"]
     (output / "specir.json").write_text(json.dumps(frozen, indent=2), encoding="utf-8")
     result = state.run_automated_rtl_pipeline(spec_id, {
-        "execute_orfs": args.execute_orfs, "max_revisions": 2,
+        # Acceptance proves the first bounded candidate through the platform
+        # gates; revision loops are a separate provider-dependent campaign.
+        "execute_orfs": args.execute_orfs, "max_revisions": 0,
     })
     (output / "pipeline.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps({"spec_id": spec_id, "status": result.get("status"), "pipeline_id": result.get("pipeline_id")}, indent=2))
