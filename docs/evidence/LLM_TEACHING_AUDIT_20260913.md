@@ -16,6 +16,7 @@ The score measures verified platform behavior, not planned features. It is delib
 - MCP query history is user-scoped, persisted in SQLite, capped at 20 records, and expires after one hour.
 - Runtime and durable DSE worker startup, heartbeats, aggregate worker health, and standard startup script.
 - Full regression suite: 858 passed, 1 deselected.
+- Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 
 ## Partial or pending
 
@@ -24,6 +25,7 @@ The score measures verified platform behavior, not planned features. It is delib
 - MCP exploration has no confirmed upgrade-to-Runtime action in the web console.
 - P12 v2 reaches RTLScout, lint, and simulation, but mutation quality currently stops the minimal AND example before ORFS/GDS. A later retry also hit an external Codex provider error.
 - Fresh 5–10 user load evidence is not recorded.
+- Interactive browser certification is pending because this ARM host has no usable headless browser runtime (Playwright browser download stalled; system Firefox fails GLX/EGL startup).
 - Final legacy cleanup and release management remain outside the current teaching-focused scope.
 
 ## Evidence boundaries
