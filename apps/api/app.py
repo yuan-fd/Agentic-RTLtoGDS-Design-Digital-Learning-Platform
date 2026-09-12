@@ -268,6 +268,8 @@ class ApiState:
                                                     self.tenant_learning_store)
         self.agent_traces = AgentTraceStore(state_root / "agent-traces.db")
         self.auth = AuthStore(auth_db_path or state_root / "web-auth.db")
+        self._mcp_history: dict[str, list[dict[str, Any]]] = {}
+        self._mcp_history_lock = threading.Lock()
         self.teaching_sessions = None
         if workbench_config is not None:
             from apps.l1_workbench.service import WorkbenchService
@@ -3264,7 +3266,21 @@ class ApiState:
             raise ValueError(f"MCP query unavailable: {exc}") from exc
         if completed.returncode != 0 or result.get("status") != "ok":
             raise ValueError(result.get("error") or "MCP query failed")
-        return {"exploration": result, "authority": "OpenROAD-MCP live query; not Runtime evidence"}
+        owner_id = str(payload.get("owner_id") or "anonymous")
+        record = {"query_id": uuid.uuid4().hex, "command": command,
+                  "result": result, "created_at": datetime.now(timezone.utc).isoformat()}
+        with self._mcp_history_lock:
+            history = self._mcp_history.setdefault(owner_id, [])
+            history.append(record)
+            del history[:-20]
+        return {"exploration": result, "query_id": record["query_id"],
+                "authority": "OpenROAD-MCP live query; not Runtime evidence"}
+
+    def mcp_history(self, owner_id: str) -> dict[str, Any]:
+        with self._mcp_history_lock:
+            records = list(self._mcp_history.get(owner_id, []))
+        return {"records": records, "limit": 20,
+                "authority": "Ephemeral exploration history; not Runtime evidence"}
 
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
                             include_legacy: bool = False) -> dict[str, Any]:
@@ -5298,6 +5314,8 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     ))
                 elif path == "/api/teaching/mcp/status":
                     self._json(state.mcp_status())
+                elif path == "/api/teaching/mcp/history":
+                    self._json(state.mcp_history(session.user_id))
                 elif path == "/api/teaching/dse/campaigns":
                     self._json(state.teaching_campaigns(
                         owner_id=list_owner,

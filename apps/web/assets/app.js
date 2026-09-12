@@ -369,9 +369,22 @@ async function runMcpQuery() {
       authority: result.authority,
       result: exploration.result ?? exploration,
     }, null, 2);
+    loadMcpHistory();
   } catch (error) {
     output.textContent = `查询未完成：${error.message}`;
   }
+}
+
+async function loadMcpHistory() {
+  const node = $("#mcpHistory");
+  if (!node) return;
+  try {
+    const result = await api("/api/teaching/mcp/history");
+    const records = result.records || [];
+    node.innerHTML = records.length
+      ? `<small>本次会话最近查询：${records.map(item => `<code>${esc(item.command)}</code>`).join(" · ")}</small>`
+      : "";
+  } catch (_) { node.textContent = ""; }
 }
 
 function renderAuth() {
