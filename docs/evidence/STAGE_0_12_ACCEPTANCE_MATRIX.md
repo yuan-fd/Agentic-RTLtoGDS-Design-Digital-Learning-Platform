@@ -4,7 +4,7 @@
 |---|---|---|
 | 0 环境与仓库审计 | 已证实 | `teaching_platform_doctor.py`；审计报告 |
 | 1–3 Labs、三入口、教学骨架 | 已证实 | 网页静态入口、真实认证浏览器回放、教学 API 回归 |
-| 4 Ibex baseline | Runtime 已证实，页面回放待验收 | Ibex ORFS run `fbfbb60abfae43a8aa1a922567f96af4` |
+| 4 Ibex baseline | Runtime 已证实，页面命令检查已回放，实际页面启动待验收 | Ibex ORFS run `fbfbb60abfae43a8aa1a922567f96af4`；浏览器 command-check `accepted=true` |
 | 5 参数比较 | Runtime 已证实，页面回放待验收 | 比较 run `5ffcbb58de464496ba8e046f1bfeb171` |
 | 6 DSE 四模式与批量约束 | 已证实（API/回归） | DSE 相关测试与计划文档 |
 | 7 Dashboard、Agent 状态、证据投影 | 已证实（API/静态渲染） | Dashboard 测试；Runtime artifact projection |
