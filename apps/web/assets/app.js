@@ -17,7 +17,7 @@ const state = {
 };
 const stages = ["synth", "floorplan", "place", "cts", "route", "finish"];
 const IBEX_LESSONS = [
-  {title: "认识 Ibex 设计", purpose: "先建立地图：知道顶层模块、时钟和配置文件分别在哪里。", command: "find designs -maxdepth 2 -type f | sort | head", explain: "find 找文件；-maxdepth 限制搜索层级；sort 让结果稳定，方便比较。", observe: "找到设计配置、RTL 源文件和约束文件。先看懂文件，再运行工具。"},
+  {title: "认识 Ibex ALU 设计", purpose: "先建立地图：知道顶层模块、时钟和配置文件分别在哪里。这个课程示例是 Ibex 的 ALU 子模块。", command: "find designs -maxdepth 2 -type f | sort | head", explain: "find 找文件；-maxdepth 限制搜索层级；sort 让结果稳定，方便比较。", observe: "找到设计配置、RTL 源文件和约束文件。先看懂文件，再运行工具。"},
   {title: "跑第一次 baseline", purpose: "使用平台已经验证过的默认配置，得到一份可以比较的真实基线。", command: "make DESIGN_CONFIG=./designs/ibex/config.mk", explain: "make 调用流程；DESIGN_CONFIG 指定设计；config.mk 保存设计和工艺配置。", observe: "流程应依次经过综合、布局规划、布局、CTS 和布线，并产生报告目录。"},
   {title: "看懂结果", purpose: "不只看成功或失败，要找到面积、时序、拥塞和 DRC 的证据。", command: "less reports/ibex/2_floorplan.rpt\nless reports/ibex/6_report.rpt", explain: "less 只读查看报告；floorplan 报告看布局；最终报告看时序和面积。", observe: "记录面积、最差时序裕量、拥塞和 DRC 数量。它们共同说明结果是否可用。"},
   {title: "改参数并比较", purpose: "只改一个因素，再和 baseline 对比，才能知道参数真正带来的影响。", command: "make DESIGN_CONFIG=./designs/ibex/config.mk CORE_UTILIZATION=50", explain: "CORE_UTILIZATION 表示核心利用率。一次只改变一个参数，其他条件保持不变。", observe: "比较两次运行的面积、时序和拥塞；不要只看单个最好的数字。"},
