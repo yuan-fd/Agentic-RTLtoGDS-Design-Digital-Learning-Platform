@@ -32,6 +32,17 @@ function renderIbexLesson(index = ibexLessonIndex) {
   $("#lessonAnswer").addEventListener("click", () => message("#lessonMessage", `参考命令：${lesson.command}`));
   $("#lessonNext").addEventListener("click", () => renderIbexLesson((ibexLessonIndex + 1) % IBEX_LESSONS.length));
 }
+
+function explainReportEvidence(metrics, failure) {
+  const value = key => Number(metrics[key]);
+  const findings = [];
+  if (failure) findings.push(ui(`Cause: the run recorded a ${failure.category || "tool"} failure. Impact: the requested result is incomplete. Recommendation: read the failure message, fix the named input or constraint, then rerun the same stage.`, `原因：任务记录了${failure.category || "工具"}失败。影响：这次结果还不完整。建议：先查看失败信息中指出的输入或约束，修复后从同一阶段重新运行。`));
+  if (Number.isFinite(value("setup_wns_ns")) && value("setup_wns_ns") < 0) findings.push(ui("Timing needs attention: negative setup WNS means at least one path misses the clock target. Try checking the clock period, placement, and routing congestion before changing many parameters.", "时序需要关注：Setup WNS 为负数，表示至少有一条路径没有达到时钟目标。先检查时钟周期、布局和布线拥塞，再一次只改一个参数。"));
+  if (Number.isFinite(value("drc_errors")) && value("drc_errors") > 0) findings.push(ui("Physical rules need attention: DRC violations mean the layout still breaks one or more manufacturing rules. Read the DRC report before treating QoR as final.", "物理规则需要关注：DRC 违例表示版图还违反了一项或多项制造规则。先查看 DRC 报告，再判断 QoR 是否可以作为最终结果。"));
+  if (Number.isFinite(value("congestion_overflow")) && value("congestion_overflow") > 0) findings.push(ui("Routing congestion needs attention: overflow means some regions have more demand than available tracks. Placement density and floorplan dimensions are the first controlled variables to inspect.", "布线拥塞需要关注：拥塞溢出表示某些区域的布线需求超过了可用轨道。优先检查布局密度和 floorplan 尺寸，并保持其他条件不变。"));
+  if (!findings.length && Object.keys(metrics).length) findings.push(ui("The available recorded metrics do not show the common timing, DRC, or congestion warnings. Keep the report and artifacts as the evidence for this run.", "当前已有指标没有显示常见的时序、DRC 或拥塞警告。请保留这次报告和产物，作为本次运行的证据。"));
+  return findings.join(" ");
+}
 const ZH = {
   "nav.overview": "平台概览", "nav.frontend": "前端设计", "nav.backend": "后端实现",
   "nav.projects": "项目与结果", "nav.evolution": "自演化", "nav.tutorial": "使用教程",
@@ -221,7 +232,8 @@ async function askEdaAssistant() {
     const localStatus = selectedRun ? `${ui("Current run", "当前任务")}: ${humanStatus(selectedRun.status)} · ${ui("target", "目标阶段")} ${runContext.target_stage}` : ui("No run is selected yet.", "当前还没有选择运行任务。");
     const evidenceText = Object.keys(metricContext).length ? ui(` Evidence available: ${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join(", ")}.`, ` 已有真实指标：${Object.entries(metricContext).map(([key, value]) => `${key}=${value}`).join("、")}。`) : ui(" No report metrics are attached to this run yet.", " 当前任务还没有附带报告指标。");
     const failureText = failure ? ui(` Failure recorded: ${failure.category || "unknown"} — ${failure.message || "no message"}.`, ` 已记录失败：${failure.category || "未知类别"}——${failure.message || "没有附加说明"}。`) : "";
-    const summary = `${localStatus}.${evidenceText}${failureText} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
+    const guidance = explainReportEvidence(metricContext, failure);
+    const summary = `${localStatus}.${evidenceText}${failureText} ${guidance} ${session.summary || session.goal || session.text || ui("The request was accepted.", "已接收你的问题。")}`;
     const next = session.next_action || session.next || ui("Review the proposed step before running it.", "请先查看建议，再决定是否运行。");
     response.innerHTML = `<div class="assistant-answer"><b>${esc(ui("Assistant summary", "助手理解"))}</b><p>${esc(summary)}</p><div class="assistant-next">${esc(next)}</div></div>`;
     status.textContent = ui("Ready", "就绪");
