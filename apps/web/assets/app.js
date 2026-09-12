@@ -811,6 +811,20 @@ async function loadRuns(preferred = null) {
     const batch = (dashboard.batches || []).at(-1);
     const batchBox = $("#batchProgress");
     if (batchBox) { batchBox.hidden = !batch && !campaigns.length; if (batch) batchBox.textContent = ui(`Batch ${batch.batch_id}: baseline ${batch.baseline} · ${batch.candidates} candidates · ${batch.succeeded}/${batch.total} complete · ${batch.active} active`, `批次 ${batch.batch_id}：baseline ${batch.baseline} · ${batch.candidates} 个候选 · ${batch.succeeded}/${batch.total} 完成 · ${batch.active} 运行中`); if (!batch && campaigns.length) { const latest = campaigns[0]; batchBox.textContent = ui(`${latest.kind} campaign ${latest.campaign_id || latest.pipeline_id}: ${latest.status || "unknown"}`, `${latest.kind} campaign ${latest.campaign_id || latest.pipeline_id}：${latest.status || "未知"}`); } }
+    const detailsBox = $("#campaignDetails");
+    if (detailsBox) {
+      const rows = [];
+      for (const item of campaigns.slice(0, 4)) {
+        const id = item.campaign_id || item.pipeline_id;
+        try {
+          const detail = await api(`/api/teaching/dse/campaigns/${encodeURIComponent(id)}`);
+          const baseline = detail.baseline?.length ?? detail.state?.baseline_run_ids?.length ?? "—";
+          const candidates = detail.candidates?.length ?? detail.state?.history?.length ?? detail.budget?.candidates ?? "—";
+          rows.push(`<div class="campaign-detail-row"><b>${esc(detail.kind || item.kind)}</b><span>${esc(detail.status || item.status || "unknown")}</span><small>${esc(id)} · baseline ${esc(baseline)} · candidates ${esc(candidates)}</small></div>`);
+        } catch (_) { rows.push(`<div class="campaign-detail-row"><b>${esc(item.kind)}</b><span>${esc(item.status || "unknown")}</span><small>${esc(id)}</small></div>`); }
+      }
+      detailsBox.innerHTML = rows.join("");
+    }
     const a2 = campaignIndex?.a2;
     const a2Box = $("#a2Workbench");
     if (a2Box) {
