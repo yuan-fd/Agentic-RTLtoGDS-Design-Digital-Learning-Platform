@@ -58,13 +58,14 @@ function explainReportEvidence(metrics, failure) {
   return findings.join(" ");
 }
 function parseExperimentIntent(text) {
-  const values = [...text.matchAll(/(?:利用率|utilization|density)[^\d]*(\d{1,2})\s*%?/gi)].map(match => Number(match[1])).filter(value => value > 0 && value < 100);
+  const match = text.match(/(?:利用率|utilization|density)[^\d]*(\d{1,2}(?:\s*[%％]?)?(?:\s*[,，、\/或和]\s*\d{1,2}\s*[%％]?)+)/i);
+  const values = match ? match[1].match(/\d{1,2}/g).map(Number).filter(value => value > 0 && value < 100) : [];
   if (values.length < 2) return null;
   const candidates = [...new Set(values)].slice(0, 6);
   return {
-    parameter: "utilization_pct",
+    parameter: "place_density",
     candidates,
-    summary: ui(`Experiment plan: compare utilization at ${candidates.map(value => `${value}%`).join(", ")}. ${candidates.length > 6 ? "Only the first six candidates are kept." : "No run has started; review and confirm first."}`, `实验计划：比较利用率 ${candidates.map(value => `${value}%`).join("、")}。尚未启动任务，请先检查并确认。`),
+    summary: ui(`Experiment plan: compare placement density at ${candidates.map(value => `${value}%`).join(", ")}. No run has started; review and confirm first.`, `实验计划：比较布局密度 ${candidates.map(value => `${value}%`).join("、")}。尚未启动任务，请先检查并确认。`),
   };
 }
 function parseCandidateValues() {
@@ -287,6 +288,8 @@ async function askEdaAssistant() {
       $("#candidateCount").value = String(count);
       updateTeachingMode();
       $("#teachingObjective").value = `比较利用率：${experiment.candidates.map(value => `${value}%`).join("、")}`;
+      $("#candidateValues").value = experiment.candidates.map(value => (value / 100).toFixed(2)).join(", ");
+      renderBatchPlanReview();
       $("#teachingObjectiveField").hidden = false;
       $("#optimizationDashboard")?.scrollIntoView({behavior: "smooth", block: "start"});
       message("#flowMessage", ui("Batch settings prepared. Review them before running.", "批量实验设置已准备好，请检查后再运行。"));

@@ -3975,7 +3975,10 @@ class ApiState:
         if raw_values is not None:
             if not isinstance(raw_values, list) or not raw_values or len(raw_values) > 6:
                 raise ValueError("candidate_values must contain between 1 and 6 values")
-            candidate_values = [round(float(value), 4) for value in raw_values]
+            try:
+                candidate_values = [round(float(value), 4) for value in raw_values]
+            except (TypeError, ValueError) as exc:
+                raise ValueError("candidate_values must be numeric") from exc
             if any(value < 0.1 or value > 0.95 for value in candidate_values):
                 raise ValueError("candidate_values must be between 0.1 and 0.95")
             count = len(candidate_values)
