@@ -4839,6 +4839,21 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def check_teaching_command(payload: dict[str, Any]) -> dict[str, Any]:
+    """Check a lesson command's shape without executing or resolving it."""
+    command = str(payload.get("command") or "").strip()
+    lesson = int(payload.get("lesson", 0))
+    if not command:
+        raise ValueError("command is required")
+    if len(command) > 1000 or any(token in command for token in (";", "&&", "||", "`", "$(", ">", "<")):
+        return {"accepted": False, "reason": "shell chaining, substitution, and redirection are not allowed"}
+    expected = (("find", "design"), ("make", "design_config"), ("less", "report"), ("make", "utilization"))
+    required = expected[max(0, min(lesson, len(expected) - 1))]
+    missing = [token for token in required if token not in command.lower()]
+    return {"accepted": not missing, "missing": missing,
+            "reason": "command shape matches this lesson" if not missing else "required lesson tokens are missing"}
+
+
 def _artifact_presentation(artifact: dict[str, Any]) -> dict[str, str | None]:
     key = str(artifact.get("store_key") or "")
     name = Path(key).name
@@ -5365,6 +5380,9 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     self._json(state.start_rule_batch(
                         scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                if path == "/api/teaching/command-check":
+                    self._json(check_teaching_command(self._read_json()))
                     return
 
                 if path == "/api/spec/sessions":

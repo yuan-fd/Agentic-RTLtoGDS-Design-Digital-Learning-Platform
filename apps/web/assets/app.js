@@ -29,12 +29,13 @@ function renderIbexLesson(index = ibexLessonIndex) {
   const lesson = IBEX_LESSONS[ibexLessonIndex];
   $$('[data-lesson]').forEach(button => button.classList.toggle("active", Number(button.dataset.lesson) === ibexLessonIndex));
   root.innerHTML = `<h3>${esc(lesson.title)}</h3><p class="lesson-purpose">${esc(lesson.purpose)}</p><div class="lesson-grid"><div class="lesson-block"><b>要输入的命令</b><pre class="lesson-command">${esc(lesson.command)}</pre></div><div class="lesson-block"><b>命令是什么意思</b><p>${esc(lesson.explain)}</p></div><div class="lesson-block"><b>你应该观察什么</b><p>${esc(lesson.observe)}</p></div><div class="lesson-block"><b>学习提示</b><p>先自己尝试；遇到不确定的地方，可以打开 EDA Console 询问助手。</p></div></div><div class="lesson-practice"><label><span>自己输入命令</span><textarea id="lessonCommandInput" rows="2" placeholder="把你认为正确的命令写在这里"></textarea></label><button class="button" type="button" id="lessonCheck">检查命令</button></div><div class="lesson-actions"><button class="button" type="button" id="lessonAnswer">看答案</button><button class="button primary" type="button" id="lessonNext">${ibexLessonIndex === IBEX_LESSONS.length - 1 ? "回到第一步" : "下一步 →"}</button></div><p class="message" id="lessonMessage" aria-live="polite"></p>`;
-  $("#lessonCheck").addEventListener("click", () => {
+  $("#lessonCheck").addEventListener("click", async () => {
     const input = $("#lessonCommandInput").value.trim();
     if (!input) return message("#lessonMessage", "请先输入一条命令。", true);
-    const expected = ibexLessonIndex === 0 ? ["find", "design"] : ibexLessonIndex === 1 ? ["make", "design_config"] : ibexLessonIndex === 2 ? ["less", "report"] : ["make", "utilization"];
-    const missing = expected.filter(token => !input.toLowerCase().includes(token));
-    message("#lessonMessage", missing.length ? `还需要检查：${missing.join("、")}。这一步先不要执行，先把命令补完整。` : "命令结构符合这一步的练习要求。执行前仍请确认设计和路径。", Boolean(missing.length));
+    try {
+      const result = await post("/api/teaching/command-check", {command: input, lesson: ibexLessonIndex});
+      message("#lessonMessage", result.accepted ? "命令结构符合这一步的练习要求。执行前仍请确认设计和路径。" : `还需要检查：${(result.missing || []).join("、") || result.reason}。这一步先不要执行。`, !result.accepted);
+    } catch (error) { message("#lessonMessage", error.message, true); }
   });
   $("#lessonAnswer").addEventListener("click", () => message("#lessonMessage", `参考命令：${lesson.command}`));
   $("#lessonNext").addEventListener("click", () => renderIbexLesson((ibexLessonIndex + 1) % IBEX_LESSONS.length));
