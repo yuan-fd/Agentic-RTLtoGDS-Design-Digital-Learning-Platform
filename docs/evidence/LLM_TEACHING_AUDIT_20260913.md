@@ -25,7 +25,6 @@ The score measures verified platform behavior, not planned features. It remains 
 ## Partial or pending
 
 - Checkpoint 3 still needs a fresh browser proof of Ibex baseline, parameter comparison, and project/evolution replay.
-- MCP interactive sessions and report-image projection are not implemented; only short-lived read-only queries are supported.
 - MCP image/report projection and long-lived interactive sessions remain unimplemented; the confirmed upgrade action is intentionally limited to the fixed Ibex reference design.
 - P12 v2 bounded `and2` acceptance is complete through ORFS/GDS; broader designs and provider-dependent revisions remain outside this bounded proof.
 - Fresh 5–10 user load evidence is represented by the bounded 8-user smoke; sustained production load and browser-level load remain unmeasured.
