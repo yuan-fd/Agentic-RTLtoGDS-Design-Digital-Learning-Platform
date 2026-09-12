@@ -144,6 +144,22 @@ def main(argv: list[str] | None = None) -> int:
             heartbeat.active_run = run.run_id
             heartbeat.status = "running"
             heartbeat.write()
+            # Queue reads are intentionally cheap and may race across worker
+            # processes.  Claim this specific run with an atomic lock file
+            # before calling execute_once; otherwise two workers can both
+            # transition the same stage and leave it stuck at running.
+            claim_path = args.runtime_db.expanduser().resolve().with_name(
+                f"runtime-run-{run.run_id}.claim")
+            try:
+                claim_fd = os.open(claim_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                os.write(claim_fd, str(os.getpid()).encode())
+                os.close(claim_fd)
+            except FileExistsError:
+                heartbeat.active_run = None
+                heartbeat.status = "idle"
+                heartbeat.write()
+                stop.wait(0.05)
+                continue
             print(f"Executing Runtime run {run.run_id} ({run.task_spec.plugin_id})", flush=True)
             try:
                 if run.task_spec.plugin_id == "taiwei-pin-3d":
@@ -154,6 +170,10 @@ def main(argv: list[str] | None = None) -> int:
                       flush=True)
                 stop.wait(args.poll_seconds)
             finally:
+                try:
+                    claim_path.unlink()
+                except FileNotFoundError:
+                    pass
                 heartbeat.active_run = None
                 heartbeat.status = "idle"
                 heartbeat.write()
