@@ -369,10 +369,25 @@ async function runMcpQuery() {
       authority: result.authority,
       result: exploration.result ?? exploration,
     }, null, 2);
+    state.pendingMcpQueryId = result.query_id || null;
+    const upgrade = $("#mcpUpgradeRun");
+    if (upgrade) upgrade.disabled = !state.pendingMcpQueryId;
     loadMcpHistory();
   } catch (error) {
     output.textContent = `查询未完成：${error.message}`;
   }
+}
+
+async function runMcpUpgrade() {
+  const queryId = state.pendingMcpQueryId;
+  if (!queryId) return;
+  const output = $("#mcpQueryResult");
+  try {
+    const plan = await post("/api/teaching/mcp/upgrade-plan", {query_id: queryId});
+    if (!window.confirm("已生成固定 Ibex Runtime 计划。确认提交吗？")) return;
+    const result = await post("/api/teaching/mcp/upgrade-run", {query_id: queryId, confirm: true});
+    output.textContent = JSON.stringify({status: "submitted", run_id: result.run?.run?.run_id || result.run?.run_id, authority: result.authority}, null, 2);
+  } catch (error) { output.textContent = `升级未完成：${error.message}`; }
 }
 
 async function loadMcpHistory() {
@@ -2161,6 +2176,7 @@ $("#submitFlow").addEventListener("click", submitFlow);
 $("#assistantAsk")?.addEventListener("click", askEdaAssistant);
 $("#assistantPrompt")?.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") askEdaAssistant(); });
 $("#mcpQueryRun")?.addEventListener("click", runMcpQuery);
+$("#mcpUpgradeRun")?.addEventListener("click", runMcpUpgrade);
 $("#mcpQueryInput")?.addEventListener("keydown", event => { if (event.key === "Enter") runMcpQuery(); });
 $$('[data-assistant-prompt]').forEach(button => button.addEventListener("click", () => { const input = $("#assistantPrompt"); if (input) { input.value = button.dataset.assistantPrompt || ""; input.focus(); } }));
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
