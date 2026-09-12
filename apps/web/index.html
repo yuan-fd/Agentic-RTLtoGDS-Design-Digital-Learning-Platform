@@ -16,7 +16,9 @@
       <span class="mark">O</span><span class="wordmark-text"><b>OpenROAD</b><i>Self-Evolving EDA Platform</i></span>
     </a>
     <nav class="tabs" aria-label="Primary navigation">
-      <button class="tab active" data-route="overview" data-i18n="nav.overview">Overview</button>
+      <button class="tab active" data-route="overview" data-i18n="nav.overview">Labs</button>
+      <button class="tab" data-route="backend">EDA Console</button>
+      <button class="tab" data-route="tutorial">Learn with Ibex</button>
       <button class="tab" data-route="frontend" data-i18n="nav.frontend">Frontend Design</button>
       <button class="tab" data-route="backend" data-i18n="nav.backend">Backend Design</button>
       <button class="tab" data-route="projects" data-i18n="nav.projects">Projects &amp; Results</button>
@@ -92,32 +94,38 @@
         </div>
       </section>
 
+      <section class="wrap learning-entrances" aria-label="学习入口">
+        <article><span class="entrance-index">01</span><div><b>Labs</b><p>直接运行准备好的 RTL、验证、参数探索和自演化实验。</p></div><button class="text-link" data-route="overview" data-scroll="features">浏览实验 →</button></article>
+        <article><span class="entrance-index">02</span><div><b>EDA Console</b><p>用自然语言询问状态、报告和参数，再由平台生成受控执行计划。</p></div><button class="text-link" data-route="backend">打开控制台 →</button></article>
+        <article><span class="entrance-index">03</span><div><b>Learn with Ibex</b><p>跟着步骤学习命令、GUI、日志和报告，完成一次真实设计。</p></div><button class="text-link" data-route="tutorial">开始课程 →</button></article>
+      </section>
+
     </section>
 
     <section class="page" id="page-tutorial">
-      <div class="page-head wrap"><div><p class="eyebrow">使用教程</p><h1>从一句话到一颗芯片</h1></div><p>四步走完一个完整流程：描述设计、生成 RTL、跑物理实现、查看结果与经验。</p></div>
+      <div class="page-head wrap"><div><p class="eyebrow">Learn with Ibex</p><h1>跟着师傅完成第一个设计</h1></div><p>用一个真实、适中的 Ibex 设计，逐步学习命令、参数、GUI、日志、报告和结果比较。</p></div>
       <section class="tutorial-section" style="padding:44px 0 64px;border-top:0">
         <div class="wrap">
           <div class="tutorial-cards">
             <article class="tutorial-card">
               <span class="tutorial-num">1</span>
-              <div><b>描述你的设计</b><p>在前端设计页用一句话描述功能，或上传 RTL 文件、选择一个示例项目。平台生成可审查的 RTL 代码。</p></div>
-              <button class="text-link" data-route="frontend" data-focus="spec">打开前端设计 →</button>
+              <div><b>认识 Ibex 和 RTL</b><p>找到顶层模块、时钟端口和配置文件，知道每个文件在流程中负责什么。</p></div>
+              <button class="text-link" data-route="frontend">查看设计输入 →</button>
             </article>
             <article class="tutorial-card">
               <span class="tutorial-num">2</span>
-              <div><b>完成物理实现</b><p>选择已登记的设计，在后端实现页配置时钟与工艺，运行 2D 或 3D 物理设计流程，产出版图与 QoR 报告。</p></div>
+              <div><b>跑综合和第一次 baseline</b><p>学习时钟约束、工艺平台和基本参数，运行一次完整的 RTL-to-GDS 基线。</p></div>
               <button class="text-link" data-route="backend">打开后端实现 →</button>
             </article>
             <article class="tutorial-card">
               <span class="tutorial-num">3</span>
-              <div><b>自主优化闭环</b><p>Agent 自动重复 baseline、用 BO/GP 搜索参数组合、验证每轮结果；连续三轮停滞后自动诊断并沉淀证据。</p></div>
-              <button class="text-link" data-route="evolution" data-focus="agent">打开优化功能 →</button>
+              <div><b>看懂 GUI、日志和报告</b><p>知道在哪里看布局、时序、面积、拥塞和 DRC，并学会从失败日志找到下一步。</p></div>
+              <button class="text-link" data-route="backend">查看实时状态 →</button>
             </article>
             <article class="tutorial-card">
               <span class="tutorial-num">4</span>
-              <div><b>查看结果与经验</b><p>在项目与结果页对比每次运行的版图与指标，查看自演化知识库沉淀的可复用经验。</p></div>
-              <button class="text-link" data-route="projects">打开结果管理 →</button>
+              <div><b>改一个参数，再比较结果</b><p>用自然语言询问助手，改变利用率或时钟目标，比较两次真实运行的 QoR 证据。</p></div>
+              <button class="text-link" data-route="backend">打开 EDA 控制台 →</button>
             </article>
           </div>
         </div>

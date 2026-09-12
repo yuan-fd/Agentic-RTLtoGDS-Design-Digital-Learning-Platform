@@ -86,6 +86,14 @@ a { color: inherit; }
 .feature-group button:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
 .f-icon { width: 22px; height: 22px; flex: 0 0 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); font-size: 14px; font-weight: 700; transition: color .15s; }
 .feature-group button:hover .f-icon { color: #fff; }
+.learning-entrances { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; border-block: 1px solid var(--line); }
+.learning-entrances article { min-height: 148px; padding: 20px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--line); }
+.learning-entrances article:last-child { border-right: 0; }
+.entrance-index { color: var(--accent); font: 600 12px var(--mono); }
+.learning-entrances b { color: var(--heading); font-size: 18px; }
+.learning-entrances p { margin: 2px 0 4px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.learning-entrances .text-link { align-self: flex-start; margin-top: auto; }
+@media (max-width: 700px) { .learning-entrances { grid-template-columns: 1fr; } .learning-entrances article { border-right: 0; border-bottom: 1px solid var(--line); } .learning-entrances article:last-child { border-bottom: 0; } }
 @media (max-width: 900px) { .feature-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .feature-grid { grid-template-columns: 1fr; } }
 /* Tutorial: divider-separated rows, no cards */
