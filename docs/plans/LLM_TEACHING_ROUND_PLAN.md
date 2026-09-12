@@ -125,6 +125,8 @@
 - [ ] 修改一个参数后完成第二次运行并看到差异。
 - [ ] 运行证据可回到 Projects 和 Self-evolution 页面查看。
 
+> 运行层面的 Ibex baseline/参数比较已有真实 Runtime 证据；本检查点仍保留未勾选，直到可用浏览器完成页面端到端回放。
+
 ## Phase 4：OpenROAD-MCP 交互探索适配
 
 #### Task 7：隔离 MCP 实时查询
@@ -158,6 +160,8 @@
 - [x] 用户能看到命令、结果和 Agent 状态；图像仍由正式 Runtime 产物投影。
 - [ ] 用户能把探索升级成正式 Runtime 实验。
 - [ ] 不同用户之间没有 Session、路径或证据泄漏。
+
+> P12 bounded acceptance 已完成 RTLScout → mutation → ORFS → GDS；该证据不替代浏览器闭环或多用户隔离验收。
 
 ## 统一交互规则
 
