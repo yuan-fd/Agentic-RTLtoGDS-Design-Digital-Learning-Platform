@@ -1379,7 +1379,7 @@ async function saveA2Answers() {
 }
 async function startA2Session() {
   try {
-    const result = await post("/api/teaching/sessions", {text: $("#a2SessionText").value, teaching_mode: "guided", teaching_context: {dse_mode: "a2_orfo"}});
+    const result = await post("/api/teaching/sessions", {text: $("#a2SessionText").value, teaching_mode: "guided"});
     state.workbenchSessionId = result.session.session_id; renderA2Questions(result.draft);
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
     message("#a2Message", ui(`L1 session ${state.workbenchSessionId} created.`, `已创建 L1 Session：${state.workbenchSessionId}。`));
