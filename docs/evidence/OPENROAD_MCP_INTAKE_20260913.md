@@ -49,3 +49,9 @@ The first web slice is now live: an authenticated user calling
 `GET /api/teaching/mcp/status` receives the server-owned build identity,
 protocol version, and 15-tool list. The endpoint only runs the read-only probe;
 it accepts no command, path, or executable from the browser.
+
+The next slice is also verified locally: `mcp_query({"command":"help"})`
+returns the live OpenROAD help output through MCP stdio, while
+`mcp_query({"command":"exec ls"})` is rejected before the subprocess starts.
+The returned envelope identifies the result as live exploration and explicitly
+does not mark it as Runtime evidence.

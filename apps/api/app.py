@@ -3240,6 +3240,32 @@ class ApiState:
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             return {"status": "unavailable", "repo": str(repo), "diagnostic": str(exc)}
 
+    def mcp_query(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Execute one allowlisted read-only query through MCP stdio."""
+        command = str(payload.get("command") or "").strip()
+        if len(command) > 500:
+            raise ValueError("MCP query is limited to 500 characters")
+        configured = os.environ.get("OPENROAD_MCP_REPO", "").strip()
+        candidates = [Path(configured)] if configured else []
+        candidates.extend((ROOT / "var" / "external-sources" / "openroad-mcp", Path("/tmp/openroad-mcp-review")))
+        repo = next((item.expanduser().resolve() for item in candidates
+                     if (item / "typescript" / "dist" / "main.js").is_file()), None)
+        if repo is None:
+            raise ValueError("server-owned OpenROAD-MCP build not found")
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "query_openroad_mcp.py"),
+                 "--repo", str(repo), "--command", command, "--timeout", "30"],
+                cwd=str(ROOT), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=35, check=False,
+            )
+            result = json.loads(completed.stdout or "{}")
+        except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+            raise ValueError(f"MCP query unavailable: {exc}") from exc
+        if completed.returncode != 0 or result.get("status") != "ok":
+            raise ValueError(result.get("error") or "MCP query failed")
+        return {"exploration": result, "authority": "OpenROAD-MCP live query; not Runtime evidence"}
+
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
                             include_legacy: bool = False) -> dict[str, Any]:
         view = self.get_runtime_run(run_id, owner_id=owner_id, include_legacy=include_legacy)
@@ -5500,6 +5526,9 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     self._json(state.start_teaching_reference_baseline(
                         scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                if path == "/api/teaching/mcp/query":
+                    self._json(state.mcp_query(scoped(self._read_json())))
                     return
                 if path == "/api/teaching/reference-comparison":
                     payload = {**scoped(self._read_json()), "run_role": "comparison"}
