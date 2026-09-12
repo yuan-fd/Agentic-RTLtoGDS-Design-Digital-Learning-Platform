@@ -161,7 +161,7 @@
 - [x] 用户能在网页中完成一次只读 OpenROAD 探索。
 - [x] 用户能看到命令、结果和 Agent 状态；图像仍由正式 Runtime 产物投影。
 - [ ] 用户能把探索升级成正式 Runtime 实验。
-- [ ] 不同用户之间没有 Session、路径或证据泄漏。
+- [x] 不同用户之间没有 Session、路径或证据泄漏（owner-scope 回归与 8 用户 HTTP smoke）。
 
 > P12 bounded acceptance 已完成 RTLScout → mutation → ORFS → GDS；该证据不替代浏览器闭环或多用户隔离验收。
 
