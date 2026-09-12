@@ -40,7 +40,7 @@ def _read(process: subprocess.Popen[bytes], selector: selectors.BaseSelector, de
     raise TimeoutError("MCP query timed out")
 
 
-def query(repo: Path, command: str, timeout: float) -> dict:
+def query(repo: Path, command: str, timeout: float, *, tool: str = "interactive_openroad_query", arguments: dict | None = None) -> dict:
     if not _valid(command):
         raise ValueError("only read-only OpenROAD query verbs are allowed")
     node = os.environ.get("OPENROAD_MCP_NODE") or "node"
@@ -64,16 +64,15 @@ def query(repo: Path, command: str, timeout: float) -> dict:
         if "result" not in initialized:
             raise RuntimeError("MCP initialize failed")
         send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
-        send({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
-            "name": "interactive_openroad_query", "arguments": {"command": command,
-            "timeout_ms": max(1000, int(timeout * 1000))}}})
+        call_args = arguments if arguments is not None else {"command": command, "timeout_ms": max(1000, int(timeout * 1000))}
+        send({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": tool, "arguments": call_args}})
         response = _read(process, selector, deadline)
         if response.get("id") != 2 or "result" not in response:
             raise RuntimeError(str(response.get("error") or "MCP query failed"))
         content = response["result"].get("content") or []
         text = next((item.get("text") for item in content if isinstance(item, dict)
                      and isinstance(item.get("text"), str)), "")
-        return {"status": "ok", "command": command, "result": json.loads(text) if text else {},
+        return {"status": "ok", "command": command, "tool": tool, "result": json.loads(text) if text else {},
                 "source": "openroad-mcp-stdio"}
     finally:
         selector.close()
@@ -91,9 +90,12 @@ def main() -> int:
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--command", required=True)
     parser.add_argument("--timeout", type=float, default=15)
+    parser.add_argument("--tool", default="interactive_openroad_query")
+    parser.add_argument("--arguments", default="")
     args = parser.parse_args()
     try:
-        print(json.dumps(query(args.repo.expanduser().resolve(), args.command, args.timeout), ensure_ascii=False))
+        arguments = json.loads(args.arguments) if args.arguments else None
+        print(json.dumps(query(args.repo.expanduser().resolve(), args.command, args.timeout, tool=args.tool, arguments=arguments), ensure_ascii=False))
         return 0
     except Exception as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))

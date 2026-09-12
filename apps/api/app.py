@@ -3278,6 +3278,48 @@ class ApiState:
         return {"exploration": result, "query_id": record["query_id"],
                 "authority": "OpenROAD-MCP live query; not Runtime evidence"}
 
+    def mcp_report_images(self, payload: dict[str, Any], *, read: bool = False) -> dict[str, Any]:
+        """Read-only, bounded report-image metadata/data through MCP.
+
+        The MCP response remains exploration output; it is never registered as
+        Runtime evidence.  Paths are represented by server-owned design keys,
+        not user supplied filesystem paths.
+        """
+        required = ("platform", "design", "run_slug")
+        if any(not str(payload.get(key) or "").strip() for key in required):
+            raise ValueError("platform, design and run_slug are required")
+        args = {key: str(payload[key]).strip() for key in required}
+        tool = "list_report_images"
+        if read:
+            image_name = str(payload.get("image_name") or "").strip()
+            if not image_name or len(image_name) > 200:
+                raise ValueError("image_name is required")
+            args["image_name"] = image_name
+            if payload.get("max_size_kb") is not None:
+                size = int(payload["max_size_kb"])
+                if size < 1 or size > 10240:
+                    raise ValueError("max_size_kb must be between 1 and 10240")
+                args["max_size_kb"] = size
+            tool = "read_report_image"
+        configured = os.environ.get("OPENROAD_MCP_REPO", "").strip()
+        candidates = [Path(configured)] if configured else []
+        candidates.extend((ROOT / "var" / "external-sources" / "openroad-mcp", Path("/tmp/openroad-mcp-review")))
+        repo = next((item.expanduser().resolve() for item in candidates
+                     if (item / "typescript" / "dist" / "main.js").is_file()), None)
+        if repo is None:
+            raise ValueError("server-owned OpenROAD-MCP build not found")
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "query_openroad_mcp.py"), "--repo", str(repo),
+             "--tool", tool, "--command", "report_image", "--arguments", json.dumps(args), "--timeout", "30"],
+            cwd=str(ROOT), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35, check=False)
+        try:
+            result = json.loads(completed.stdout or "{}")
+        except ValueError as exc:
+            raise ValueError("MCP image response was invalid") from exc
+        if completed.returncode != 0 or result.get("status") != "ok":
+            raise ValueError(result.get("error") or "MCP report image query failed")
+        return {"exploration": result, "authority": "OpenROAD-MCP report image; not Runtime evidence"}
+
     def mcp_history(self, owner_id: str) -> dict[str, Any]:
         with sqlite3.connect(self._mcp_history_db) as connection:
             cutoff = (datetime.now(timezone.utc).timestamp() - 3600)
@@ -5621,6 +5663,12 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/teaching/mcp/query":
                     self._json(state.mcp_query(scoped(self._read_json())))
+                    return
+                if path == "/api/teaching/mcp/report-images":
+                    self._json(state.mcp_report_images(scoped(self._read_json()), read=False))
+                    return
+                if path == "/api/teaching/mcp/report-image":
+                    self._json(state.mcp_report_images(scoped(self._read_json()), read=True))
                     return
                 if path == "/api/teaching/mcp/upgrade-plan":
                     self._json(state.mcp_upgrade_plan(scoped(self._read_json())))
