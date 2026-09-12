@@ -40,6 +40,7 @@ def _sha256(path: Path) -> str:
 class _Registry:
     def resolve(self, plugin_id, *, capability, **_kwargs):
         if (plugin_id, capability) not in {
+            ("a2-orfo", "optimizer.l2.a2-orfo-initialize"),
             ("a2-orfo", "optimizer.l2.a2-orfo-policy"),
             ("a2-orfo", "optimizer.l2.a2-orfo-feedback"),
             ("orfs-agent", "optimizer.l2.upstream-full-candidate"),
