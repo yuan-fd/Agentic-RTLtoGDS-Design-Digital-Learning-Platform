@@ -3292,7 +3292,8 @@ class ApiState:
         tool = "list_report_images"
         if read:
             image_name = str(payload.get("image_name") or "").strip()
-            if not image_name or len(image_name) > 200:
+            if (not image_name or len(image_name) > 200 or image_name in {".", ".."}
+                    or "/" in image_name or "\\" in image_name):
                 raise ValueError("image_name is required")
             args["image_name"] = image_name
             if payload.get("max_size_kb") is not None:
