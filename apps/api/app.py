@@ -3134,6 +3134,10 @@ class ApiState:
                     "status": state.get("status", "unknown"), "state": state,
                     "budget": {key: state.get(key) for key in
                                ("repetitions", "max_rounds", "round", "stall_window")},
+                    "evidence": {"active_runs": len(state.get("active_run_ids") or []),
+                                 "history_points": len(state.get("history") or []),
+                                 "measured_points": sum(1 for item in state.get("history", [])
+                                                        if item.get("summary", {}).get("complete_objectives"))},
                     "authority": "durable BO/GP checkpoint"}
         runs = self.list_runtime_runs(limit=500, owner_id=owner_id,
                                       include_legacy=include_legacy)["runs"]
@@ -3150,6 +3154,10 @@ class ApiState:
                                else "succeeded" if all(item["status"] == "succeeded" for item in matched) else "mixed"),
                     "baseline": grouped["baseline"], "candidates": grouped["candidate"],
                     "budget": {"total": len(matched), "candidates": len(grouped["candidate"])},
+                    "evidence": {"runs": len(matched),
+                                 "succeeded": sum(item["status"] == "succeeded" for item in matched),
+                                 "failed": sum(item["status"] == "failed" for item in matched),
+                                 "terminal": sum(item["status"] in {"succeeded", "failed", "cancelled", "timed_out", "lost"} for item in matched)},
                     "authority": "WorkflowRuntime"}
         raise KeyError(campaign_id)
 
