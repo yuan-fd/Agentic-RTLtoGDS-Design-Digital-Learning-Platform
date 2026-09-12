@@ -1462,6 +1462,9 @@ function backendMode(mode) {
 
 function updateTeachingMode() {
   const mode = $("#teachingMode")?.value || "guided";
+  const dse = $("#dseMode")?.value || "baseline";
+  const a2Controls = $("#a2Controls");
+  if (a2Controls) a2Controls.hidden = dse !== "a2_orfo";
   state.teachingMode = mode;
   const challenge = mode === "challenge";
   $("#teachingObjectiveField")?.toggleAttribute("hidden", mode === "guided");
@@ -1929,6 +1932,7 @@ $("#a2Configure")?.addEventListener("click", () => a2Action("l2-configure", {pip
 $("#a2Advance")?.addEventListener("click", () => a2Action("l2-advance", {pipeline_id: $("#a2Pipeline").value}));
 $("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
+$("#dseMode")?.addEventListener("change", updateTeachingMode);
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.
 $$('[data-locale]').forEach(button => button.addEventListener("click", () => { applyLocale(button.dataset.locale); if (!state.selectedRun) renderStageRail(new Map()); }));
