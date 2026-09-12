@@ -19,6 +19,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - Full regression suite: 861 passed, 1 deselected.
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 - MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed.
+- Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`).
 
 ## Partial or pending
 
@@ -26,7 +27,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - MCP interactive sessions and report-image projection are not implemented; only short-lived read-only queries are supported.
 - MCP exploration has no confirmed upgrade-to-Runtime action in the web console.
 - P12 v2 bounded `and2` acceptance is complete through ORFS/GDS; broader designs and provider-dependent revisions remain outside this bounded proof.
-- Fresh 5–10 user load evidence is not recorded.
+- Fresh 5–10 user load evidence is represented by the bounded 8-user smoke; sustained production load and browser-level load remain unmeasured.
 - Interactive browser certification is pending because this ARM host has no usable headless browser runtime (Playwright browser download stalled; system Firefox fails GLX/EGL startup).
 - Final legacy cleanup and release management remain outside the current teaching-focused scope.
 
