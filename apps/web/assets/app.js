@@ -1493,7 +1493,7 @@ async function submitFlow() {
       return;
     }
     const result = dseMode === "bo_gp"
-      ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
+      ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, reference_design: $("#referenceDesign")?.value || undefined, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
       : dseMode === "batch"
       ? await post("/api/teaching/dse/batch", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module, platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk", candidate_count: Number($("#candidateCount")?.value || 3), candidate_values: parseCandidateValues()})
       : await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
@@ -2066,6 +2066,14 @@ $("#a2RunCandidate")?.addEventListener("click", () => a2Action("candidates", {pr
 $("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 $("#dseMode")?.addEventListener("change", updateTeachingMode);
+$("#referenceDesign")?.addEventListener("change", () => {
+  if ($("#referenceDesign").value) {
+    $("#dseMode").value = "bo_gp";
+    if ($("#flowPdk").value === "nangate45") $("#flowPdk").value = "sky130hd";
+    updateTeachingMode();
+    message("#flowMessage", "完整 Ibex 将使用服务器固定的 ORFS 参考设计和 BO/GP 流程。请检查工艺后再运行。");
+  }
+});
 $("#candidateValues")?.addEventListener("input", renderBatchPlanReview);
 $("#candidateCount")?.addEventListener("input", renderBatchPlanReview);
 $("#openDensity")?.addEventListener("input", renderBatchPlanReview);
