@@ -118,3 +118,8 @@ is retained and labelled historical. Rollback: revert the correction commit.
 - The baseline proves the Runtime path and evidence collection. The browser
   dashboard still needs a connected run against the live web service, and the
   second parameter-comparison run remains outstanding.
+
+- The second controlled Runtime run completed with only placement density
+  changed from 0.55 to 0.60. Its evidence and metric deltas are recorded in
+  `docs/evidence/IBEX_TEACHING_PARAMETER_COMPARISON_20260912.md`; the browser
+  still needs an end-to-end live-service verification of both runs.
