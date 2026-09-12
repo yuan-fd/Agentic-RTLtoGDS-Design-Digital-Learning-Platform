@@ -131,12 +131,20 @@ class WorkflowRuntime:
         workspace = (
             self.workspace_root / run_id / ready.stage_run_id / f"attempt-{attempt_number}"
         )
-        attempt = self.store.start_attempt(
-            ready.stage_run_id,
-            worker_id=self.worker_id,
-            workspace=workspace,
-            lease_seconds=self.lease_seconds,
-        )
+        try:
+            attempt = self.store.start_attempt(
+                ready.stage_run_id,
+                worker_id=self.worker_id,
+                workspace=workspace,
+                lease_seconds=self.lease_seconds,
+            )
+        except ValueError as exc:
+            # Another worker may have won the transactional stage transition
+            # after this caller selected the ready row.  Return authoritative
+            # state instead of surfacing a false execution failure.
+            if str(exc).startswith("Invalid stage transition "):
+                return self.store.get_run(run_id)
+            raise
         pulse = _LeasePulse(
             self.store, run_id, attempt.attempt_id,
             worker_id=self.worker_id, lease_seconds=self.lease_seconds,
