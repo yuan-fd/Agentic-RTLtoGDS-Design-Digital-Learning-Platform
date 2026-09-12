@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import sqlite3
 import uuid
 from dataclasses import dataclass
@@ -257,8 +258,12 @@ class JobStore:
             self._event(connection, job_id, event, {})
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
+        lock_path = self.path.with_suffix(self.path.suffix + ".init.lock")
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                with self._connect() as connection:
+                    connection.executescript(
                 """
                 PRAGMA journal_mode = WAL;
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -283,12 +288,14 @@ class JobStore:
                     created_at TEXT NOT NULL
                 );
                 """
-            )
-            columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
-            }
-            if "runtime_run_id" not in columns:
-                connection.execute("ALTER TABLE jobs ADD COLUMN runtime_run_id TEXT")
+                    )
+                    columns = {
+                        row["name"] for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+                    }
+                    if "runtime_run_id" not in columns:
+                        connection.execute("ALTER TABLE jobs ADD COLUMN runtime_run_id TEXT")
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=30, isolation_level=None)

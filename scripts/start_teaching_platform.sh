@@ -12,6 +12,8 @@ RUNTIME_DB="${RUNTIME_DB:-$ROOT/var/public/runtime.db}"
 OPTIMIZATION_DB="${OPTIMIZATION_DB:-$ROOT/var/public/optimization.db}"
 
 python3 "$ROOT/scripts/teaching_platform_doctor.py"
+PLATFORM_DB="${PLATFORM_DB:-$ROOT/var/platform.db}" \
+  python3 -c 'from openroad_platform_scheduler import JobStore; import os; JobStore(os.environ["PLATFORM_DB"])'
 WORKER_COUNT="${WORKER_COUNT:-4}"
 if ! [[ "$WORKER_COUNT" =~ ^[1-9][0-9]*$ ]] || (( WORKER_COUNT > 16 )); then
   echo "WORKER_COUNT must be an integer from 1 to 16" >&2
@@ -22,14 +24,10 @@ for slot in $(seq 1 "$WORKER_COUNT"); do
   python3 "$ROOT/scripts/run_runtime_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
     --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --worker-slot "$slot" &
   worker_pids+=("$!")
-  # JobStore initializes the shared SQLite schema on first start. Give each
-  # process a short, bounded handoff so API/controller startup cannot race it.
-  sleep 1
 done
 python3 "$ROOT/scripts/run_dse_controller_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
   --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --optimization-db "$OPTIMIZATION_DB" &
 worker_pids+=("$!")
-sleep 1
 cleanup() {
   for pid in "${worker_pids[@]}"; do kill "$pid" 2>/dev/null || true; done
   for pid in "${worker_pids[@]}"; do wait "$pid" 2>/dev/null || true; done

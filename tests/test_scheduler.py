@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+
 from openroad_platform_contracts import RunRequest, RunStatus
 from openroad_platform_scheduler import JobStore
 
@@ -28,3 +32,12 @@ def test_queued_job_can_be_cancelled_without_worker(tmp_path):
     assert cancelled.status is RunStatus.CANCELLED
     assert [event["kind"] for event in store.events(job.id)] == ["submitted", "cancelled"]
 
+
+def test_concurrent_store_initialization_is_serialized(tmp_path):
+    db = tmp_path / "platform.db"
+    code = "from openroad_platform_scheduler import JobStore; JobStore(__import__('sys').argv[1])"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    processes = [subprocess.Popen([sys.executable, "-c", code, str(db)], env=env) for _ in range(16)]
+    assert all(process.wait(timeout=10) == 0 for process in processes)
+    assert JobStore(db).list() == []
