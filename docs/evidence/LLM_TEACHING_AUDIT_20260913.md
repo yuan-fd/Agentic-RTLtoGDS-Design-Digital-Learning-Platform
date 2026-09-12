@@ -21,6 +21,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed. The confirmed web upgrade route reuses Runtime and keeps MCP observations separate from formal evidence.
 - Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`).
 - Authenticated Playwright browser reached the teaching command-check endpoint and received an accepted guided Ibex action.
+- Environment doctor passes with server-managed OpenROAD, Yosys, Verilator, Icarus, ORFS and optimizer dependencies (`teaching_platform_doctor.py --json`).
 
 ## Partial or pending
 
