@@ -148,7 +148,7 @@
 
 #### Task 9：探索升级正式实验
 
-当前已提供 `POST /api/teaching/mcp/upgrade-plan` 生成 review-only 计划；确认后的 Runtime 提交和证据回链仍待完成。
+已提供 `POST /api/teaching/mcp/upgrade-plan` 生成 review-only 计划，以及要求 `confirm=true` 的 `POST /api/teaching/mcp/upgrade-run`。后者只允许服务器固定的 Ibex 参考设计，并复用现有 Runtime；正式端到端回链证据仍待验收。
 
 **验收标准**
 
