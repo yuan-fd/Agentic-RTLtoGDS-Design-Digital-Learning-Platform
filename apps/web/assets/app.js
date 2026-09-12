@@ -60,6 +60,15 @@ function parseExperimentIntent(text) {
     summary: ui(`Experiment plan: compare utilization at ${candidates.map(value => `${value}%`).join(", ")}. ${candidates.length > 6 ? "Only the first six candidates are kept." : "No run has started; review and confirm first."}`, `实验计划：比较利用率 ${candidates.map(value => `${value}%`).join("、")}。尚未启动任务，请先检查并确认。`),
   };
 }
+function parseCandidateValues() {
+  const raw = $("#candidateValues")?.value.trim();
+  if (!raw) return undefined;
+  const values = raw.split(/[,，\s]+/).filter(Boolean).map(Number);
+  if (values.length < 1 || values.length > 6 || values.some(value => !Number.isFinite(value) || value < 0.1 || value > 0.95)) {
+    throw new Error(ui("Candidate values must be 0.10–0.95, with at most 6 values.", "候选值必须在 0.10–0.95 之间，最多填写 6 个。"));
+  }
+  return values;
+}
 const ZH = {
   "nav.overview": "平台概览", "nav.frontend": "前端设计", "nav.backend": "后端实现",
   "nav.projects": "项目与结果", "nav.evolution": "自演化", "nav.tutorial": "使用教程",
@@ -1469,7 +1478,7 @@ async function submitFlow() {
     const result = dseMode === "bo_gp"
       ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
       : dseMode === "batch"
-      ? await post("/api/teaching/dse/batch", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module, platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk", candidate_count: Number($("#candidateCount")?.value || 3)})
+      ? await post("/api/teaching/dse/batch", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module, platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk", candidate_count: Number($("#candidateCount")?.value || 3), candidate_values: parseCandidateValues()})
       : await post("/api/craft/plans", {design_id: state.selectedDesign?.id, top: state.selectedDesign?.module,
       platform: $("#flowPdk")?.value || "nangate45", clock: $("#flowClock")?.value || "clk",
       teaching_mode: mode, teaching_context: context, execute: true});

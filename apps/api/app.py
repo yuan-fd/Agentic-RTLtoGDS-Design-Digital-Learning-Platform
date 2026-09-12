@@ -3970,6 +3970,15 @@ class ApiState:
         baseline_density = _number(payload, "place_density", 0.45)
         if not 0.1 <= baseline_density <= 0.95:
             raise ValueError("place_density must be between 0.1 and 0.95")
+        raw_values = payload.get("candidate_values")
+        candidate_values = None
+        if raw_values is not None:
+            if not isinstance(raw_values, list) or not raw_values or len(raw_values) > 6:
+                raise ValueError("candidate_values must contain between 1 and 6 values")
+            candidate_values = [round(float(value), 4) for value in raw_values]
+            if any(value < 0.1 or value > 0.95 for value in candidate_values):
+                raise ValueError("candidate_values must be between 0.1 and 0.95")
+            count = len(candidate_values)
         baseline_task = dataclasses.replace(template, task_id=f"{batch_id}-baseline",
             parameters={**template.parameters, "place_density": round(baseline_density, 4)},
             labels={**template.labels, "teaching_batch_id": batch_id,
@@ -3979,7 +3988,7 @@ class ApiState:
                                          include_legacy=include_legacy)
         for index in range(count):
             offset = (index - (count - 1) / 2) * 0.05
-            density = min(0.95, max(0.1, baseline_density + offset))
+            density = candidate_values[index] if candidate_values is not None else min(0.95, max(0.1, baseline_density + offset))
             task = dataclasses.replace(template, task_id=f"{batch_id}-{index + 1}",
                 parameters={**template.parameters, "place_density": round(density, 4)},
                 labels={**template.labels, "teaching_batch_id": batch_id,
@@ -3988,7 +3997,8 @@ class ApiState:
             run = self.runtime.submit(task, capability="eda.rtl_to_gds")
             runs.append(self.get_runtime_run(run.run_id, owner_id=owner_id,
                                              include_legacy=include_legacy))
-        return {"batch_id": batch_id, "candidate_count": count, "baseline": baseline, "runs": runs,
+        return {"batch_id": batch_id, "candidate_count": count, "candidate_values": candidate_values,
+                "baseline": baseline, "runs": runs,
                 "strategy": "rule_batch", "execution_started": False}
 
 
