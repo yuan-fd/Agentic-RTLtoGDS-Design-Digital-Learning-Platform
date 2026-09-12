@@ -106,3 +106,15 @@ is retained and labelled historical. Rollback: revert the correction commit.
   subsequent long Codex request with the same capacity response. It remains a
   partial real run, not a completed A2 acceptance; its Runtime database is
   preserved under `var/evidence/a2-orfo-single-feedback-20260912-real-r13/`.
+
+## Ibex teaching baseline
+
+- The lesson baseline action now submits a server-pinned `sky130hd/ibex`
+  reference through `/api/teaching/reference-baseline`, carrying the complete
+  RTL bundle, fixed SDC, source fingerprint, and ORFS commit.
+- A real Runtime run completed successfully with finish artifacts and parsed
+  evidence (area 155774, setup WNS -0.0469225, DRC errors 0). The evidence is
+  recorded in `docs/evidence/IBEX_TEACHING_RUNTIME_BASELINE_20260912.md`.
+- The baseline proves the Runtime path and evidence collection. The browser
+  dashboard still needs a connected run against the live web service, and the
+  second parameter-comparison run remains outstanding.
