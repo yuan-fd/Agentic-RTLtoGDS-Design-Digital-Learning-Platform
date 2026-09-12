@@ -1152,9 +1152,10 @@ function renderStageRail(values) {
 
 async function selectRun(id) {
   if (state.runtimePoll) clearTimeout(state.runtimePoll);
-  if (!id) return resetRunResult();
+  if (!id) { if ($("#assistantStatus")) $("#assistantStatus").textContent = ui("Ready", "就绪"); return resetRunResult(); }
   const detail = await api(`/api/runtime/runs/${encodeURIComponent(id)}`);
   state.selectedRun = detail;
+  if ($("#assistantStatus")) $("#assistantStatus").textContent = humanStatus(detail.run?.status || "queued");
   await loadRtlGeneratorComparison();
   const run = detail.run;
   const task = run.task_spec || {};
