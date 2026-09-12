@@ -148,6 +148,8 @@
 
 #### Task 9：探索升级正式实验
 
+当前已提供 `POST /api/teaching/mcp/upgrade-plan` 生成 review-only 计划；确认后的 Runtime 提交和证据回链仍待完成。
+
 **验收标准**
 
 - [ ] MCP 的状态修改建议先生成结构化计划。
