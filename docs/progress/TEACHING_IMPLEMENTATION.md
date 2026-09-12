@@ -89,3 +89,5 @@ is retained and labelled historical. Rollback: revert the correction commit.
   evidence-gated `eligible_for_review` state from observed Runtime status,
   successful terminal status, and evidence pointers. It never promotes data
   automatically or writes public knowledge.
+
+- A2 durable-controller replay acceptance fixed the native initializer capability registration and completed with `accepted: true`; evidence is under `docs/evidence/a2-controller-acceptance-20260912/` (SHA-256 `f857152247c6fa68572d8f46a2dd039dfd38c8f465b0f8bc477bb55e2ef2471a`). This validates protocol/controller invariants, not a new EDA campaign.
