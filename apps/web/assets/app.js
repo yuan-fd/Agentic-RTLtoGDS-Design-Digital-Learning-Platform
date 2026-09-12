@@ -355,6 +355,25 @@ async function askEdaAssistant() {
   }
 }
 
+async function runMcpQuery() {
+  const input = $("#mcpQueryInput");
+  const output = $("#mcpQueryResult");
+  const command = input?.value.trim();
+  if (!command || !output) return;
+  output.textContent = "正在查询 OpenROAD…";
+  try {
+    const result = await post("/api/teaching/mcp/query", {command});
+    const exploration = result.exploration || {};
+    output.textContent = JSON.stringify({
+      source: exploration.source || "openroad-mcp-stdio",
+      authority: result.authority,
+      result: exploration.result ?? exploration,
+    }, null, 2);
+  } catch (error) {
+    output.textContent = `查询未完成：${error.message}`;
+  }
+}
+
 function renderAuth() {
   const button = $("#accountButton");
   if (!button) {
@@ -2127,6 +2146,8 @@ $("#runSelect").addEventListener("change", event => selectRun(event.target.value
 $("#submitFlow").addEventListener("click", submitFlow);
 $("#assistantAsk")?.addEventListener("click", askEdaAssistant);
 $("#assistantPrompt")?.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") askEdaAssistant(); });
+$("#mcpQueryRun")?.addEventListener("click", runMcpQuery);
+$("#mcpQueryInput")?.addEventListener("keydown", event => { if (event.key === "Enter") runMcpQuery(); });
 $$('[data-assistant-prompt]').forEach(button => button.addEventListener("click", () => { const input = $("#assistantPrompt"); if (input) { input.value = button.dataset.assistantPrompt || ""; input.focus(); } }));
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
 $("#a2Start")?.addEventListener("click", startA2Session);

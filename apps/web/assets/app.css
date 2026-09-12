@@ -146,6 +146,11 @@ a { color: inherit; }
 .assistant-answer b { display: block; margin-bottom: 5px; color: var(--heading); }
 .assistant-answer p { margin: 4px 0; }
 .assistant-next { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--accent); font-weight: 600; }
+.mcp-explorer { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.mcp-explorer-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.mcp-explorer-head small { color: var(--muted); font-size: 11px; }
+.mcp-explorer input { min-height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 4px; font: 13px var(--mono); color: var(--ink); }
+.mcp-query-result { margin: 12px 0 0; max-height: 260px; overflow: auto; padding: 12px; border: 1px solid var(--line); background: #101820; color: #d7e3ef; font: 12px/1.5 var(--mono); white-space: pre-wrap; }
 @media (max-width: 640px) { .assistant-compose { grid-template-columns: 1fr; } .assistant-compose .button { justify-self: start; } }
 .demo-notice { min-height: 16px; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 

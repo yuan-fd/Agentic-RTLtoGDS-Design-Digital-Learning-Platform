@@ -282,6 +282,11 @@
             </div>
             <div class="assistant-compose"><textarea id="assistantPrompt" rows="3" maxlength="1000" placeholder="例如：我想比较利用率对时序的影响，应该先做什么？"></textarea><button class="button primary" id="assistantAsk" type="button">询问助手</button></div>
             <div class="assistant-response" id="assistantResponse" aria-live="polite"><div class="assistant-empty">选择一个问题，或输入你自己的问题。</div></div>
+            <div class="mcp-explorer">
+              <div class="mcp-explorer-head"><b>实时 OpenROAD 探索</b><small>只读查询，结果来自 MCP；不会创建正式实验，也不会写入证据。</small></div>
+              <div class="assistant-compose"><input id="mcpQueryInput" maxlength="500" value="report_design_area" placeholder="例如：report_design_area"><button class="button" id="mcpQueryRun" type="button">查询</button></div>
+              <pre class="mcp-query-result" id="mcpQueryResult" aria-live="polite">输入 report_*、get_* 或 check_* 查询，先观察当前 OpenROAD 状态。</pre>
+            </div>
           </div>
         </section>
 
