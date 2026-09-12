@@ -402,6 +402,29 @@ async function loadMcpHistory() {
   } catch (_) { node.textContent = ""; }
 }
 
+async function loadMcpImages() {
+  const list = $("#mcpImageList"); if (!list) return;
+  const base = {platform: $("#mcpImagePlatform")?.value.trim(), design: $("#mcpImageDesign")?.value.trim(), run_slug: $("#mcpImageRun")?.value.trim()};
+  list.textContent = "正在读取报告图…";
+  try {
+    const result = await post("/api/teaching/mcp/report-images", base);
+    const groups = result.exploration?.result?.images_by_stage || {};
+    const images = Object.values(groups).flat();
+    list.innerHTML = images.length ? images.map(item => `<button type="button" class="text-link mcp-image-item" data-image="${esc(item.filename)}">${esc(item.filename)}</button>`).join(" ") : "没有找到报告图";
+    $$(".mcp-image-item", list).forEach(button => button.addEventListener("click", () => readMcpImage(base, button.dataset.image)));
+  } catch (error) { list.textContent = `报告图读取失败：${error.message}`; }
+}
+async function readMcpImage(base, imageName) {
+  const preview = $("#mcpImagePreview"); if (!preview) return;
+  try {
+    const result = await post("/api/teaching/mcp/report-image", {...base, image_name: imageName, max_size_kb: 512});
+    const image = result.exploration?.images?.[0];
+    if (!image?.data) throw new Error("MCP 未返回可显示的图像数据");
+    const img = $("img", preview); img.src = `data:${image.mimeType || "image/webp"};base64,${image.data}`; preview.hidden = false;
+    $("figcaption", preview).textContent = `${imageName} · MCP 探索结果（非 Runtime 证据）`;
+  } catch (error) { message("#mcpQueryResult", error.message, true); }
+}
+
 function renderAuth() {
   const button = $("#accountButton");
   if (!button) {
@@ -2177,6 +2200,7 @@ $("#assistantAsk")?.addEventListener("click", askEdaAssistant);
 $("#assistantPrompt")?.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") askEdaAssistant(); });
 $("#mcpQueryRun")?.addEventListener("click", runMcpQuery);
 $("#mcpUpgradeRun")?.addEventListener("click", runMcpUpgrade);
+$("#mcpImagesList")?.addEventListener("click", loadMcpImages);
 $("#mcpQueryInput")?.addEventListener("keydown", event => { if (event.key === "Enter") runMcpQuery(); });
 $$('[data-assistant-prompt]').forEach(button => button.addEventListener("click", () => { const input = $("#assistantPrompt"); if (input) { input.value = button.dataset.assistantPrompt || ""; input.focus(); } }));
 $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);

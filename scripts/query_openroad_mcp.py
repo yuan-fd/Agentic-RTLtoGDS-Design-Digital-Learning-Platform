@@ -72,7 +72,10 @@ def query(repo: Path, command: str, timeout: float, *, tool: str = "interactive_
         content = response["result"].get("content") or []
         text = next((item.get("text") for item in content if isinstance(item, dict)
                      and isinstance(item.get("text"), str)), "")
+        images = [{"data": item.get("data"), "mimeType": item.get("mimeType")}
+                  for item in content if isinstance(item, dict) and isinstance(item.get("data"), str)]
         return {"status": "ok", "command": command, "tool": tool, "result": json.loads(text) if text else {},
+                **({"images": images} if images else {}),
                 "source": "openroad-mcp-stdio"}
     finally:
         selector.close()
