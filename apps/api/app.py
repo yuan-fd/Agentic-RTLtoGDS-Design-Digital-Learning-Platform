@@ -3316,6 +3316,28 @@ class ApiState:
             "authority": "Proposed Runtime plan; not executed and not evidence",
         }
 
+    def mcp_upgrade_run(self, payload: dict[str, Any], *, owner_id: str | None = None,
+                        include_legacy: bool = False) -> dict[str, Any]:
+        """Submit a confirmed, server-pinned Runtime experiment from MCP exploration."""
+        if payload.get("confirm") is not True:
+            raise ValueError("explicit confirm=true is required")
+        query_id = str(payload.get("query_id") or "").strip()
+        if not query_id:
+            raise ValueError("query_id is required")
+        # Only the existing pinned teaching reference is admitted here.  MCP
+        # never supplies filesystem paths or executable flow parameters.
+        run_payload = {"reference_design": "ibex", "platform": "sky130hd",
+                       "run_role": "comparison"}
+        if payload.get("place_density") is not None:
+            run_payload["place_density"] = payload["place_density"]
+        if payload.get("or_seed") is not None:
+            run_payload["or_seed"] = payload["or_seed"]
+        result = self.start_teaching_reference_baseline(
+            run_payload, owner_id=owner_id, include_legacy=include_legacy)
+        result["source_query_id"] = query_id
+        result["authority"] = "Confirmed Runtime submission; MCP observation remains separate"
+        return result
+
     def runtime_evidence_ir(self, run_id: str, *, owner_id: str | None = None,
                             include_legacy: bool = False) -> dict[str, Any]:
         view = self.get_runtime_run(run_id, owner_id=owner_id, include_legacy=include_legacy)
@@ -5598,6 +5620,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/teaching/mcp/upgrade-plan":
                     self._json(state.mcp_upgrade_plan(scoped(self._read_json())))
+                    return
+                if path == "/api/teaching/mcp/upgrade-run":
+                    self._json(state.mcp_upgrade_run(
+                        scoped(self._read_json()), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return
                 if path == "/api/teaching/reference-comparison":
                     payload = {**scoped(self._read_json()), "run_role": "comparison"}
