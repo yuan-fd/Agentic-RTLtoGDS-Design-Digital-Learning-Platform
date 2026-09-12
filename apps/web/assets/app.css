@@ -874,3 +874,4 @@ footer { min-height: 56px; padding: 14px 24px; display: flex; justify-content: s
   .optimization-row small { grid-column: 1 / -1; }
 }
 .campaign-details{display:grid;gap:.5rem;margin:.5rem 0}.campaign-detail-row{display:flex;gap:.75rem;align-items:baseline;flex-wrap:wrap;padding:.5rem .75rem;border:1px solid var(--line,#d9dee8);background:var(--surface,#fff)}.campaign-detail-row span{font-weight:600}.campaign-detail-row small{color:var(--muted,#667085)}
+.dse-comparison{display:grid;gap:.4rem;margin:.75rem 0}.dse-comparison-head{display:flex;gap:.75rem;align-items:baseline;flex-wrap:wrap}.dse-comparison-head span,.dse-comparison-row small{color:var(--muted,#667085)}.dse-comparison-row{display:grid;grid-template-columns:minmax(8rem,1fr) minmax(6rem,.8fr) minmax(8rem,1fr);gap:.75rem;padding:.45rem .75rem;border-bottom:1px solid var(--line,#d9dee8)}

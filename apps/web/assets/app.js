@@ -825,6 +825,17 @@ async function loadRuns(preferred = null) {
       }
       detailsBox.innerHTML = rows.join("");
     }
+    const compareBox = $("#dseComparison");
+    if (compareBox) {
+      const modes = [{key: "baseline", label: "Baseline"}, {key: "batch", label: "Rule Batch"}, {key: "bo_gp", label: "BO / GP"}, {key: "a2_orfo", label: "A2-ORFO"}];
+      const byKind = new Map(campaigns.map(item => [item.kind, item]));
+      compareBox.innerHTML = `<div class="dse-comparison-head"><b>${ui("DSE mode comparison", "DSE 模式比较")}</b><span>${ui("Only recorded Runtime evidence is shown.", "仅显示已记录的 Runtime 证据。")}</span></div>` + modes.map(mode => {
+        const item = byKind.get(mode.key === "bo_gp" ? "bo_gp" : mode.key);
+        const status = mode.key === "baseline" ? (state.runs.length ? "available" : "not run") : (item?.status || "not run");
+        const count = mode.key === "batch" ? `${item?.candidates || 0} candidates` : mode.key === "baseline" ? `${state.runs.filter(run => run.status === "succeeded").length} successful runs` : item ? "recorded" : "—";
+        return `<div class="dse-comparison-row"><b>${mode.label}</b><span>${esc(status)}</span><small>${esc(count)}</small></div>`;
+      }).join("");
+    }
     const a2 = campaignIndex?.a2;
     const a2Box = $("#a2Workbench");
     if (a2Box) {
