@@ -16,7 +16,7 @@ The score measures verified platform behavior, not planned features. It remains 
 - OpenROAD-MCP 1.1.0 stdio probe, bounded read-only query adapter, HTTP status/query/history endpoints.
 - MCP query history is user-scoped, persisted in SQLite, capped at 20 records, and expires after one hour.
 - Runtime and durable DSE worker startup, heartbeats, aggregate worker health, and standard startup script.
-- Full regression suite: 861 passed, 1 deselected.
+- Full regression suite: 863 passed, 1 deselected (2026-09-13).
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 - MCP upgrade-plan/upgrade-run ownership and explicit-confirmation regression: 2 tests passed; teaching/dashboard/API regression subset: 27 tests passed.
 - Bounded HTTP concurrency smoke accepted 8 simultaneous teaching users, with 8 isolated sessions and 8 observed runs (`scripts/run_teaching_http_concurrency_smoke.py`).
