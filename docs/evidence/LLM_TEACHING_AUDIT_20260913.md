@@ -2,7 +2,7 @@
 
 ## Current score
 
-**7.8 / 10 (implementation readiness)**
+**8.0 / 10 (implementation readiness)**
 
 The score measures verified platform behavior, not planned features. It remains reduced for missing browser end-to-end evidence, incomplete MCP image/session projection, and missing fresh multi-user load evidence.
 
