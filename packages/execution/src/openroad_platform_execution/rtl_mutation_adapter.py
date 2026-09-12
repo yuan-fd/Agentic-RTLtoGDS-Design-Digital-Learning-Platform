@@ -9,7 +9,7 @@ def _sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def _write(path,value): path.write_text(json.dumps(value,indent=2),encoding="utf-8")
 def _mutants(source, maximum):
     source_sha=hashlib.sha256(source.encode()).hexdigest(); rows=[]
-    for name, pattern, replacement in (("eq_to_ne",r"==(?!=)","!="),("ne_to_eq",r"!=","=="),("plus_to_minus",r"(?<!\+)\+(?!\+)","-"),("minus_to_plus",r"(?<!-)\-(?!-)","+"),("and_to_or",r"&&","||"),("or_to_and",r"\|\|","&&"),("zero_to_one",r"(?<![\w'])0(?![\w])","1"),("one_to_zero",r"(?<![\w'])1(?![\w])","0")):
+    for name, pattern, replacement in (("eq_to_ne",r"==(?!=)","!="),("ne_to_eq",r"!=","=="),("plus_to_minus",r"(?<!\+)\+(?!\+)","-"),("minus_to_plus",r"(?<!-)\-(?!-)","+"),("and_to_or",r"&&","||"),("or_to_and",r"\|\|","&&"),("bitand_to_bitor",r"(?<!&)&(?!&)","|"),("bitor_to_bitand",r"(?<!\|)\|(?!\|)","&"),("zero_to_one",r"(?<![\w'])0(?![\w])","1"),("one_to_zero",r"(?<![\w'])1(?![\w])","0")):
         for match in re.finditer(pattern,source):
             mutated=source[:match.start()]+replacement+source[match.end():]; digest=hashlib.sha256(mutated.encode()).hexdigest(); rows.append({"mutation_id":f"mut-{hashlib.sha256(f'{source_sha}:{name}:{match.start()}:{digest}'.encode()).hexdigest()[:20]}","operator":name,"source_sha256":source_sha,"mutated_source":mutated,"mutated_source_sha256":digest,"location":match.start()})
             if len(rows)>=maximum:return rows
