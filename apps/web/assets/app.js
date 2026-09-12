@@ -1386,7 +1386,10 @@ async function a2Action(action, payload = {}) {
   try {
     const result = await post(`/api/teaching/sessions/${encodeURIComponent(state.workbenchSessionId)}/${action}`, payload);
     if (result.pipeline_id) $("#a2Pipeline").value = result.pipeline_id;
-    message("#a2Message", ui(`A2 session updated: ${action}.`, `A2 Session 已更新：${action}。`));
+    if (result.campaigns?.length) {
+      const latest = result.campaigns.at(-1); const state = latest.state || {};
+      message("#a2Message", ui(`A2 ${latest.pipeline_id}: ${state.status || latest.status || "updated"} · ${state.round || 0} rounds`, `A2 ${latest.pipeline_id}：${state.status || latest.status || "已更新"} · ${state.round || 0} 轮`));
+    } else message("#a2Message", ui(`A2 session updated: ${action}.`, `A2 Session 已更新：${action}。`));
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
     $("#a2Advance").disabled = !$("#a2Pipeline").value;
     return result;
