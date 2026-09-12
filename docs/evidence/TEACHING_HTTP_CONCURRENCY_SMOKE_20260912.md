@@ -25,5 +25,7 @@ Observed result:
 ```
 
 This proves the HTTP/Session/Runtime smoke boundary for eight simultaneous
-users. It uses the bounded smoke backend and therefore does not claim that
-eight real EDA campaigns can complete concurrently.
+clients in one isolated local workspace. It does not exercise separate account
+credentials or owner isolation, and it uses the bounded smoke backend; it
+therefore does not claim that eight real EDA campaigns can complete
+concurrently.

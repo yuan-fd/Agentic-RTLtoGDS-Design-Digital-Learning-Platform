@@ -44,9 +44,10 @@ incomplete.
    state with the pinned 12-D protocol and protected evaluator.
 2. Run a fresh Direct LLM and RTLScout pair from one frozen SpecIR and
    verification package, then compare measured QoR in the shared read model.
-3. Exercise the configured Web server with multiple owner-scoped sessions and
-   record a bounded 5–10-user concurrency result. The current smoke proves 8
-   concurrent Session creation, L1 execution requests, and `observed` terminal
-   snapshots on the smoke backend; a real EDA load result is still required.
+3. Exercise the configured Web server with multiple authenticated,
+   owner-scoped sessions and record a bounded 5–10-user concurrency result.
+   The current smoke proves 8 concurrent Session creation, L1 execution
+   requests, and `observed` terminal snapshots in one isolated local workspace;
+   a credential-separated EDA load result is still required.
 4. Update this scorecard only from those new evidence records; do not promote
    replay or historical artifacts into current capability claims.
