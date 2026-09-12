@@ -22,6 +22,12 @@ The server returned protocol version `2025-03-26`, server name `openroad-mcp`,
 version `1.1.0`, and the expected interactive session, ORFS metrics, report
 image, and flow-run tools.
 
+The repository now includes `scripts/probe_openroad_mcp.py`, a read-only
+repeatable probe. Running it against the pinned local checkout returned
+`status=ok`, protocol `2025-06-18`, and 15 tools in 0.545 seconds. It uses
+`npx --no-install` when no local build is supplied, so it never downloads a
+package as part of a platform check.
+
 ## Integration decision
 
 This proves that the official server can run on the platform host, but it does
