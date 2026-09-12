@@ -91,3 +91,12 @@ is retained and labelled historical. Rollback: revert the correction commit.
   automatically or writes public knowledge.
 
 - A2 durable-controller replay acceptance fixed the native initializer capability registration and completed with `accepted: true`; evidence is under `docs/evidence/a2-controller-acceptance-20260912/` (SHA-256 `f857152247c6fa68572d8f46a2dd039dfd38c8f465b0f8bc477bb55e2ef2471a`). This validates protocol/controller invariants, not a new EDA campaign.
+
+- The first fresh A2 single-feedback bounded acceptance (`real-r4`) reached the
+  real ORFS observation stage but failed in the platform-managed Codex policy
+  provider because the selected model was at capacity. This is recorded in
+  `var/evidence/a2-orfo-single-feedback-20260912-real-r4/runtime.sqlite` and
+  is not counted as a successful A2 campaign. The valid historical checkpoint
+  for a retry is the r3 handoff state (`pipeline-ef2fd9f80e8940a1b796a68de5af9916`),
+  which contains 75 measured observations; the r2 checkpoint contains none and
+  must not be used as the historical dataset.
