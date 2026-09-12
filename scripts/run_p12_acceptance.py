@@ -41,13 +41,18 @@ def main() -> int:
     provider = CodexCliSpecProvider(model=args.model, timeout_seconds=240)
     manager = SpecConversationManager(spec_store, provider)
     session = manager.create(message=(
-        "设计一个纯组合二输入与门：顶层模块必须叫 and2，输入为 a、b，输出为 y，"
-        "功能为 y=a&b。目标 Nangate45，运行完整 OpenROAD 流程并生成 GDS。"
+        "设计一个纯组合二输入与门：顶层模块必须叫 and2，输入为 1 位 a、1 位 b，"
+        "输出为 1 位 y，功能为 y=a&b。目标 Nangate45，运行完整 OpenROAD 流程并生成 GDS。"
     ))
     _write(output / "spec_session.json", session)
     proposal = session["state"]
-    if not proposal["ready_for_execution"] or not proposal.get("rtl_source"):
+    if not proposal["ready_for_execution"]:
         raise RuntimeError(f"Codex proposal still requires clarification: {proposal}")
+    if not proposal.get("rtl_source"):
+        raise RuntimeError(
+            "P12 acceptance requires the v2 RTLScout path: SpecIR is ready, "
+            "but direct Spec-to-RTL compilation is retired."
+        )
     rtl = output / "and2.v"
     rtl.write_text(proposal["rtl_source"] + "\n", encoding="utf-8")
     task = manager.compile(
