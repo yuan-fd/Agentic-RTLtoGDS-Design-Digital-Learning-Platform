@@ -5137,6 +5137,10 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         owner_id=list_owner,
                         include_legacy=session.legacy_access or developer_all,
                     ))
+                elif path == "/api/teaching/sessions":
+                    if state.teaching_sessions is None:
+                        raise ValueError("Teaching workbench is not configured")
+                    self._json({"sessions": state.teaching_sessions.list(session.user_id)})
                 elif (match := re.fullmatch(r"/api/teaching/dse/campaigns/([^/]+)", path)):
                     self._json(state.teaching_campaign_detail(
                         unquote(match.group(1)), owner_id=direct_owner,

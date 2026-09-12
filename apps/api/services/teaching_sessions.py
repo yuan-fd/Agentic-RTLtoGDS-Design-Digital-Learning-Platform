@@ -20,6 +20,10 @@ class TeachingSessions:
         self.authorize(sid, owner_id)
         return self.workbench.snapshot(sid)
 
+    def list(self, owner_id):
+        return [self.workbench.snapshot(sid)
+                for sid in self.auth.resources_owned("teaching_session", owner_id)]
+
     def act(self, sid, action, payload, owner_id):
         self.authorize(sid, owner_id)
         svc = self.workbench

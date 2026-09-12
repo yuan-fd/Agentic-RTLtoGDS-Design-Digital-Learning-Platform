@@ -248,6 +248,15 @@ class AuthStore:
             ).fetchone()
         return str(row[0]) if row is not None else None
 
+    def resources_owned(self, resource_type: str, user_id: str) -> list[str]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT resource_id FROM web_resource_owners_v1
+                   WHERE resource_type = ? AND user_id = ? ORDER BY created_at DESC""",
+                (resource_type, user_id),
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
     def has_user(self, user_id: str) -> bool:
         with self._connect() as connection:
             row = connection.execute(

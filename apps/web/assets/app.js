@@ -838,6 +838,16 @@ async function loadRuns(preferred = null) {
         return `<div class="dse-comparison-row"><b>${mode.label}</b><span>${esc(status)}</span><small>${esc(count)}</small></div>`;
       }).join("");
     }
+    const historyBox = $("#teachingHistory");
+    if (historyBox) {
+      try {
+        const history = (await api("/api/teaching/sessions")).sessions || [];
+        historyBox.innerHTML = `<div class="dse-comparison-head"><b>${ui("My teaching history", "我的教学历史")}</b><span>${history.length} sessions</span></div>` + (history.slice(0, 6).map(item => {
+          const evidence = item.state?.evidence?.length || 0;
+          return `<div class="campaign-detail-row"><b>${esc(item.teaching_mode || "guided")}</b><span>${esc(item.session?.status || "unknown")}</span><small>${esc(item.session?.session_id || "")} · ${evidence} evidence pointers</small></div>`;
+        }).join("") || `<div class="empty-row">${ui("No teaching sessions yet.", "尚无教学 Session。")}</div>`);
+      } catch (_) { historyBox.innerHTML = ""; }
+    }
     const a2 = campaignIndex?.a2;
     const a2Box = $("#a2Workbench");
     if (a2Box) {
