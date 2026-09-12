@@ -69,6 +69,15 @@ function parseCandidateValues() {
   }
   return values;
 }
+function renderBatchPlanReview() {
+  const root = $("#batchPlanReview"); if (!root) return;
+  const raw = $("#candidateValues")?.value.trim();
+  const values = raw ? raw.split(/[,，\s]+/).filter(Boolean).map(Number).filter(Number.isFinite) : [];
+  const count = Math.min(6, Math.max(1, Number($("#candidateCount")?.value || 3)));
+  const baseline = Number($("#openDensity")?.value || 0.45);
+  const planned = values.length ? values.slice(0, 6) : Array.from({length: count}, (_, index) => Math.min(.95, Math.max(.1, baseline + (index - (count - 1) / 2) * .05)));
+  root.innerHTML = `<b>批量实验预览</b><span>Baseline：${baseline.toFixed(2)} · 候选：${planned.map(value => value.toFixed(2)).join("、")} · 共 ${planned.length} 组</span>`;
+}
 const ZH = {
   "nav.overview": "平台概览", "nav.frontend": "前端设计", "nav.backend": "后端实现",
   "nav.projects": "项目与结果", "nav.evolution": "自演化", "nav.tutorial": "使用教程",
@@ -2049,6 +2058,10 @@ $("#a2RunCandidate")?.addEventListener("click", () => a2Action("candidates", {pr
 $("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
 $("#dseMode")?.addEventListener("change", updateTeachingMode);
+$("#candidateValues")?.addEventListener("input", renderBatchPlanReview);
+$("#candidateCount")?.addEventListener("input", renderBatchPlanReview);
+$("#openDensity")?.addEventListener("input", renderBatchPlanReview);
+renderBatchPlanReview();
 updateTeachingMode();
 // The v2 product has one implementation entry: the autonomous BO/GP loop.
 $$('[data-locale]').forEach(button => button.addEventListener("click", () => { applyLocale(button.dataset.locale); if (!state.selectedRun) renderStageRail(new Map()); }));

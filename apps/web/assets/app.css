@@ -539,6 +539,9 @@ footer { min-height: 56px; padding: 14px 24px; display: flex; justify-content: s
 .spec-review pre:empty { display: none; }
 .spec-review-actions { display: flex; gap: 8px; margin-top: 10px; }
 .batch-plan-review { display: grid; gap: 12px; }
+.batch-plan-review b, .batch-plan-review span { display: block; }
+.batch-plan-review b { color: var(--heading); font-size: 12px; }
+.batch-plan-review span { color: var(--muted); font-size: 12px; }
 .batch-candidate { display: grid; grid-template-columns: 42px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .batch-candidate:last-child { border-bottom: 0; }
 .batch-candidate span { color: var(--muted); font-size: 12px; }
