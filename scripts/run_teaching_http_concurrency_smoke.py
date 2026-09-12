@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -65,13 +66,23 @@ def main() -> int:
                     base, f"/api/teaching/sessions/{sid}/execute",
                     {"decision_summary": "bounded concurrency smoke"}), ids))
                 snapshots = list(pool.map(lambda sid: get(base, sid), ids))
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline and any(
+                (item.get("state") or {}).get("status") not in {"observed", "failed"}
+                for item in snapshots
+            ):
+                time.sleep(0.2)
+                snapshots = [get(base, sid) for sid in ids]
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=5)
     if (len(set(ids)) != 8 or
             any((item.get("session") or {}).get("session_id") not in ids for item in snapshots)):
         raise RuntimeError("teaching HTTP concurrency smoke returned inconsistent sessions")
+    observed = sum((item.get("state") or {}).get("status") == "observed" for item in snapshots)
+    if observed != 8:
+        raise RuntimeError(f"teaching HTTP concurrency smoke did not observe all runs: {observed}/8")
     print(json.dumps({"accepted": True, "concurrent_sessions": 8,
-                      "snapshot_reads": len(snapshots),
+                      "snapshot_reads": len(snapshots), "observed_runs": observed,
                       "execute_responses": len(prepared)}, sort_keys=True))
     return 0
 
