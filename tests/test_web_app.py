@@ -97,6 +97,29 @@ def test_mcp_history_is_owner_scoped_and_expires(tmp_path):
     assert state.mcp_history("alice")["records"] == []
 
 
+def test_mcp_upgrade_plan_is_owner_scoped_and_upgrade_run_requires_confirmation(tmp_path, monkeypatch):
+    state = make_state(tmp_path)
+    import sqlite3
+    with sqlite3.connect(state._mcp_history_db) as connection:
+        connection.execute(
+            "INSERT INTO mcp_queries VALUES (?,?,?,?,?)",
+            ("q1", "alice", "report_checks", json.dumps({"status": "ok"}),
+             "2099-01-01T00:00:00+00:00"),
+        )
+    with pytest.raises(ValueError, match="not found"):
+        state.mcp_upgrade_plan({"owner_id": "bob", "query_id": "q1"})
+    plan = state.mcp_upgrade_plan({"owner_id": "alice", "query_id": "q1"})
+    assert plan["status"] == "review_required"
+    assert plan["plan"]["plugin_id"] == "orfs"
+    with pytest.raises(ValueError, match="confirm=true"):
+        state.mcp_upgrade_run({"query_id": "q1"}, owner_id="alice")
+    called = {}
+    monkeypatch.setattr(state, "start_teaching_reference_baseline", lambda payload, **kwargs: called.update(payload) or {"run": {}})
+    result = state.mcp_upgrade_run({"query_id": "q1", "confirm": True, "place_density": 0.6}, owner_id="alice")
+    assert called == {"reference_design": "ibex", "platform": "sky130hd", "run_role": "comparison", "place_density": 0.6}
+    assert result["source_query_id"] == "q1"
+
+
 
 
 
