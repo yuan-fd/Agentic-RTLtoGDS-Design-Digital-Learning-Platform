@@ -44,3 +44,8 @@ The next acceptance slice is an authenticated, owner-scoped adapter probe for
 read-only version/report queries and report-image projection. It must use a
 server-pinned MCP build, an isolated workspace, bounded Session lifetime, and
 must not expose `run_orfs_stage` directly.
+
+The first web slice is now live: an authenticated user calling
+`GET /api/teaching/mcp/status` receives the server-owned build identity,
+protocol version, and 15-tool list. The endpoint only runs the read-only probe;
+it accepts no command, path, or executable from the browser.
