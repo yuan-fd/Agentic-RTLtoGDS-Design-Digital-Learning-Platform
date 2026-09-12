@@ -60,6 +60,20 @@ def test_health_reports_only_a_fresh_live_runtime_worker(tmp_path):
     assert health["runtime_worker_status"] == "idle"
 
 
+def test_health_aggregates_slot_runtime_worker_heartbeat(tmp_path):
+    state = make_state(tmp_path)
+    (tmp_path / "runtime-worker-1.heartbeat.json").write_text(json.dumps({
+        "pid": os.getpid(), "status": "running", "active_run": "run-slot-1",
+        "updated_at": "now", "updated_at_epoch": time.time(),
+    }))
+
+    health = state.health()
+
+    assert health["runtime_worker_ready"] is True
+    assert health["runtime_worker_status"] == "running"
+    assert health["runtime_worker_active_run"] == "run-slot-1"
+
+
 def test_health_reports_fresh_durable_dse_controller(tmp_path):
     state = make_state(tmp_path)
     (tmp_path / "dse-controller.heartbeat.json").write_text(json.dumps({
