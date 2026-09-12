@@ -1401,12 +1401,14 @@ async function a2Action(action, payload = {}) {
   if (!state.workbenchSessionId) return message("#a2Message", ui("Start an L1 session first.", "请先启动 L1 Session。"), true);
   try {
     const result = await post(`/api/teaching/sessions/${encodeURIComponent(state.workbenchSessionId)}/${action}`, payload);
-    if (result.pipeline_id) $("#a2Pipeline").value = result.pipeline_id;
-    if (result.campaigns?.length) {
-      const latest = result.campaigns.at(-1); const state = latest.state || {};
-      message("#a2Message", ui(`A2 ${latest.pipeline_id}: ${state.status || latest.status || "updated"} · ${state.round || 0} rounds`, `A2 ${latest.pipeline_id}：${state.status || latest.status || "已更新"} · ${state.round || 0} 轮`));
+    const latest = result.campaigns?.at(-1);
+    if (result.pipeline_id || latest?.pipeline_id) $("#a2Pipeline").value = result.pipeline_id || latest.pipeline_id;
+    if (latest) {
+      const checkpointState = latest.state || {};
+      message("#a2Message", ui(`A2 ${latest.pipeline_id}: ${checkpointState.status || latest.status || "updated"} · ${checkpointState.feedback_step || checkpointState.round || 0} rounds`, `A2 ${latest.pipeline_id}：${checkpointState.status || latest.status || "已更新"} · ${checkpointState.feedback_step || checkpointState.round || 0} 轮`));
     } else message("#a2Message", ui(`A2 session updated: ${action}.`, `A2 Session 已更新：${action}。`));
     $("#a2Execute").disabled = false; $("#a2Escalate").disabled = false;
+    $("#a2Configure").disabled = !$("#a2Pipeline").value;
     $("#a2Advance").disabled = !$("#a2Pipeline").value;
     return result;
   } catch (error) { message("#a2Message", error.message, true); }
@@ -1908,6 +1910,7 @@ $("#copyOpenRun")?.addEventListener("click", copySelectedRunToOpen);
 $("#a2Start")?.addEventListener("click", startA2Session);
 $("#a2Execute")?.addEventListener("click", () => a2Action("execute", {decision_summary: "Student confirmed the approved L1 baseline step."}));
 $("#a2Escalate")?.addEventListener("click", () => a2Action("l2-escalate", {decision_summary: "Student reviewed the recorded L1 evidence and requests A2."}));
+$("#a2Configure")?.addEventListener("click", () => a2Action("l2-configure", {pipeline_id: $("#a2Pipeline").value, objective: "ECP"}));
 $("#a2Advance")?.addEventListener("click", () => a2Action("l2-advance", {pipeline_id: $("#a2Pipeline").value}));
 $("#a2Answer")?.addEventListener("click", saveA2Answers);
 $("#teachingMode")?.addEventListener("change", updateTeachingMode);
