@@ -55,6 +55,15 @@ def main() -> int:
                     range(8),
                 ))
                 ids = [item["session"]["session_id"] for item in created]
+                def prepare(sid: str, item: dict) -> dict:
+                    questions = (item.get("draft") or {}).get("questions") or []
+                    answers = [{"question_id": q["question_id"], "field": q["field"],
+                                "value": "bounded concurrency smoke"} for q in questions]
+                    return post(base, f"/api/teaching/sessions/{sid}/answers", {"answers": answers})
+                prepared = list(pool.map(lambda pair: prepare(pair[0], pair[1]), zip(ids, created)))
+                list(pool.map(lambda sid: post(
+                    base, f"/api/teaching/sessions/{sid}/execute",
+                    {"decision_summary": "bounded concurrency smoke"}), ids))
                 snapshots = list(pool.map(lambda sid: get(base, sid), ids))
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=5)
@@ -62,7 +71,8 @@ def main() -> int:
             any((item.get("session") or {}).get("session_id") not in ids for item in snapshots)):
         raise RuntimeError("teaching HTTP concurrency smoke returned inconsistent sessions")
     print(json.dumps({"accepted": True, "concurrent_sessions": 8,
-                      "snapshot_reads": len(snapshots)}, sort_keys=True))
+                      "snapshot_reads": len(snapshots),
+                      "execute_responses": len(prepared)}, sort_keys=True))
     return 0
 
 
