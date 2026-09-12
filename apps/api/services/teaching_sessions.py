@@ -24,6 +24,26 @@ class TeachingSessions:
         return [self.workbench.snapshot(sid)
                 for sid in self.auth.resources_owned("teaching_session", owner_id)]
 
+    def learning(self, sid, owner_id):
+        view = self.get(sid, owner_id)
+        state = view.get("state") or {}
+        evidence = state.get("evidence") or []
+        runtime = view.get("runtime") or {}
+        run = runtime.get("run") or {}
+        observed = state.get("status") == "observed"
+        succeeded = run.get("status") == "succeeded"
+        return {
+            "session_id": sid,
+            "evidence_count": len(evidence),
+            "promotion": {
+                "status": "eligible_for_review" if observed and succeeded and evidence else "not_eligible",
+                "requirements": {"observed_runtime": observed,
+                                  "successful_runtime": succeeded,
+                                  "evidence_pointer": bool(evidence)},
+                "authority": "Runtime evidence and teaching Session snapshot",
+            },
+        }
+
     def act(self, sid, action, payload, owner_id):
         self.authorize(sid, owner_id)
         svc = self.workbench

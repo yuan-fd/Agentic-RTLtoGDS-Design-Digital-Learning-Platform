@@ -41,3 +41,13 @@ def test_teaching_campaign_detail_projects_runtime_batch_roles():
     assert detail["kind"] == "batch" and detail["status"] == "running"
     assert [item["run_id"] for item in detail["baseline"]] == ["b"]
     assert [item["run_id"] for item in detail["candidates"]] == ["c"]
+
+
+def test_teaching_learning_projection_requires_runtime_evidence():
+    from apps.api.services.teaching_sessions import TeachingSessions
+    service = TeachingSessions(None, None)
+    service.get = lambda sid, owner: {"state": {"status": "observed", "evidence": [{"ref": "run:x"}]}, "runtime": {"run": {"status": "succeeded"}}}
+    result = service.learning("s1", "u1")
+    assert result["promotion"]["status"] == "eligible_for_review"
+    service.get = lambda sid, owner: {"state": {"status": "observed", "evidence": []}, "runtime": {"run": {"status": "succeeded"}}}
+    assert service.learning("s1", "u1")["promotion"]["status"] == "not_eligible"

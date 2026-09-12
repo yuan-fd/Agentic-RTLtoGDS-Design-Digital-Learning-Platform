@@ -5150,6 +5150,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                         raise ValueError("Teaching workbench is not configured")
                     self._json(state.teaching_sessions.get(
                         unquote(match.group(1)), session.user_id))
+                elif (match := re.fullmatch(r"/api/teaching/sessions/([^/]+)/learning", path)):
+                    if state.teaching_sessions is None:
+                        raise ValueError("Teaching workbench is not configured")
+                    self._json(state.teaching_sessions.learning(
+                        unquote(match.group(1)), session.user_id))
                 elif re.fullmatch(r"/api/runtime/runs/[^/]+/artifacts/[^/]+/excerpt", path):
                     parts = path.split("/")
                     values = parse_qs(parsed.query)
