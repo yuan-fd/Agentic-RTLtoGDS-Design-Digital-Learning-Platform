@@ -3949,6 +3949,69 @@ class ApiState:
                                                      include_legacy=include_legacy)
         return result
 
+    def start_teaching_reference_baseline(self, payload: dict[str, Any], *,
+                                          owner_id: str | None = None,
+                                          include_legacy: bool = False) -> dict[str, Any]:
+        """Submit one server-pinned reference design through the teaching Runtime.
+
+        The browser selects a reference name, never a filesystem path.  The
+        reference loader supplies the complete RTL bundle, fixed constraints,
+        and provenance so the lesson baseline is reproducible.
+        """
+        from openroad_platform_execution import load_orfs_reference_design
+
+        design_name = str(payload.get("reference_design") or "ibex").strip()
+        platform = str(payload.get("platform") or "sky130hd").strip()
+        if design_name != "ibex" or platform != "sky130hd":
+            raise ValueError("teaching baseline only admits the pinned sky130hd/ibex reference")
+        reference = load_orfs_reference_design(
+            self.orfs_root, platform=platform, design=design_name,
+        )
+        overrides = dict(reference.native_baseline_overrides)
+        task = build_orfs_task(
+            next(path for path in reference.rtl_files if path.stem == reference.top),
+            project_id="openroad-platform",
+            design_id=f"orfs-ref-{reference.platform}-{reference.design}-{reference.source_fingerprint[:12]}",
+            top=reference.top,
+            clock=reference.clock,
+            platform_name=reference.platform,
+            target_stage="finish",
+            clock_period_ns=reference.clock_period_ns,
+            core_utilization_pct=float(overrides.get("core_utilization_pct", 50)),
+            place_density=float(overrides.get("place_density", .55)),
+            or_seed=int(payload.get("or_seed") or 101),
+            stage_timeout_seconds=3600,
+            timeout_seconds=7200,
+            flow_parameters=overrides,
+            labels={
+                "teaching_mode": "guided",
+                "teaching_reference_baseline": "true",
+                "reference_design": reference.design,
+                "design_bundle_sha256": reference.source_fingerprint,
+                "orfs_commit": reference.orfs_commit,
+                **({"owner_id": owner_id} if owner_id else {}),
+            },
+            rtl_files=reference.rtl_files,
+            rtl_root=reference.rtl_root,
+            rtl_include_dirs=reference.include_dirs,
+            synth_hdl_frontend=reference.synth_hdl_frontend,
+            design_options=dict(reference.design_options),
+            sdc_path=reference.sdc_path,
+        )
+        run = self.runtime.submit(task, capability="eda.rtl_to_gds")
+        return {
+            "run": self.get_runtime_run(run.run_id, owner_id=owner_id,
+                                         include_legacy=include_legacy),
+            "reference_design": reference.design,
+            "platform": reference.platform,
+            "top": reference.top,
+            "design_bundle_sha256": reference.source_fingerprint,
+            "orfs_commit": reference.orfs_commit,
+            "parameters": overrides,
+            "execution_started": False,
+            "authority": "server-pinned reference and Runtime-backed outcomes",
+        }
+
     def start_rule_batch(self, payload: dict[str, Any], *, owner_id: str | None = None,
                          include_legacy: bool = False) -> dict[str, Any]:
         raw_count = payload.get("candidate_count")
@@ -5383,6 +5446,11 @@ def make_handler(state: ApiState) -> type[BaseHTTPRequestHandler]:
                     return
                 if path == "/api/teaching/dse/batch":
                     self._json(state.start_rule_batch(
+                        scoped(self._read_json()), owner_id=session.user_id,
+                        include_legacy=session.legacy_access), HTTPStatus.CREATED)
+                    return
+                if path == "/api/teaching/reference-baseline":
+                    self._json(state.start_teaching_reference_baseline(
                         scoped(self._read_json()), owner_id=session.user_id,
                         include_legacy=session.legacy_access), HTTPStatus.CREATED)
                     return

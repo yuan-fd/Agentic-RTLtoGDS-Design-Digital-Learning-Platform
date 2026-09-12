@@ -36,12 +36,16 @@ function renderIbexLesson(index = ibexLessonIndex) {
       const result = await post("/api/teaching/command-check", {command: input, lesson: ibexLessonIndex});
       if (result.accepted) {
         $("#lessonMessage").classList.remove("error");
-        $("#lessonMessage").innerHTML = `命令结构符合这一步的练习要求。<button class="text-link" type="button" id="lessonUseAction">打开受控操作 →</button>`;
+        const actionLabel = result.action === "run_baseline" ? "运行固定 Ibex baseline →" : "打开受控操作 →";
+        $("#lessonMessage").innerHTML = `命令结构符合这一步的练习要求。<button class="text-link" type="button" id="lessonUseAction">${actionLabel}</button>`;
         $("#lessonUseAction").addEventListener("click", () => {
+          if (result.action === "run_baseline") {
+            startIbexReferenceBaseline();
+            return;
+          }
           route("backend");
           setTimeout(() => {
-            if (result.action === "run_baseline") { $("#dseMode").value = "baseline"; $("#submitFlow")?.focus(); }
-            else if (result.action === "run_single_parameter_comparison") { $("#dseMode").value = "batch"; $("#submitFlow")?.focus(); }
+            if (result.action === "run_single_parameter_comparison") { $("#dseMode").value = "batch"; $("#submitFlow")?.focus(); }
             else $("#assistantPrompt").value = `请解释课程动作：${result.action}`;
           }, 0);
         });
@@ -56,6 +60,25 @@ function renderIbexLesson(index = ibexLessonIndex) {
   });
   $("#lessonAnswer").addEventListener("click", () => message("#lessonMessage", `参考命令：${lesson.command}`));
   $("#lessonNext").addEventListener("click", () => renderIbexLesson((ibexLessonIndex + 1) % IBEX_LESSONS.length));
+}
+
+async function startIbexReferenceBaseline() {
+  const target = $("#lessonMessage");
+  if (target) message("#lessonMessage", "正在提交固定 Ibex baseline 到 Runtime……");
+  try {
+    const result = await post("/api/teaching/reference-baseline", {
+      reference_design: "ibex", platform: "sky130hd",
+    });
+    const runId = result.run?.run?.run_id;
+    if (runId) {
+      await loadRuns();
+      await selectRun(runId);
+    }
+    route("backend");
+    message("#flowMessage", `固定 Ibex baseline 已提交（${runId || "等待 Runtime"}）。页面会显示真实阶段、日志和报告。`);
+  } catch (error) {
+    message("#lessonMessage", error.message, true);
+  }
 }
 
 function explainReportEvidence(metrics, failure) {
