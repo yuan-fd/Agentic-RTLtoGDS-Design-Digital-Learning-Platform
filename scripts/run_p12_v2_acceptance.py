@@ -29,6 +29,10 @@ def main() -> int:
         "message": "Design a pure combinational two-input AND gate named and2 with 1-bit inputs a and b and 1-bit output y, y=a&b, target nangate45."
     })
     (output / "spec_session.json").write_text(json.dumps(session, indent=2), encoding="utf-8")
+    if not session["state"].get("ready_for_execution"):
+        session = state.add_spec_turn(session["session_id"], {
+            "message": "Target the finish stage; confirm the complete flow through GDS generation."
+        })
     frozen = state.materialize_specir(session["session_id"], {"confirmed": True})
     spec_id = frozen["spec"]["spec_id"]
     (output / "specir.json").write_text(json.dumps(frozen, indent=2), encoding="utf-8")
