@@ -2,9 +2,9 @@
 
 ## Current score
 
-**7.4 / 10 (implementation readiness)**
+**7.8 / 10 (implementation readiness)**
 
-The score measures verified platform behavior, not planned features. It is deliberately reduced for missing browser end-to-end evidence, incomplete MCP image/session projection, and the unresolved provider-dependent P12 promotion.
+The score measures verified platform behavior, not planned features. It remains reduced for missing browser end-to-end evidence, incomplete MCP image/session projection, and missing fresh multi-user load evidence.
 
 ## Verified
 
@@ -12,10 +12,11 @@ The score measures verified platform behavior, not planned features. It is delib
 - Ibex teaching steps, command checking, report explanation, and controlled experiment planning.
 - Real Ibex ORFS baseline and controlled place-density comparison with recorded QoR evidence.
 - RTLScout-v2 path with independent verification oracle, Runtime-backed candidate, lint and simulation evidence.
+- Bounded RTLScout → mutation → ORFS → GDS promotion for `nangate45/and2`, with final GDS/ODB/DEF/netlist, area, timing, power and zero-DRC evidence.
 - OpenROAD-MCP 1.1.0 stdio probe, bounded read-only query adapter, HTTP status/query/history endpoints.
 - MCP query history is user-scoped, persisted in SQLite, capped at 20 records, and expires after one hour.
 - Runtime and durable DSE worker startup, heartbeats, aggregate worker health, and standard startup script.
-- Full regression suite: 858 passed, 1 deselected.
+- Full regression suite: 861 passed, 1 deselected.
 - Standard startup now serializes shared SQLite initialization; a 32-process live constructor smoke and scheduler regression passed (`6649e49`).
 
 ## Partial or pending
@@ -23,7 +24,7 @@ The score measures verified platform behavior, not planned features. It is delib
 - Checkpoint 3 still needs a fresh browser proof of Ibex baseline, parameter comparison, and project/evolution replay.
 - MCP interactive sessions and report-image projection are not implemented; only short-lived read-only queries are supported.
 - MCP exploration has no confirmed upgrade-to-Runtime action in the web console.
-- P12 v2 reaches RTLScout, lint, and simulation, but mutation quality currently stops the minimal AND example before ORFS/GDS. A later retry also hit an external Codex provider error.
+- P12 v2 bounded `and2` acceptance is complete through ORFS/GDS; broader designs and provider-dependent revisions remain outside this bounded proof.
 - Fresh 5–10 user load evidence is not recorded.
 - Interactive browser certification is pending because this ARM host has no usable headless browser runtime (Playwright browser download stalled; system Firefox fails GLX/EGL startup).
 - Final legacy cleanup and release management remain outside the current teaching-focused scope.
