@@ -1370,6 +1370,10 @@ async function submitFlow() {
   message("#flowMessage", ui("Creating a Runtime experiment…", "正在创建 Runtime 实验……"));
   try {
     const dseMode = $("#dseMode")?.value || "baseline";
+    if (dseMode === "a2_orfo") {
+      message("#flowMessage", ui("Use the A2-ORFO session controls below to preserve its native authorization flow.", "请使用下方 A2-ORFO Session 控件，以保留原生授权流程。"));
+      return;
+    }
     const result = dseMode === "bo_gp"
       ? await post("/api/v2/closed-loops", {design_id: state.selectedDesign?.id, platform: $("#flowPdk")?.value || "nangate45", objective_profile: "balanced", repetitions: Math.max(2, Math.min(6, Number($("#candidateCount")?.value || 3)))})
       : dseMode === "batch"
