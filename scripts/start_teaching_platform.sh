@@ -8,6 +8,8 @@ export OPENROAD_BIN="${OPENROAD_BIN:-$ROOT/../bin/openroad}"
 export YOSYS_BIN="${YOSYS_BIN:-$ROOT/../bin/yosys}"
 export VERILATOR_BIN="${VERILATOR_BIN:-$(command -v verilator || true)}"
 export IVERILOG_BIN="${IVERILOG_BIN:-$(command -v iverilog || true)}"
+RUNTIME_DB="${RUNTIME_DB:-$ROOT/var/public/runtime.db}"
+OPTIMIZATION_DB="${OPTIMIZATION_DB:-$ROOT/var/public/optimization.db}"
 
 python3 "$ROOT/scripts/teaching_platform_doctor.py"
 WORKER_COUNT="${WORKER_COUNT:-4}"
@@ -18,13 +20,17 @@ fi
 worker_pids=()
 for slot in $(seq 1 "$WORKER_COUNT"); do
   python3 "$ROOT/scripts/run_runtime_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
-    --orfs-root "$ORFS_ROOT" --worker-slot "$slot" &
+    --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --worker-slot "$slot" &
   worker_pids+=("$!")
 done
+python3 "$ROOT/scripts/run_dse_controller_worker.py" --db "${PLATFORM_DB:-$ROOT/var/platform.db}" \
+  --orfs-root "$ORFS_ROOT" --runtime-db "$RUNTIME_DB" --optimization-db "$OPTIMIZATION_DB" &
+worker_pids+=("$!")
 cleanup() {
   for pid in "${worker_pids[@]}"; do kill "$pid" 2>/dev/null || true; done
   for pid in "${worker_pids[@]}"; do wait "$pid" 2>/dev/null || true; done
 }
 trap cleanup EXIT INT TERM
 python3 "$ROOT/apps/api/app.py" --host "${HOST:-127.0.0.1}" --port "${PORT:-8000}" \
-  --db "${PLATFORM_DB:-$ROOT/var/platform.db}" --orfs-root "$ORFS_ROOT"
+  --db "${PLATFORM_DB:-$ROOT/var/platform.db}" --orfs-root "$ORFS_ROOT" \
+  --runtime-db "$RUNTIME_DB" --optimization-db "$OPTIMIZATION_DB"
