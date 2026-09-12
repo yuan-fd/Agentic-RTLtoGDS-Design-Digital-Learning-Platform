@@ -26,7 +26,7 @@ def main() -> int:
         load_taiwei_plugin=False,
     )
     session = state.create_spec_session({
-        "message": "Design a pure combinational two-input AND gate named and2 with 1-bit inputs a and b and 1-bit output y, y=a&b, target nangate45."
+        "message": "Design a pure combinational two-input AND gate named and2 with 1-bit inputs a and b and 1-bit output y, y=a&b, target nangate45. Use target stage finish, core utilization 50%, and placement density 0.55."
     })
     (output / "spec_session.json").write_text(json.dumps(session, indent=2), encoding="utf-8")
     if not session["state"].get("ready_for_execution"):
