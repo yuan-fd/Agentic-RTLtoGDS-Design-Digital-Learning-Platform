@@ -4,4 +4,4 @@ An authenticated browser submission reached the real Runtime and returned HTTP 2
 
 `Runtime run ... could not start: Invalid stage transition running -> running`
 
-The run was later cancelled when the temporary server was stopped. The cause was a benign queue-read race that surfaced as an error log. The worker path now treats a losing SQLite stage transition as normal contention and relies on the transactional RuntimeStore state machine (commit `f18ab82`); focused worker/scheduler tests pass (`6 passed`). A fresh long ORFS browser run is still needed for final closure.
+The run was later cancelled when the temporary server was stopped. The cause was a benign queue-read race that surfaced as an error log. The worker path now treats a losing SQLite stage transition as normal contention and relies on the transactional RuntimeStore state machine (commit `f18ab82`). A four-process race regression now passes with exactly one adapter execution and one successful attempt (commit `4034166`); the focused runtime set passes (`14 passed`). A fresh long ORFS browser run is still needed for final closure.
