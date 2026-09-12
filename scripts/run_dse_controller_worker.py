@@ -74,11 +74,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--orfs-root", type=Path,
                         default=Path(os.environ.get(
                             "ORFS_ROOT", ROOT.parent / "OpenROAD-flow-scripts")))
-    parser.add_argument("--heartbeat", type=Path,
-                        default=local_state / "dse-controller.heartbeat.json")
+    parser.add_argument("--heartbeat", type=Path, default=None,
+                        help="heartbeat file; defaults beside --runtime-db")
     parser.add_argument("--poll-seconds", type=float, default=2.0)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args(argv)
+    if args.heartbeat is None:
+        args.heartbeat = args.runtime_db.expanduser().resolve().parent / "dse-controller.heartbeat.json"
     if args.poll_seconds <= 0:
         parser.error("--poll-seconds must be positive")
     lock_path = args.heartbeat.with_suffix(".lock")
