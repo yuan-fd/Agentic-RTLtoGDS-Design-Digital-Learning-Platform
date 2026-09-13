@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
+from rich.markup import escape
 from rich.text import Text
 from textual import events
 from textual.containers import Horizontal, Vertical
@@ -278,7 +279,7 @@ class Sidebar(Vertical):
             state = session.get("status", "?")
             colour = {"running": "green", "idle": "yellow", "exited": "red"}.get(state, "white")
             lines.append("%s %d %s  [%s]%s" % (
-                marker, index, session.get("name", session["id"]), colour, state))
+                marker, index, escape(str(session.get("name", session["id"]))), colour, state))
         if not lines:
             lines.append("(无终端)")
         self.sessions_view.update("\n".join(lines))
@@ -289,8 +290,11 @@ class Sidebar(Vertical):
             status = run.get("status", "?")
             colour = {"success": "green", "failed": "red", "running": "yellow",
                       "cancelled": "magenta"}.get(status, "white")
-            command = (run.get("command") or "")[:22]
-            lines.append("[%s]%s[/] %s %s" % (colour, status[:4], run.get("started_text", ""), command))
+            # Command text is user data: it routinely contains "[" (printf, awk,
+            # globs) and would otherwise be parsed as rich markup and crash the app.
+            command = escape((run.get("command") or "")[:22])
+            lines.append("[%s]%s[/] %s %s" % (
+                colour, status[:4], escape(str(run.get("started_text", ""))), command))
         if not lines:
             lines.append("(暂无运行记录)")
         self.runs_view.update("\n".join(lines))

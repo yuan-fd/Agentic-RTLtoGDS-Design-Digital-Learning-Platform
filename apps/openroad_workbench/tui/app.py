@@ -143,17 +143,19 @@ class WorkbenchTUI(App):
         session = self._active() or {}
         runs = status.get("runs") or []
         run = runs[0] if runs else {}
+        # Every dynamic value is escaped: design names, terminal names, command
+        # text, cwd and paths all come from the user and can contain "[".
         bits = [
             "[b]OpenROAD Workbench[/b]",
-            "设计 %s" % (design.get("name") or "-"),
-            "终端 %s" % (session.get("name") or "-"),
-            "状态 %s" % (session.get("status") or "-"),
+            "设计 %s" % escape(str(design.get("name") or "-")),
+            "终端 %s" % escape(str(session.get("name") or "-")),
+            "状态 %s" % escape(str(session.get("status") or "-")),
         ]
         if run and run.get("status") == "running":
-            bits.append("运行 %s" % (run.get("command") or "")[:30])
+            bits.append("运行 %s" % escape(str(run.get("command") or "")[:30]))
             if run.get("stages"):
-                bits.append("阶段 %s" % run["stages"][-1])
-            bits.append("耗时 %s" % run.get("elapsed_text", "-"))
+                bits.append("阶段 %s" % escape(str(run["stages"][-1])))
+            bits.append("耗时 %s" % escape(str(run.get("elapsed_text", "-"))))
         self.query_one("#topbar", Static).update("  ·  ".join(bits))
 
         counts = status.get("artifacts") or {}
@@ -162,11 +164,11 @@ class WorkbenchTUI(App):
         self.query_one("#status", StatusBar).update(
             "cwd %s   pid %s   %s   %s   stage %s   结果[报告%s 图%s 日志%s]   Ctrl+N 新终端 · Ctrl+J Agent"
             % (
-                session.get("cwd") or "-",
+                escape(str(session.get("cwd") or "-")),
                 session.get("pid") or "-",
                 "RUNNING" if session.get("status") == "running" else "IDLE",
-                ("run " + (run.get("command") or "")[:24]) if running else "空闲",
-                stage,
+                ("run " + escape(str(run.get("command") or "")[:24])) if running else "空闲",
+                escape(str(stage)),
                 counts.get("report", 0),
                 counts.get("image", 0),
                 counts.get("log", 0),

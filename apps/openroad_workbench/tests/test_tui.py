@@ -134,6 +134,15 @@ async def main(argv: List[str]) -> int:
                          got and "未配置模型" in app._last_reply,
                          (app._last_reply or "")[:70].replace("\n", " "))
 
+            # ---------------- markup safety: "[" in user text must not crash
+            await app.client.send_input(
+                session_id, "printf '\\033[1;32m[INFO]\\033[0m a[1] b[/] c[red]\\n'\r")
+            await asyncio.sleep(1.5)
+            await pilot.pause()
+            report.check("commands containing [ ] and ANSI do not crash the TUI",
+                         app.is_running and "INFO" in pane_text(app),
+                         "running=%s" % app.is_running)
+
             # ------------------------- Ctrl+G must fill, never execute (P1)
             runs_before = len(workbench.list_runs(session_id=session_id))
             app._last_reply = "脚本如下：\n```tcl\nset OWB_MARKER_ONE 1\nputs OWB_MARKER_TWO\n```\n"
