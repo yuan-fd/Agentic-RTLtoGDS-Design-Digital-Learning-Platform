@@ -522,10 +522,9 @@ function message(selector, value, error = false) {
 
 function route(name, options = {}) {
   if (!$(`#page-${name}`)) name = "overview";
-  if (name !== "overview" && !state.auth?.authenticated) {
-    openAuth(ui("Sign in to open your personal workspace.", "请先登录个人工作区。"));
-    name = "overview";
-  }
+  // Page navigation is public so visitors can inspect the teaching platform
+  // before signing in.  Mutating actions and private result APIs still enforce
+  // authentication at their call sites.
   $$(".page").forEach(page => page.classList.toggle("active", page.id === `page-${name}`));
   $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.route === name));
   history.replaceState(null, "", `#${name}`);
