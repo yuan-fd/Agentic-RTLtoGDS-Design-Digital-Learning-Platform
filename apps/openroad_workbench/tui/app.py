@@ -22,7 +22,7 @@ HELP = """[b]OpenROAD Workbench[/b]
 
  Ctrl+N      新建终端          Ctrl+W      关闭当前终端
  Ctrl+1..9   切换终端          Ctrl+B      显示/隐藏侧栏
- Ctrl+J      聚焦 Agent 输入    Esc         回到终端
+ Ctrl+J      聚焦 Agent 输入    Esc         回到终端\n Ctrl+E      显示/隐藏 Agent 面板
  Ctrl+G      把 Agent 的代码块填入终端（不执行）
  Ctrl+U/D    向上/向下翻屏      Ctrl+Y      回到最底部
  F1          本帮助            Ctrl+Q      退出（后台任务继续运行）
@@ -37,15 +37,20 @@ class WorkbenchTUI(App):
     #status { height: 1; background: $panel; color: $text; padding: 0 1; }
     .section { height: 1; background: $panel; color: $text; padding: 0 1; }
     """
+    # Deliberately avoids Ctrl-B/E/J/U/D/Y: those belong to readline and to the
+    # shell.  Panel and scroll actions live on F-keys and Alt- combos instead.
     BINDINGS = [
         Binding("ctrl+q", "quit", "退出", priority=True),
         Binding("ctrl+n", "new_session", "新终端"),
         Binding("ctrl+w", "close_session", "关闭终端"),
-        Binding("ctrl+b", "toggle_sidebar", "侧栏"),
-        Binding("ctrl+j", "focus_agent", "Agent"),
         Binding("ctrl+g", "send_proposal", "填入终端"),
-        Binding("ctrl+y", "scroll_bottom", "底部"),
+        Binding("alt+u", "scroll_up", "上翻"),
+        Binding("alt+d", "scroll_down", "下翻"),
+        Binding("alt+b", "scroll_bottom", "底部"),
         Binding("f1", "help", "帮助"),
+        Binding("f2", "focus_agent", "Agent 输入"),
+        Binding("f3", "toggle_agent", "Agent 面板"),
+        Binding("f4", "toggle_sidebar", "侧栏"),
     ]
 
     def __init__(self, base_url: str, status: Optional[Dict[str, Any]] = None) -> None:
@@ -130,6 +135,8 @@ class WorkbenchTUI(App):
         return None
 
     def _refresh_header(self) -> None:
+        if not self.is_mounted or not self.query("#topbar"):
+            return
         status = self.state or self.initial_status
         designs = status.get("designs") or []
         design = designs[0] if designs else {}
@@ -151,13 +158,14 @@ class WorkbenchTUI(App):
 
         counts = status.get("artifacts") or {}
         stage = (run.get("stages") or ["-"])[-1] if run else "-"
+        running = bool(run) and run.get("status") == "running"
         self.query_one("#status", StatusBar).update(
-            "cwd %s   pid %s   %s   run %s   stage %s   结果[报告%s 图%s 日志%s]   Ctrl+N 新终端 · Ctrl+J Agent"
+            "cwd %s   pid %s   %s   %s   stage %s   结果[报告%s 图%s 日志%s]   Ctrl+N 新终端 · Ctrl+J Agent"
             % (
                 session.get("cwd") or "-",
                 session.get("pid") or "-",
                 "RUNNING" if session.get("status") == "running" else "IDLE",
-                (run.get("command") or "-")[:24],
+                ("run " + (run.get("command") or "")[:24]) if running else "空闲",
                 stage,
                 counts.get("report", 0),
                 counts.get("image", 0),
@@ -304,6 +312,12 @@ class WorkbenchTUI(App):
         sidebar = self.sidebar
         sidebar.display = not sidebar.display
 
+    def action_toggle_agent(self) -> None:
+        agent = self.agent
+        agent.display = not agent.display
+        if not agent.display:
+            self.pane.focus()
+
     def action_focus_agent(self) -> None:
         self.agent.prompt.focus()
 
@@ -312,8 +326,17 @@ class WorkbenchTUI(App):
         if not proposal:
             self.agent.write_line("[yellow]Agent 最近回复里没有可填入的代码块[/yellow]")
             return
-        await self.client.send_input(self.active_session, proposal)
-        self.agent.write_line("[green]已填入终端输入栏（未执行，按回车执行）[/green]")
+        result = await self.client.fill(self.active_session, proposal)
+        mode = result.get("mode")
+        if mode == "insert":
+            self.agent.write_line("[green]已填入终端输入栏，未执行。[/green]确认后按回车执行。")
+        elif mode == "bracketed":
+            self.agent.write_line(
+                "[green]已用括号粘贴填入多行脚本，未执行。[/green]检查无误后按回车执行。")
+        elif mode == "refused":
+            self.agent.write_line(
+                "[yellow]没有自动填入：%s[/yellow] 请手动复制上面的代码块。"
+                % escape(str(result.get("reason") or "")))
         self.pane.focus()
 
     def action_scroll_bottom(self) -> None:
@@ -334,15 +357,15 @@ class WorkbenchTUI(App):
                 self._refresh_header()
                 event.stop()
             return
-        if key == "ctrl+u":
-            self.pane.scroll_back(6)
-            event.stop()
-        elif key == "ctrl+d":
-            self.pane.scroll_back(-6)
-            event.stop()
-        elif key == "escape" and self.agent.prompt.has_focus:
+        if key == "escape" and self.agent.prompt.has_focus:
             self.pane.focus()
             event.stop()
+
+    def action_scroll_up(self) -> None:
+        self.pane.scroll_back(6)
+
+    def action_scroll_down(self) -> None:
+        self.pane.scroll_back(-6)
 
     # ------------------------------------------------------------------- agent
     async def on_input_submitted(self, event) -> None:
@@ -353,7 +376,7 @@ class WorkbenchTUI(App):
         if not question or self._agent_busy:
             return
         self._agent_busy = True
-        self.agent.write_line("[b cyan]你[/b cyan]  %s" % escape(question))
+        self.agent.write_user("[b cyan]你[/b cyan]  %s" % escape(question))
         collected: List[str] = []
         try:
             async for chunk in self.client.ask(question, session_id=self.active_session):
@@ -375,6 +398,8 @@ class WorkbenchTUI(App):
 
 
 def _first_code_block(text: str) -> str:
+    """Extract the first fenced code block. Never appends a newline: a trailing
+    newline is Enter, and Enter *executes* the text."""
     if not text:
         return ""
     parts = text.split("```")
@@ -385,7 +410,8 @@ def _first_code_block(text: str) -> str:
     if lines and lines[0].strip().lower() in (
         "bash", "sh", "shell", "zsh", "tcl", "tclsh", "python", "py", "makefile", "make", ""):
         lines = lines[1:]
-    return "\n".join(lines).strip() + "\n"
+    return "\n".join(lines).strip()
+
 
 
 def run_tui(base_url: str, status: Optional[Dict[str, Any]] = None) -> int:

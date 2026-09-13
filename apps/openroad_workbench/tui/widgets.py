@@ -8,7 +8,8 @@ from rich.text import Text
 from textual import events
 from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
-from textual.widgets import Input, RichLog, Static
+from textual.containers import VerticalScroll
+from textual.widgets import Input, Static
 
 # --------------------------------------------------------------------- keymap
 SPECIAL_KEYS = {
@@ -87,6 +88,7 @@ class TerminalPane(Widget):
                  on_resize: Optional[Callable[[int, int], None]] = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.lines: List[str] = []
+        self.runs: List[List[Dict[str, Any]]] = []
         self.cursor = {"x": 0, "y": 0}
         self.history_len = 0
         self.pty_rows = 32
@@ -99,6 +101,7 @@ class TerminalPane(Widget):
     # ------------------------------------------------------------- data in
     def set_frame(self, frame: Dict[str, Any]) -> None:
         self.lines = frame.get("screen") or []
+        self.runs = frame.get("runs") or []
         self.cursor = frame.get("cursor") or {"x": 0, "y": 0}
         self.history_len = int(frame.get("history_len") or 0)
         self.pty_rows = int(frame.get("rows") or 32)
@@ -107,37 +110,87 @@ class TerminalPane(Widget):
         self.refresh()
 
     # ------------------------------------------------------------- rendering
+    # pyte colour name -> rich colour name
+    COLORS = {
+        "default": None, "black": "black", "red": "red", "green": "green",
+        "brown": "yellow", "blue": "blue", "magenta": "magenta", "cyan": "cyan",
+        "white": "white", "brightblack": "bright_black", "brightred": "bright_red",
+        "brightgreen": "bright_green", "brightbrown": "bright_yellow",
+        "brightblue": "bright_blue", "brightmagenta": "bright_magenta",
+        "brightcyan": "bright_cyan", "brightwhite": "bright_white",
+    }
+
+    def _run_style(self, run: Dict[str, Any]) -> str:
+        parts: List[str] = []
+        fg = self.COLORS.get(run.get("fg") or "default")
+        bg = self.COLORS.get(run.get("bg") or "default")
+        if fg:
+            parts.append(fg)
+        if bg:
+            parts.append("on " + bg)
+        if run.get("b"):
+            parts.append("bold")
+        if run.get("i"):
+            parts.append("italic")
+        if run.get("u"):
+            parts.append("underline")
+        if run.get("r"):
+            parts.append("reverse")
+        return " ".join(parts)
+
+    def _line_text(self, index: int, width: int) -> Text:
+        """Build one styled line, falling back to plain text for old frames."""
+        line = Text(no_wrap=True, overflow="crop")
+        runs = self.runs[index] if index < len(self.runs) else []
+        if not runs:
+            line.append((self.lines[index] if index < len(self.lines) else "")[:width])
+            return line
+        cursor_col = -1
+        cursor_row = self.history_len + int(self.cursor.get("y", 0))
+        if index == cursor_row:
+            cursor_col = int(self.cursor.get("x", 0))
+        column = 0
+        for run in runs:
+            text = run.get("t") or ""
+            style = self._run_style(run)
+            if cursor_col < 0 or not (column <= cursor_col < column + len(text)):
+                line.append(text, style=style)
+            else:
+                cut = cursor_col - column
+                line.append(text[:cut], style=style)
+                line.append(text[cut], style=(style + " reverse").strip())
+                line.append(text[cut + 1:], style=style)
+            column += len(text)
+            if column >= width:
+                break
+        return line
+
     def render(self) -> Text:
         height = max(1, self.size.height)
         width = max(20, self.size.width)
         total = len(self.lines)
         end = max(1, total - self.scroll_back_lines)
         start = max(0, end - height)
-        window = self.lines[start:end]
-        cursor_abs_y = self.history_len + int(self.cursor.get("y", 0))
-        cursor_x = int(self.cursor.get("x", 0))
-
-        text = Text(no_wrap=True, overflow="crop")
-        for index, line in enumerate(window):
-            if index:
-                text.append("\n")
-            absolute = start + index
-            if absolute == cursor_abs_y and 0 <= cursor_x < max(len(line), 1):
-                clipped = line[:width]
-                if cursor_x < len(clipped):
-                    text.append(clipped[:cursor_x], style="")
-                    text.append(clipped[cursor_x], style="reverse")
-                    text.append(clipped[cursor_x + 1:], style="")
-                else:
-                    text.append(clipped + " " * (cursor_x - len(clipped)), style="")
-                    text.append(" ", style="reverse")
-            else:
-                text.append(line[:width], style="")
-        return text
+        out = Text(no_wrap=True, overflow="crop")
+        for offset, index in enumerate(range(start, end)):
+            if offset:
+                out.append("\n")
+            out.append_text(self._line_text(index, width))
+        return out
 
     # -------------------------------------------------------------- input out
+    # Keys the application owns.  Everything else is forwarded to the PTY, so the
+    # terminal keeps Ctrl-U (kill line), Ctrl-D (EOF), Ctrl-B/E (cursor moves)
+    # and the whole readline keymap -- stealing those is what makes a "terminal
+    # replacement" worse than a terminal.
+    APP_KEYS = {
+        "ctrl+n", "ctrl+w", "ctrl+q", "ctrl+g",
+        "alt+u", "alt+d", "alt+b",
+        "f1", "f2", "f3", "f4",
+    }
+
     def on_key(self, event: events.Key) -> None:
-        if event.key in ("ctrl+b", "ctrl+j", "ctrl+n", "ctrl+w", "ctrl+q", "f1"):
+        if event.key in self.APP_KEYS:
             return  # let the app bindings handle these
         data = key_to_data(event)
         if data is None:
@@ -244,27 +297,47 @@ class Sidebar(Vertical):
 
 
 class AgentPane(Vertical):
+    """Agent transcript + input.
+
+    Uses one ``Static`` per message in a real scroll container instead of a
+    ``RichLog``: RichLog mis-measures the height of wrapped lines when messages
+    are written before the widget has its final width, which showed up as
+    overlapping text in the agent column.
+    """
+
     DEFAULT_CSS = """
     AgentPane {
-        width: 46;
+        width: 52;
         border-left: solid $panel;
     }
-    AgentPane RichLog { height: 1fr; }
+    AgentPane #agent-scroll { height: 1fr; }
     AgentPane Input { dock: bottom; }
+    AgentPane .agent-msg { padding: 0 1; }
+    AgentPane .agent-user { color: $text; }
+    AgentPane .agent-bot { color: $text; }
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.transcript = RichLog(highlight=False, markup=True, wrap=True, id="agent-log")
+        self.scroll = VerticalScroll(id="agent-scroll")
         self.prompt = Input(placeholder="问 Agent：写个 Tcl/Python 脚本…", id="agent-input")
+        self.messages: List[str] = []
 
     def compose(self):
         yield Static("[b]Agent[/b]  (Ctrl+J 聚焦 · Esc 回到终端)", classes="section")
-        yield self.transcript
+        yield self.scroll
         yield self.prompt
 
-    def write_line(self, text: str) -> None:
-        self.transcript.write(text)
+    def write_line(self, text: str, kind: str = "bot") -> None:
+        self.messages.append(text)
+        widget = Static(text, classes="agent-msg agent-%s" % kind, markup=True)
+        self.scroll.mount(widget)
+        self.scroll.scroll_end(animate=False, immediate=True)
+
+    def write_user(self, text: str) -> None:
+        self.write_line(text, kind="user")
 
     def clear_log(self) -> None:
-        self.transcript.clear()
+        self.messages = []
+        for child in list(self.scroll.children):
+            child.remove()

@@ -1,0 +1,12 @@
+# OpenROAD Workbench runtime dependencies (Python >= 3.9).
+#
+#   python3 -m pip install --user -r apps/openroad_workbench/requirements.txt
+#   # 国内/内网可用镜像：
+#   python3 -m pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple \
+#       -r apps/openroad_workbench/requirements.txt
+#
+# The workbench also needs the `node` runtime, but only to launch the official
+# OpenROAD-MCP server; nothing here is an npm dependency.
+aiohttp>=3.8
+pyte>=0.8
+textual>=1.0

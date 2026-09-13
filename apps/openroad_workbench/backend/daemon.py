@@ -14,7 +14,7 @@ import os
 import signal
 import sys
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from . import config as config_mod
 from .core import Workbench
@@ -47,8 +47,27 @@ def build_config(args: argparse.Namespace) -> Dict[str, Any]:
     return config
 
 
+def already_running(host: str, port: int) -> Optional[int]:
+    """Return the pid of a live workbench daemon on this port, if any."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("http://%s:%d/api/status" % (host, port), timeout=2) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    if data.get("app") == "openroad-workbench":
+        return int(data.get("pid") or 0)
+    return None
+
+
 async def run(args: argparse.Namespace) -> int:
     config = build_config(args)
+    existing = already_running(config["host"], config["port"])
+    if existing:
+        print("OpenROAD Workbench already running on %s:%d (pid %d); refusing to start a second one."
+              % (config["host"], config["port"], existing), file=sys.stderr)
+        return 1
     loop = asyncio.get_running_loop()
     workbench = Workbench(loop, config)
 

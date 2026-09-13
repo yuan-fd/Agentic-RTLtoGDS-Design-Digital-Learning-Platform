@@ -49,6 +49,7 @@ class Workbench:
         self._conversations: Dict[str, Conversation] = {}
         self._counters: Dict[str, int] = defaultdict(int)
         self._tasks: List[asyncio.Task] = []
+        self._background: set = set()
         self._osc_seen: Dict[str, bool] = {}
         self.last_refresh: Dict[str, float] = {}
 
@@ -63,10 +64,35 @@ class Workbench:
             self.register_design(default_cwd)
         if not self._sessions and not self.config.get("_skip_main_session"):
             self.create_session(name="主终端", cwd=default_cwd)
+        # Warm the MCP catalog here rather than in the daemon: every embedding
+        # (daemon, tests, future front-ends) then gets the same guarantee that
+        # /api/status can report the tool count without taking the tool lock.
+        if self.mcp.available:
+            try:
+                await asyncio.wait_for(self.mcp.catalog(), timeout=30)
+            except Exception as exc:
+                self.bus.publish("mcp.unavailable", error=str(exc))
         self.bus.publish("workbench.ready", pid=os.getpid())
 
+    def spawn(self, coro: Any) -> asyncio.Task:
+        """Track fire-and-forget work so shutdown can cancel it and failures are
+        visible instead of being dropped on the floor."""
+        task = asyncio.ensure_future(coro)
+        self._background.add(task)
+
+        def _done(finished: asyncio.Task) -> None:
+            self._background.discard(finished)
+            if finished.cancelled():
+                return
+            exc = finished.exception()
+            if exc is not None:
+                self.bus.publish("task.failed", error="%s: %s" % (type(exc).__name__, exc))
+
+        task.add_done_callback(_done)
+        return task
+
     async def shutdown(self) -> None:
-        for task in self._tasks:
+        for task in list(self._tasks) + list(self._background):
             task.cancel()
         for session in list(self._sessions.values()):
             session.terminate(signal.SIGTERM)
@@ -139,6 +165,32 @@ class Workbench:
             raise KeyError("unknown session %s" % session_id)
         session.write(data)
         return {"ok": True, "bytes": len(data)}
+
+    def fill_command_line(self, session_id: str, text: str) -> Dict[str, Any]:
+        """Insert text into the command line WITHOUT executing it.
+
+        The safety decision lives here, not in the UI: a newline in a PTY means
+        Enter, so multi-line text is only ever inserted inside bracketed-paste
+        markers, and only when the session guarantees readline understands them.
+        """
+        session = self._sessions.get(session_id)
+        if session is None:
+            raise KeyError("unknown session %s" % session_id)
+        body = (text or "").strip("\n")
+        if not body:
+            return {"ok": False, "mode": "empty", "inserted": ""}
+        if "\n" not in body:
+            session.write_raw(body)
+            return {"ok": True, "mode": "insert", "inserted": body}
+        if not getattr(session, "bracketed_paste", False):
+            return {
+                "ok": False,
+                "mode": "refused",
+                "inserted": "",
+                "reason": "该终端未启用括号粘贴，自动插入多行会被逐行执行",
+            }
+        session.write_raw("\x1b[200~" + body + "\x1b[201~")
+        return {"ok": True, "mode": "bracketed", "inserted": body}
 
     def interrupt(self, session_id: str) -> Dict[str, Any]:
         session = self._sessions.get(session_id)
@@ -339,7 +391,7 @@ class Workbench:
         self._persist_run(run)
         self.bus.publish("run.completed", run=run.as_dict())
         if run.design_id:
-            asyncio.ensure_future(self.refresh_artifacts(run.design_id))
+            self.spawn(self.refresh_artifacts(run.design_id))
 
     def _finish_run_for_session(self, session_id: str, exit_code: Optional[int], reason: str) -> None:
         meta = self._meta.get(session_id) or {}
@@ -390,7 +442,7 @@ class Workbench:
         self._designs[design.id] = design
         self._design_by_path[real] = design.id
         self.bus.publish("design.registered", design=design.as_dict())
-        asyncio.ensure_future(self.refresh_artifacts(design.id))
+        self.spawn(self.refresh_artifacts(design.id))
         return design
 
     def list_designs(self) -> List[Dict[str, Any]]:

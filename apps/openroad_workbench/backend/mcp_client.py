@@ -76,6 +76,8 @@ class MCPClient:
         self._lock = asyncio.Lock()
         self._catalog: Optional[List[Dict[str, Any]]] = None
         self.last_error: Optional[str] = None
+        self._stderr_tail: List[str] = []
+        self._stderr_task: Optional[asyncio.Task] = None
 
     # ---------------------------------------------------------------- lifecycle
     @property
@@ -94,9 +96,10 @@ class MCPClient:
             cwd=self.repo,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
         )
         self._reader_task = asyncio.ensure_future(self._reader())
+        self._stderr_task = asyncio.ensure_future(self._drain_stderr())
         await self._request(
             "initialize",
             {
@@ -153,7 +156,7 @@ class MCPClient:
             raise MCPError("MCP server is not running")
         self._ident += 1
         ident = self._ident
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         future: asyncio.Future = loop.create_future()
         self._pending[ident] = future
         payload = json.dumps({"jsonrpc": "2.0", "id": ident, "method": method, "params": params})
@@ -164,6 +167,21 @@ class MCPClient:
         except asyncio.TimeoutError:
             self._pending.pop(ident, None)
             raise MCPError("MCP request %s timed out after %.0fs" % (method, timeout))
+
+    async def _drain_stderr(self) -> None:
+        """Keep the server's stderr instead of throwing it away: when the MCP
+        child fails to start, its message is the only useful diagnostic."""
+        if self._proc is None or self._proc.stderr is None:
+            return
+        try:
+            while True:
+                line = await self._proc.stderr.readline()
+                if not line:
+                    break
+                self._stderr_tail.append(line.decode("utf-8", "replace").rstrip())
+                del self._stderr_tail[:-40]
+        except Exception:
+            pass
 
     async def close(self) -> None:
         if self._reader_task is not None:
@@ -216,11 +234,13 @@ class MCPClient:
         blocks = result.get("content") or []
         text = ""
         images = []
+        texts: List[str] = []
         for block in blocks:
             if block.get("type") == "text" and block.get("text"):
-                text = block["text"]
+                texts.append(block["text"])
             if block.get("data"):
                 images.append({"data": block["data"], "mimeType": block.get("mimeType", "image/webp")})
+        text = "\n".join(texts)
         parsed: Any
         try:
             parsed = json.loads(text) if text else {}
@@ -235,6 +255,8 @@ class MCPClient:
         }
 
     async def status(self) -> Dict[str, Any]:
+        """Never blocks on the tool-call lock: a status probe must stay instant
+        even while a 120 s ORFS stage call is in flight."""
         info = {
             "available": self.available,
             "repo": self.repo,
@@ -242,13 +264,12 @@ class MCPClient:
             "node": self.node,
             "running": self._proc is not None and self._proc.returncode is None,
             "last_error": self.last_error,
+            "catalog_loaded": self._catalog is not None,
+            "tool_count": len(self._catalog) if self._catalog is not None else 0,
         }
-        if self.available:
-            try:
-                info["tool_count"] = len(await self.catalog())
-            except Exception as exc:
-                info["tool_count"] = 0
-                info["last_error"] = str(exc)
-        else:
-            info["tool_count"] = 0
+        if self._stderr_tail:
+            info["stderr_tail"] = self._stderr_tail[-10:]
+        if not self.available:
+            info["last_error"] = info["last_error"] or (
+                "OpenROAD-MCP not found at %s (set mcp_repo in ~/.openroad-workbench/config.json)" % self.entry)
         return info

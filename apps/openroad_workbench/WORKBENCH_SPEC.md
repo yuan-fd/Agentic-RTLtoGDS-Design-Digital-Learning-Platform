@@ -87,7 +87,8 @@ apps/openroad_workbench/
 
 - Always：先验证真实 PTY 和官方 MCP，再做视觉层；用户界面显示可读名称；每个执行动作保留原始命令和日志。
 - Ask first：新增外部依赖、改变官方 MCP 运行方式、持久化数据格式、远程执行能力。
-- Never：用固定按钮替代终端；用一次性 subprocess 假装 PTY；把哈希 ID 当用户名称；把 MCP 工具删成少数演示接口；在终端闭环未通过前堆视觉装饰。
+- Never：用固定按钮替代终端；用一次性 subprocess 假装 PTY；把哈希 ID 当用户名称；把 MCP 工具删成少数演示接口；在终端闭环未通过前堆视觉装饰；把 Agent 生成的代码直接送进 PTY 执行。
+- Never：抢占 shell 的 readline 键位（Ctrl-B/E/J/U/D/Y）；这些键永远属于终端。
 
 ## References
 

@@ -16,9 +16,11 @@ RUNTIME_DIR = os.path.join(HOME, ".openroad-workbench")
 SHELL_DIR = os.path.join(RUNTIME_DIR, "shell")
 CONFIG_PATH = os.path.join(RUNTIME_DIR, "config.json")
 
+# Only stable locations.  A /tmp clone was previously a silent default, which
+# made the deployment depend on a directory that a reboot deletes.
 DEFAULT_MCP_CANDIDATES = [
     os.path.join(HOME, "openroad-mcp"),
-    "/tmp/openroad-mcp-review",
+    os.path.join(HOME, "openroad-mcp-review"),
 ]
 
 DEFAULTS: Dict[str, Any] = {

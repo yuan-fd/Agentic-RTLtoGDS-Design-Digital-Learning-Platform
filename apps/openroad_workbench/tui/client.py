@@ -81,6 +81,10 @@ class DaemonClient:
     async def send_input(self, session_id: str, data: str) -> None:
         await self.post("/api/sessions/%s/input" % session_id, {"data": data})
 
+    async def fill(self, session_id: str, text: str) -> Dict[str, Any]:
+        """Ask the daemon to insert text into the command line (never executes)."""
+        return await self.post("/api/sessions/%s/fill" % session_id, {"text": text})
+
     async def interrupt(self, session_id: str) -> None:
         await self.post("/api/sessions/%s/interrupt" % session_id)
 

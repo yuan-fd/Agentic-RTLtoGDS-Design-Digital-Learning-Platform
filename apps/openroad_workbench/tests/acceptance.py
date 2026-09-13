@@ -86,21 +86,81 @@ async def run_command(
     return (event or {}).get("data", {}).get("run")
 
 
-async def wait_for_prompt(watcher: Watcher, workbench: Workbench, session_id: str, timeout: float = 25.0) -> bool:
+async def wait_for_prompt(watcher: Watcher, workbench: Workbench, session_id: str, timeout: float = 60.0) -> bool:
+    """Wait for an interactive prompt.
+
+    Polls the screen as well as the event queue: the first prompt can be emitted
+    before this test subscribes (the daemon warms the MCP catalog during
+    ``Workbench.start``), so event-only waiting is racy by construction.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
-        try:
-            event = await asyncio.wait_for(watcher.queue.get(), timeout=max(0.1, deadline - time.time()))
-        except asyncio.TimeoutError:
-            return False
-        if event.get("type") == "shell.prompt":
+        screen = "\n".join(workbench.screen(session_id, lines=40)["screen"])
+        if "$" in screen or "#" in screen:
             return True
-        if event.get("type") == "terminal.output":
-            screen = "\n".join(workbench.screen(session_id, lines=30)["screen"])
-            if "$" in screen or "#" in screen:
-                # No shell integration yet but a prompt is visibly there.
-                return True
+        try:
+            await asyncio.wait_for(watcher.queue.get(), timeout=0.5)
+        except asyncio.TimeoutError:
+            pass
     return False
+
+
+def http_elapsed(path: str, timeout: float = 20.0) -> float:
+    url = "http://127.0.0.1:%d%s" % (TEST_PORT, path)
+    start = time.time()
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        response.read()
+    return time.time() - start
+
+
+def http_expect_error(path: str, method: str, payload: dict):
+    url = "http://127.0.0.1:%d%s" % (TEST_PORT, path)
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode(), method=method,
+        headers={"content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, response.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", "replace")
+
+
+def _make_fake_orfs_tree(root: str) -> None:
+    """A miniature ORFS result tree, so the indexer is tested on real shapes
+    instead of on an empty directory."""
+    files = [
+        "config.mk",
+        "constraint.sdc",
+        "reports/congestion.rpt",
+        "metrics.json",
+        "results/sky130hd/gcd/base/3_place/congestion.webp",
+        "logs/sky130hd/gcd/base/1_synth/synth.log",
+        "scripts/flow.tcl",
+    ]
+    for rel in files:
+        path = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("x\n")
+
+
+async def forged_osc_check(workbench: "Workbench", watcher: Watcher, session_id: str) -> bool:
+    """A program printing the workbench's private OSC sequence must not be able
+    to invent a Run: the sequence carries a per-session token."""
+    watcher.drain()
+    token_before = workbench.get_session(session_id).osc_token
+    payload = (
+        '{"t":"prompt","ec":0,"cwd":"/etc","cmd":"FORGED-MUST-NOT-APPEAR"}'
+    )
+    # printf with a literal ESC; the whole thing is single-quoted for the shell.
+    forged = "printf '\\033]7770;owb;" + payload + "\\007'\r"
+    workbench.write_input(session_id, forged)
+    await watcher.wait("run.completed", timeout=25)
+    await asyncio.sleep(0.8)
+    runs = workbench.list_runs(session_id=session_id, limit=20)
+    forged_seen = any((r.get("command") or "").strip() == "FORGED-MUST-NOT-APPEAR" for r in runs)
+    cwd_now = (workbench.get_session(session_id).cwd or "").rstrip("/")
+    return (not forged_seen) and cwd_now != "/etc" and bool(token_before)
 
 
 def http_headers(path: str, timeout: float = 8.0):
@@ -231,9 +291,22 @@ async def main() -> int:
 
         # ---------------------------------------------------------- HTTP API
         status = await http_json_async("/api/status")
-        report.check("/api/status stays compatible and reports the workbench",
-                     status.get("ok") is True and status.get("app") == "openroad-workbench",
-                     "tool_count=%s" % status.get("tool_count"))
+        # Assert the *original* contract the task's acceptance command relied on,
+        # not just the new fields.
+        legacy_ok = (
+            status.get("ok") is True
+            and status.get("transport") == "stdio"
+            and isinstance(status.get("repo"), str) and bool(status.get("repo"))
+            and status.get("tool_count") == 15
+        )
+        report.check("/api/status keeps its original contract (ok/transport/repo/tool_count)",
+                     legacy_ok,
+                     "ok=%s transport=%s repo=%s tool_count=%s" % (
+                         status.get("ok"), status.get("transport"),
+                         status.get("repo"), status.get("tool_count")))
+        report.check("/api/status does not block on MCP tool calls",
+                     (await asyncio.to_thread(http_elapsed, "/api/status")) < 2.0,
+                     "%.2fs" % (await asyncio.to_thread(http_elapsed, "/api/status")))
 
         state = await http_json_async("/api/state")
         report.check("/api/state exposes designs/sessions/runs/artifacts",
@@ -260,9 +333,70 @@ async def main() -> int:
         except Exception as exc:
             report.check("official MCP catalog is fully exposed (15 tools)", False, str(exc))
 
-        artifacts = (await http_json_async("/api/artifacts"))["artifacts"]
-        report.check("artifact index answers (may legitimately be empty in /tmp)", isinstance(artifacts, list),
-                     "%d artifacts" % len(artifacts))
+        # ------------------------------- scrollback + colour + ORFS stages
+        await run_command(workbench, watcher, session_id, "seq 1 400 >/dev/null; seq 1 400")
+        deep = workbench.screen(session_id, lines=5000)
+        report.check("terminal keeps scrollback history",
+                     deep.get("history_len", 0) > 0 and len(deep.get("screen") or []) > 200,
+                     "history_len=%s lines=%s" % (deep.get("history_len"), len(deep.get("screen") or [])))
+
+        await run_command(workbench, watcher, session_id, "printf '\\033[31mRED\\033[0m plain\\n'")
+        frame = workbench.screen(session_id, lines=60)
+        coloured = any(
+            (run.get("fg") or "default") not in ("default",)
+            for line in (frame.get("runs") or []) for run in line
+        )
+        report.check("terminal frame carries ANSI colour", coloured,
+                     "runs=%d" % sum(len(line) for line in (frame.get("runs") or [])))
+
+        # Fixture: the stage lines OpenROAD-flow-scripts actually prints
+        # (flow/scripts/flow.sh: echo "Running $2.tcl, stage $1").
+        orfs_lines = [
+            "Running synth_odb.tcl, stage 1_synth",
+            "Running floorplan.tcl, stage 2_floorplan",
+            "Running macro_place.tcl, stage 2_floorplan",
+            "Running tapcell.tcl, stage 2_floorplan",
+            "Running pdn.tcl, stage 2_floorplan",
+            "Running global_place_skip_io.tcl, stage 3_place",
+            "Running global_place.tcl, stage 3_place",
+            "Running detail_place.tcl, stage 3_place",
+            "Running cts.tcl, stage 4_cts",
+            "Running global_route.tcl, stage 5_route",
+            "Running detail_route.tcl, stage 5_route",
+            "Running final_report.tcl, stage 6_final_report",
+        ]
+        printer = "printf '%s\\n' " + " ".join("'" + line + "'" for line in orfs_lines)
+        run = await run_command(workbench, watcher, session_id, printer)
+        stages = set((run or {}).get("stages") or [])
+        report.check("real ORFS stage lines are recognised",
+                     {"synth", "floorplan", "place", "cts", "route", "finish"} <= stages,
+                     "stages=%s" % sorted(stages))
+
+        # ------------------------------------------- artifact index (SC 5 seed)
+        _make_fake_orfs_tree(workdir)
+        registered = await http_json_async("/api/designs", "POST", {"path": workdir, "name": "accept-design"})
+        design_id = registered["design"]["id"]
+        await asyncio.to_thread(lambda: time.sleep(0.6))
+        await http_json_async("/api/artifacts/refresh", "POST", {"design_id": design_id})
+        listing = await http_json_async("/api/artifacts", "GET")
+        found = listing["artifacts"]
+        kinds = {a["kind"] for a in found}
+        report.check("artifact index classifies reports/images/logs/metrics/scripts",
+                     {"report", "image", "log", "metric", "script"} <= kinds,
+                     "kinds=%s n=%d" % (sorted(kinds), len(found)))
+        staged = [a for a in found if a.get("stage") == "place"]
+        report.check("artifact index derives the ORFS stage from the path", bool(staged),
+                     "place artifacts=%d" % len(staged))
+
+        # ------------------------------------------------- destructive gate
+        blocked = await asyncio.to_thread(
+            http_expect_error, "/api/tool", "POST",
+            {"tool": "run_orfs_stage", "arguments": {"design": "gcd"}})
+        report.check("state-changing MCP tools require confirm=true", blocked is not None
+                     and blocked[0] == 400 and "confirm" in blocked[1],
+                     str(blocked))
+        report.check("forged OSC from program output cannot fabricate a run",
+                     await forged_osc_check(workbench, watcher, session_id))
 
         index_html = await asyncio.to_thread(http_text, "/")
         report.check("web dashboard is served", "OpenROAD Workbench" in index_html,

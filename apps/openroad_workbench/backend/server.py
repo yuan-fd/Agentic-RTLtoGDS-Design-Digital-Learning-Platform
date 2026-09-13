@@ -76,6 +76,7 @@ class Server:
         app.router.add_post("/api/sessions", self.handle_session_create)
         app.router.add_get("/api/sessions/{sid}", self.handle_session_detail)
         app.router.add_post("/api/sessions/{sid}/input", self.handle_session_input)
+        app.router.add_post("/api/sessions/{sid}/fill", self.handle_session_fill)
         app.router.add_post("/api/sessions/{sid}/interrupt", self.handle_session_interrupt)
         app.router.add_post("/api/sessions/{sid}/terminate", self.handle_session_terminate)
         app.router.add_post("/api/sessions/{sid}/close", self.handle_session_close)
@@ -197,6 +198,12 @@ class Server:
         if data is None:
             raise ValueError("data is required")
         return json_response(self.workbench.write_input(request.match_info["sid"], str(data)))
+
+    async def handle_session_fill(self, request: web.Request) -> web.Response:
+        """Insert text into the command line without executing it."""
+        payload = await _json_body(request)
+        return json_response(self.workbench.fill_command_line(
+            request.match_info["sid"], str(payload.get("text") or "")))
 
     async def handle_session_interrupt(self, request: web.Request) -> web.Response:
         return json_response(self.workbench.interrupt(request.match_info["sid"]))

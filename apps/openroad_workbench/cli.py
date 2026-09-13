@@ -109,6 +109,18 @@ def pick_port(host: str, preferred: int, attempts: int = 20) -> Tuple[int, Optio
     raise SystemExit("no free port near %d" % preferred)
 
 
+def find_daemon(host: str, preferred: int, span: int = 20):
+    """Locate a *running* daemon.  Never drifts onto a free port the way
+    pick_port does, which used to make --status/--stop report "not running"
+    whenever the daemon had been started on a neighbouring port."""
+    for offset in range(span):
+        port = preferred + offset
+        status = daemon_status(host, port)
+        if status:
+            return port, status
+    return None, None
+
+
 def stop_daemon(host: str, port: int) -> int:
     status = daemon_status(host, port)
     if not status:
@@ -159,8 +171,7 @@ def main(argv=None) -> int:
     preferred = args.port or int(config.get("port") or 8780)
 
     if args.status:
-        port, _ = pick_port(host, preferred)
-        status = daemon_status(host, port)
+        port, status = find_daemon(host, preferred)
         if not status:
             print(json.dumps({"ok": False, "error": "daemon not running"}, indent=2))
             return 1
@@ -168,7 +179,10 @@ def main(argv=None) -> int:
         return 0
 
     if args.stop:
-        port, _ = pick_port(host, preferred)
+        port, _ = find_daemon(host, preferred)
+        if port is None:
+            print("no openroad-workbench daemon near %s:%d" % (host, preferred))
+            return 1
         return stop_daemon(host, port)
 
     if args.log:

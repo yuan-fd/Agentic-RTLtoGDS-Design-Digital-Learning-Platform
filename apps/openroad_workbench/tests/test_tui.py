@@ -134,6 +134,21 @@ async def main(argv: List[str]) -> int:
                          got and "未配置模型" in app._last_reply,
                          (app._last_reply or "")[:70].replace("\n", " "))
 
+            # ------------------------- Ctrl+G must fill, never execute (P1)
+            runs_before = len(workbench.list_runs(session_id=session_id))
+            app._last_reply = "脚本如下：\n```tcl\nset OWB_MARKER_ONE 1\nputs OWB_MARKER_TWO\n```\n"
+            app.pane.focus()
+            await pilot.press("ctrl+g")
+            await asyncio.sleep(1.5)
+            runs_after = len(workbench.list_runs(session_id=session_id))
+            text = pane_text(app)
+            report.check("Ctrl+G fills the command line without executing it",
+                         runs_after == runs_before and "OWB_MARKER_ONE" in text,
+                         "runs %d -> %d, visible=%s" % (
+                             runs_before, runs_after, "OWB_MARKER_ONE" in text))
+            # clear the pending edit line so later checks start clean
+            await app.client.send_input(session_id, "\x15")
+
             # -------------------------------------------------------- sidebars
             sidebar_text = "\n".join(str(w.renderable if hasattr(w, "renderable") else "") for w in [])
             sessions_view = app.sidebar.sessions_view

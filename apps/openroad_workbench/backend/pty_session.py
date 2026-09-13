@@ -25,6 +25,7 @@ import json
 import os
 import pty
 import re
+import secrets
 import signal
 import struct
 import termios
@@ -36,18 +37,73 @@ from typing import Any, Callable, Dict, List, Optional
 import pyte
 
 OSC_PREFIX = "\x1b]7770;owb;"
+OSC_TOKEN_PLACEHOLDER = "%TOKEN%"
 OSC_RE = re.compile(re.escape(OSC_PREFIX) + r"(.*?)(?:\x07|\x1b\\)", re.S)
 RAW_LIMIT = 4 * 1024 * 1024
 HISTORY_LINES = 4000
 
 # Stages we recognise in terminal output.  This is a *detector*, not a source of
 # truth: unknown stages are simply not claimed.
+# OpenROAD-flow-scripts announces each step as
+#     Running <script>.tcl, stage <N_stage>            (flow/scripts/flow.sh)
+# where the script name is e.g. synth_odb / global_place / detail_route.  The
+# earlier patterns required the stage word to follow "Running" directly, so
+# "Running global_place.tcl" and "Running synth_odb.tcl" never matched -- which
+# made the live stage panel a no-op on a real flow.
+ORFS_RUN_RE = re.compile(r"Running\s+(\S+?)\.tcl,\s*stage\s+(\S+)", re.I)
+
+ORFS_SCRIPT_STAGE = {
+    "synth": "synth", "synth_odb": "synth", "synth_generic": "synth",
+    "floorplan": "floorplan", "macro_place": "place", "tapcell": "place",
+    "pdn": "place", "global_place_skip_io": "place", "global_place": "place",
+    "detail_place": "place", "place": "place",
+    "cts": "cts", "clock_tree": "cts",
+    "grt": "grt", "global_route": "route", "detail_route": "route", "route": "route",
+    "final_report": "finish", "finish": "finish",
+}
+
 STAGE_PATTERNS = [
+    # "<stage dir>" forms such as 1_synth, 3_place, 6_final_report.
+    (re.compile(r"\b\d+[_\-]?([a-z_]+)\b", re.I), 1),
+    # Generic fallbacks for other flows / user scripts.
+    (re.compile(r"\bstage\s*[=:]\s*([a-z_]+)", re.I), 1),
     (re.compile(r"\bRunning\s+(synth|floorplan|place|cts|grt|route|finish)\b", re.I), 1),
-    (re.compile(r"\b(?:ORFS|flow)\s*[:>]\s*(synth|floorplan|place|cts|grt|route|finish)\b", re.I), 1),
-    (re.compile(r"^\s*\d+[_\-\s]?(synth|floorplan|place|cts|grt|route|finish)\b", re.I), 1),
-    (re.compile(r"\b(?:stage|step)\s*[=:]\s*(synth|floorplan|place|cts|grt|route|finish)\b", re.I), 1),
 ]
+
+STAGE_ALIASES = {
+    "synth": "synth", "synthesis": "synth", "1_synth": "synth",
+    "floorplan": "floorplan", "2_floorplan": "floorplan",
+    "place": "place", "placement": "place", "global_place": "place",
+    "detail_place": "place", "macro_place": "place", "3_place": "place",
+    "cts": "cts", "clock_tree_synthesis": "cts", "4_cts": "cts",
+    "grt": "grt", "global_route": "route", "route": "route", "detail_route": "route",
+    "5_route": "route", "5_1_grt": "route", "5_2_route": "route",
+    "finish": "finish", "final_report": "finish", "6_final": "finish", "6_final_report": "finish",
+}
+
+
+def normalise_stage(token: str) -> Optional[str]:
+    """Map a stage directory / script name onto the canonical stage list."""
+    if not token:
+        return None
+    token = token.strip().lower().strip("/")
+    if token in STAGE_ALIASES:
+        return STAGE_ALIASES[token]
+    if token in ORFS_SCRIPT_STAGE:
+        return ORFS_SCRIPT_STAGE[token]
+    # "3_place" / "2_1_floorplan" -> drop the numeric prefix and retry.
+    stripped = re.sub(r"^\d+[_\-]*", "", token)
+    if stripped in STAGE_ALIASES:
+        return STAGE_ALIASES[stripped]
+    if stripped in ORFS_SCRIPT_STAGE:
+        return ORFS_SCRIPT_STAGE[stripped]
+    for stage in STAGE_ORDER_NAMES:
+        if stripped.startswith(stage):
+            return stage
+    return None
+
+
+STAGE_ORDER_NAMES = ["synth", "floorplan", "place", "cts", "grt", "route", "finish"]
 
 
 def shell_integration_bashrc(path: str) -> str:
@@ -109,13 +165,18 @@ __owb_precmd() {
     line="$__owb_cmd"
   fi
   __owb_last="$line"
-  printf '\033]7770;owb;{"t":"prompt","ec":%d,"cwd":"%s","cmd":"%s"}\007' \
-    "$ec" "$(__owb_esc "$PWD")" "$(__owb_esc "$line")"
+  printf '\033]7770;owb;%s;{"t":"prompt","ec":%d,"cwd":"%s","cmd":"%s"}\007' \
+    "$OWB_OSC_TOKEN" "$ec" "$(__owb_esc "$PWD")" "$(__owb_esc "$line")"
   __owb_cmd=""
   __owb_armed=1
 }
 
 trap '__owb_preexec' DEBUG
+
+# Guarantee bracketed paste: the workbench relies on it to insert a multi-line
+# agent proposal WITHOUT the shell executing every line as it arrives.
+bind 'set enable-bracketed-paste on' 2>/dev/null || true
+bind 'set bell-style none' 2>/dev/null || true
 
 if declare -p PROMPT_COMMAND 2>/dev/null | grep -q 'declare -a'; then
   PROMPT_COMMAND=(__owb_save_ec "${PROMPT_COMMAND[@]}" __owb_precmd)
@@ -145,8 +206,8 @@ __owb_save_ec() { __owb_ec=$?; }
 __owb_precmd() {
   local ec=$__owb_ec
   local cmd="$(fc -ln -1 2>/dev/null)"
-  printf '\033]7770;owb;{"t":"prompt","ec":%d,"cwd":"%s","cmd":"%s"}\007' \
-    "$ec" "$(__owb_esc "$PWD")" "$(__owb_esc "${cmd# }")"
+  printf '\033]7770;owb;%s;{"t":"prompt","ec":%d,"cwd":"%s","cmd":"%s"}\007' \
+    "$OWB_OSC_TOKEN" "$ec" "$(__owb_esc "$PWD")" "$(__owb_esc "${cmd# }")"
   __owb_ec=0
 }
 if [ -n "${precmd_functions+x}" ]; then
@@ -199,8 +260,14 @@ class PtySession:
         self._version = 0
         self._reader: Optional[threading.Thread] = None
         self._line = ""            # optimistic keystroke reconstruction
+        self._in_escape = False    # inside a CSI/SS3 sequence
         self._closed = False
         self.command_seq = 0
+        self.bracketed_paste = False
+        # Unpredictable per-session value handed to the shell integration.  It
+        # is a spoofing barrier, not a secret: the user's own processes could
+        # read it, but ordinary output (logs, tool dumps) cannot.
+        self.osc_token = secrets.token_hex(8)
 
         self._spawn(argv, cwd, env, shell_rc)
 
@@ -216,24 +283,29 @@ class PtySession:
         child_env.setdefault("TERM", "xterm-256color")
         child_env["OWB_SESSION"] = self.id
         child_env["OWB_SESSION_NAME"] = self.name
+        child_env["OWB_OSC_TOKEN"] = self.osc_token
         if env:
             child_env.update({k: str(v) for k, v in env.items()})
 
         shell = os.environ.get("SHELL") or "/bin/bash"
         if argv:
             args = list(argv)
+            self.bracketed_paste = False
         else:
             base = os.path.basename(shell)
             self.shell = base
             if base.endswith("bash"):
                 rc = shell_rc or os.path.expanduser("~/.openroad-workbench/shell/owb.bashrc")
                 args = [shell, "--rcfile", rc, "-i"]
+                self.bracketed_paste = True
             elif base.endswith("zsh"):
                 rc = os.path.expanduser("~/.openroad-workbench/shell/owb.zshrc")
                 child_env["ZDOTDIR"] = os.path.dirname(rc)
                 args = [shell, "-i"]
+                self.bracketed_paste = True
             else:
                 args = [shell, "-i"]
+                self.bracketed_paste = False
 
         pid, fd = pty.fork()
         if pid == 0:  # pragma: no cover - child process
@@ -338,8 +410,14 @@ class PtySession:
         return "".join(out), payloads
 
     def _handle_osc(self, payload: str) -> None:
+        # payload is "<token>;<json>" -- output from an arbitrary program cannot
+        # guess the token, so it can no longer fabricate a Run.
+        token, sep, body = payload.partition(";")
+        if not sep or not self.osc_token or token != self.osc_token:
+            self._emit("shell.prompt.rejected", reason="bad token")
+            return
         try:
-            data = json.loads(payload)
+            data = json.loads(body)
         except Exception:
             return
         if data.get("t") != "prompt":
@@ -357,14 +435,31 @@ class PtySession:
         )
 
     def _detect_stages(self, text: str) -> None:
+        """Report every stage we can see in this chunk.
+
+        The previous version returned after the first match *per chunk*, so when
+        several stage lines arrived together (the normal case -- a flow prints
+        them back to back) only one was recorded.
+        """
         if not text or self._on_event is None:
             return
+        seen: List[str] = []
         for line in text.splitlines():
+            match = ORFS_RUN_RE.search(line)
+            if match:
+                stage = normalise_stage(match.group(2)) or normalise_stage(match.group(1))
+                if stage and stage not in seen:
+                    seen.append(stage)
+                continue
             for pattern, group in STAGE_PATTERNS:
-                match = pattern.search(line)
-                if match:
-                    self._emit("stage.observed", stage=match.group(group).lower())
-                    return
+                found = pattern.search(line)
+                if found:
+                    stage = normalise_stage(found.group(group))
+                    if stage and stage not in seen:
+                        seen.append(stage)
+                    break
+        for stage in seen:
+            self._emit("stage.observed", stage=stage)
 
     def _finalise(self) -> None:
         with self._lock:
@@ -381,10 +476,7 @@ class PtySession:
             status = None
         self.exit_code = status
         self.alive = False
-        try:
-            os.close(self.master_fd)
-        except OSError:
-            pass
+        self._close_master()
         self._emit("session.exited", exit_code=status, session=self.snapshot(include_screen=False))
 
     # ------------------------------------------------------------------- input
@@ -400,6 +492,14 @@ class PtySession:
 
     def _track_input(self, data: str) -> None:
         for char in data:
+            if self._in_escape:
+                # Consume a CSI/SS3/function-key body: it ends at a letter or '~'.
+                if char.isalpha() or char == "~":
+                    self._in_escape = False
+                continue
+            if char == "\x1b":
+                self._in_escape = True
+                continue
             if char == "\r" or char == "\n":
                 command = self._line.strip()
                 self._line = ""
@@ -412,11 +512,19 @@ class PtySession:
                 self._line = self._line[:-1]
             elif char in ("\x03", "\x15"):
                 self._line = ""
-            elif char == "\x1b":
-                # Arrow keys / escapes: drop the pending guess, do not clear history.
-                self._line = self._line
             elif char.isprintable():
                 self._line += char
+
+    def write_raw(self, data: str) -> int:
+        """Write to the PTY *without* treating it as typed keystrokes.
+
+        Used to insert a proposal: the text is not a command the user typed, so
+        it must not create an optimistic Run.
+        """
+        if not self.alive:
+            raise RuntimeError("session %s is not running" % self.id)
+        with self._lock:
+            return os.write(self.master_fd, data.encode("utf-8", "replace"))
 
     def interrupt(self) -> None:
         if self.alive:
@@ -456,46 +564,89 @@ class PtySession:
         except OSError:
             return candidate or os.path.expanduser("~")
 
-    def _all_lines(self) -> List[str]:
-        """Full buffer: scrollback history followed by the visible screen."""
+    def _row_text(self, row) -> str:
+        """One screen row as text.
+
+        The cell is a ``pyte.screens.Char`` namedtuple, so joining the cells
+        themselves raises TypeError ("expected str instance, Char found").  That
+        exception used to be swallowed by a bare ``except Exception: pass``,
+        which is why scrollback silently returned nothing for every session.
+        """
+        return "".join(row[col].data for col in range(self._screen.columns))
+
+    def _row_runs(self, row) -> List[Dict[str, Any]]:
+        """One screen row as styled runs: [{'t': text, 'fg':..., 'b':...}, ...]."""
+        runs: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+        for col in range(self._screen.columns):
+            cell = row[col]
+            data = cell.data
+            if not data:
+                continue  # continuation cell of a double-width character
+            key = (cell.fg, cell.bg, bool(cell.bold), bool(cell.italics),
+                   bool(cell.underscore), bool(cell.reverse))
+            if current is not None and current["_key"] == key:
+                current["t"] += data
+            else:
+                current = {
+                    "_key": key, "t": data, "fg": cell.fg, "bg": cell.bg,
+                    "b": bool(cell.bold), "i": bool(cell.italics),
+                    "u": bool(cell.underscore), "r": bool(cell.reverse),
+                }
+                runs.append(current)
+        for run in runs:
+            run.pop("_key", None)
+        if runs:
+            runs[-1]["t"] = runs[-1]["t"].rstrip()
+            runs = [run for run in runs if run["t"]]
+        return runs
+
+    def _lines_and_runs(self, limit: Optional[int], with_runs: bool = True):
         with self._lock:
-            lines = list(self._screen.display)
-            try:
-                width = self._screen.columns
-                lines = [
-                    "".join(line[col] for col in range(width))
-                    for line in self._screen.history.top
-                ] + lines
-            except Exception:
-                pass
-        return [line.rstrip() for line in lines]
+            display_rows = list(self._screen.buffer[row] for row in range(self._screen.lines))
+            history_rows = list(self._screen.history.top)
+        rows = history_rows + display_rows
+        if limit:
+            rows = rows[-limit:]
+        texts = [self._row_text(row).rstrip() for row in rows]
+        runs = [self._row_runs(row) for row in rows] if with_runs else [[] for _ in rows]
+        return texts, runs
+
+    def _all_lines(self) -> List[str]:
+        texts, _ = self._lines_and_runs(None, with_runs=False)
+        while len(texts) > 1 and not texts[-1]:
+            texts.pop()
+        return texts
 
     def screen_lines(self, limit: Optional[int] = None, include_history: bool = True) -> List[str]:
-        lines = self._all_lines()
-        if not include_history:
-            lines = lines[-self.rows:]
-        # Trim trailing blank lines, keeping at least one.
-        while len(lines) > 1 and not lines[-1]:
-            lines.pop()
+        texts, _ = self._lines_and_runs(None if include_history else self.rows, with_runs=False)
+        while len(texts) > 1 and not texts[-1]:
+            texts.pop()
         if limit:
-            lines = lines[-limit:]
-        return lines
+            texts = texts[-limit:]
+        return texts
 
-    def screen_state(self, limit: int = 200) -> Dict[str, Any]:
-        """Screen plus the metadata a client needs to place the cursor."""
-        lines = self._all_lines()
-        total = len(lines)
-        trimmed = lines[-limit:] if limit and total > limit else list(lines)
-        included_history = max(0, len(trimmed) - self.rows)
-        while len(trimmed) > 1 and not trimmed[-1]:
-            trimmed.pop()
-        return {
-            "screen": trimmed,
+    def screen_state(self, limit: int = 200, with_runs: bool = True) -> Dict[str, Any]:
+        """Screen plus the metadata a client needs to place the cursor and to
+        paint colour.  ``screen`` stays plain text so existing consumers keep
+        working; ``runs`` carries the per-line styling."""
+        texts, runs = self._lines_and_runs(limit)
+        rows = self.rows
+        while len(texts) > 1 and not texts[-1]:
+            texts.pop()
+            runs.pop()
+        included_history = max(0, len(texts) - rows)
+        state = {
+            "screen": texts,
             "history_len": included_history,
+            "history_lines": len(texts),
             "cursor": {"x": self._screen.cursor.x, "y": self._screen.cursor.y},
             "cols": self.cols,
-            "rows": self.rows,
+            "rows": rows,
         }
+        if with_runs:
+            state["runs"] = runs
+        return state
 
     def raw_text(self) -> str:
         with self._lock:
@@ -526,9 +677,18 @@ class PtySession:
             data["cursor"] = state["cursor"]
         return data
 
-    def close(self) -> None:
-        self.terminate(signal.SIGKILL)
+    def _close_master(self) -> None:
+        """Exactly one code path may close the master fd.  Closing twice can
+        silently close an unrelated fd that has since been reused."""
+        with self._lock:
+            fd, self.master_fd = self.master_fd, -1
+        if fd is None or fd < 0:
+            return
         try:
-            os.close(self.master_fd)
+            os.close(fd)
         except OSError:
             pass
+
+    def close(self) -> None:
+        self.terminate(signal.SIGKILL)
+        self._close_master()

@@ -15,6 +15,33 @@ TUI (Textual)   Web dashboard        Agent
               bash / openroad / tclsh / python / make / ORFS
 ```
 
+## 前置条件
+
+| 需要 | 版本/位置 | 说明 |
+|---|---|---|
+| Python | **>= 3.9** | 用到 `os.waitstatus_to_exitcode`（3.9 起） |
+| Python 包 | `aiohttp>=3.8`、`pyte>=0.8`、`textual>=1.0` | 见 `requirements.txt` |
+| Node | >= 18 | 仅用于启动官方 OpenROAD-MCP |
+| 官方 MCP | `~/openroad-mcp`（`typescript/dist/main.js` 必须已构建） | 用 `--mcp-repo` 或 config 指向别处 |
+| OpenROAD | 在 PATH 中 | 终端里 `openroad` 可用即可；工作台不依赖其内部 API |
+
+```bash
+python3 -m pip install --user -r apps/openroad_workbench/requirements.txt
+# 内网/国内镜像：
+# python3 -m pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple \
+#     -r apps/openroad_workbench/requirements.txt
+```
+
+官方 MCP 获取与构建：
+
+```bash
+git clone https://github.com/The-OpenROAD-Project/OpenROAD-MCP ~/openroad-mcp
+cd ~/openroad-mcp/typescript && npm install && npm run build
+```
+
+`mcp_repo` 未解析到时，`/api/status` 会明确返回 `available: false`，
+`openroad-workbench --status` 非 0 退出；不会静默降级。
+
 ## 快速开始
 
 ```bash
@@ -41,12 +68,16 @@ ssh -L 8780:127.0.0.1:8780 user@host
 | `Ctrl+C` | 发送到终端（中断前台进程），**不会退出程序** |
 | `Ctrl+N` / `Ctrl+W` | 新建 / 关闭终端 |
 | `Ctrl+1..9` | 切换终端 |
-| `Ctrl+B` | 显示/隐藏侧栏 |
-| `Ctrl+J` / `Esc` | 聚焦 Agent 输入 / 回到终端 |
-| `Ctrl+G` | 把 Agent 最近回复里的代码块填进终端输入栏（不执行） |
-| `Ctrl+U` / `Ctrl+D` / `Ctrl+Y` | 上翻 / 下翻 / 回到最底部 |
+| `F4` | 显示/隐藏侧栏 |
+| `F2` / `Esc` | 聚焦 Agent 输入 / 回到终端 |
+| `F3` | 显示/隐藏 Agent 面板 |
+| `Ctrl+G` | 把 Agent 最近回复里的代码块**填入**终端输入栏（不执行；多行用括号粘贴插入，回车由你按） |
+| `Alt+U` / `Alt+D` / `Alt+B` | 上翻 / 下翻 / 回到最底部 |
 | `F1` | 帮助 |
 | `Ctrl+Q` | 退出 TUI（后台任务继续运行，重开即重连） |
+
+> 键位刻意避开 readline 的 `Ctrl-B/E/J/U/D/Y`：那些属于 shell。
+> `Ctrl-U`（删行）、`Ctrl-D`（EOF）、`Ctrl-B/E`（左右移光标）在终端里照常可用。
 
 ## 设计要点
 
@@ -61,13 +92,23 @@ ssh -L 8780:127.0.0.1:8780 user@host
 ## 目录
 
 ```
-backend/  core.py(状态机) pty_session.py(真 PTY) runs/artifacts/mcp_client/agent/corpus/server/daemon
+backend/  core.py(状态机) pty_session.py(真 PTY) artifacts/mcp_client/agent/corpus/server/daemon/config
 tui/      Textual 客户端（app.py, widgets.py, client.py）
 web/      aiohttp dashboard（原生 JS，无前端框架）
-tests/    acceptance.py(终端验收) test_tui.py(无头 TUI 验收)
-install.py
-WORKBENCH_SPEC.md
+tests/    acceptance.py(终端+HTTP+负向用例) test_tui.py(无头 TUI 验收)
+install.py  requirements.txt  WORKBENCH_SPEC.md
 ```
+
+## 已知未实现 / 边界（如实申报）
+
+* **Agent 未接模型**：`provider=null`，只做上下文汇总与本地语料检索；不会编造执行结果。
+* **Agent 不展示 diff**：SPEC 里"展示 diff"未实现，目前只有"填入命令行 + 原文回显"。
+* **语料库未内置**：`corpus_path` 为空时检索返回 0 条，不会假装命中。
+* **Web 端不跑命令**：终端画面只读；命令只在 TUI 里执行（这是刻意的职责划分）。
+* **单用户、无鉴权**：daemon 只监听 `127.0.0.1`，任何能访问该端口的人即拥有该用户的
+  shell 权限。端口转发给别人等于交出 shell。
+* **Run 记录来源**：shell 集成上报（带每会话随机 token）与键盘重建；`stages` 是从
+  终端输出推断的**观察值**，不是 ORFS 的权威阶段状态。
 
 ## 验证
 

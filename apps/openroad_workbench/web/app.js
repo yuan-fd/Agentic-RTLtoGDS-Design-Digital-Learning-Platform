@@ -410,11 +410,53 @@ function connectTerminal(sessionId) {
   ws.onclose = () => { if (S.ws === ws) setTimeout(() => { if (S.activeSession === sessionId) connectTerminal(sessionId); }, 1500); };
 }
 
+const TERM_COLORS = {
+  black: '#3b4252', red: '#e05a5a', green: '#5fc96a', brown: '#d29922',
+  blue: '#4d9dff', magenta: '#bc8cff', cyan: '#4fc1c9', white: '#cdd6e3',
+  brightblack: '#6b7688', brightred: '#ff7b72', brightgreen: '#7ee787',
+  brightbrown: '#e3b341', brightblue: '#7cb8ff', brightmagenta: '#d2a8ff',
+  brightcyan: '#7fe4e8', brightwhite: '#ffffff',
+};
+
+function runStyle(run) {
+  const parts = [];
+  if (run.fg && run.fg !== 'default' && TERM_COLORS[run.fg]) parts.push('color:' + TERM_COLORS[run.fg]);
+  if (run.bg && run.bg !== 'default' && TERM_COLORS[run.bg]) parts.push('background:' + TERM_COLORS[run.bg]);
+  if (run.b) parts.push('font-weight:600');
+  if (run.i) parts.push('font-style:italic');
+  if (run.u) parts.push('text-decoration:underline');
+  if (run.r) parts.push('filter:invert(1)');
+  return parts.join(';');
+}
+
 function renderTerminal(frame) {
   const node = $('#terminal');
   const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 24;
-  node.textContent = (frame.screen || []).join('\n');
+  const lines = frame.screen || [];
+  const runs = frame.runs || [];
+  if (!runs.length) {
+    node.textContent = lines.join('\n');
+  } else {
+    const html = lines.map((plain, index) => {
+      const lineRuns = runs[index] || [];
+      if (!lineRuns.length) return esc(plain);
+      return lineRuns.map((run) => {
+        const style = runStyle(run);
+        return style ? '<span style="' + style + '">' + esc(run.t) + '</span>' : esc(run.t);
+      }).join('');
+    }).join('\n');
+    node.innerHTML = html;
+  }
   if (atBottom) node.scrollTop = node.scrollHeight;
+}
+
+// ANSI escapes are already interpreted for the terminal pane; the raw log view
+// must not print them literally (`[0;33-40m14.48[0m`).
+function stripAnsi(text) {
+  return String(text)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1b[@-Z\\-_]/g, '');
 }
 
 async function loadLog() {
@@ -424,7 +466,7 @@ async function loadLog() {
   try {
     const response = await fetch('/api/sessions/' + encodeURIComponent(session.id) + '/log');
     const text = await response.text();
-    body.innerHTML = '<pre>' + esc(text.slice(-200000)) + '</pre>';
+    body.innerHTML = '<pre>' + esc(stripAnsi(text.slice(-200000))) + '</pre>';
   } catch (error) {
     body.innerHTML = '<div class="empty">读取失败：' + esc(error.message) + '</div>';
   }
