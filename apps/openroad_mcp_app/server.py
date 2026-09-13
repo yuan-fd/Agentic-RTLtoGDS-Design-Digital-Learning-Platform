@@ -46,7 +46,10 @@ class App(BaseHTTPRequestHandler):
   if self.path=='/api/status':return self.send(200,{'ok':True,'transport':'stdio','repo':str(self.mcp.repo),'tool_count':len(self.mcp.catalog())})
   if self.path=='/api/tools':return self.send(200,{'tools':self.mcp.catalog()})
   if self.path=='/':return self.send(200,(Path(__file__).parent/'static/index.html').read_bytes(),'text/html; charset=utf-8')
-  if self.path.startswith('/static/'):return self.send(200,(Path(__file__).parent/self.path.lstrip('/')).read_bytes())
+  if self.path.startswith('/static/'):
+   asset=Path(__file__).parent/self.path.lstrip('/')
+   types={'.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.html':'text/html; charset=utf-8'}
+   return self.send(200,asset.read_bytes(),types.get(asset.suffix,'application/octet-stream'))
   return self.send(404,{'error':'not found'})
  def do_POST(self):
   try:
