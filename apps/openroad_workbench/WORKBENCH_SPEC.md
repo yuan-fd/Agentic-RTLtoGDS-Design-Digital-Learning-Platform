@@ -46,23 +46,30 @@
 
 ## Commands
 
-- 启动：`openroad-workbench`
-- 兼容启动：`python3 apps/openroad_mcp_app/launcher.py`
-- 检查：`node --check ...`、`python3 -m py_compile ...`
-- 官方 MCP 验证：在官方 `typescript` 目录运行其测试命令。
+- 安装：`python3 apps/openroad_workbench/install.py`（写入 `~/bin/openroad-workbench`）
+- 启动：`openroad-workbench`（后台 + TUI + Web 同时起）
+- 仅后台：`openroad-workbench --no-tui`；状态：`--status`；停止：`--stop`
+- 兼容接口：`curl http://127.0.0.1:8780/api/status` 仍返回 `{ok, transport, repo, tool_count}`
+- 检查：`node --check web/app.js`、`python3 -m compileall apps/openroad_workbench`
+- 验收：`python3 -m openroad_workbench.tests.acceptance`、`python3 -m openroad_workbench.tests.test_tui`
+- 官方 MCP：默认路径 `~/openroad-mcp`（可用 `--mcp-repo` 覆盖）
 
 ## Architecture
 
 ```text
-launcher
-  ├── Workbench backend
-  │   ├── PTY/session manager
-  │   ├── MCP client
-  │   ├── run/process tracker
-  │   ├── artifact index
-  │   └── agent context
-  ├── TUI client
-  └── Web GUI client
+apps/openroad_workbench/
+  cli.py                  openroad-workbench 入口（拉起 daemon / TUI）
+  backend/
+    core.py               单一真相源状态机（designs/sessions/runs/artifacts）
+    pty_session.py        真 PTY + shell 集成（OSC 7770 上报命令/cwd/退出码）
+    artifacts.py          ORFS 结果索引
+    mcp_client.py         官方 MCP stdio 客户端（15 个工具）
+    agent.py / corpus.py  可插拔 Agent + 本地语料检索
+    server.py             aiohttp REST + SSE + 终端 WebSocket
+    daemon.py             常驻后台
+  tui/                    Textual 客户端（终端/Agent/状态栏）
+  web/                    原生 JS dashboard
+  tests/                  acceptance.py, test_tui.py
 ```
 
 ## Success Criteria
