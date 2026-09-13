@@ -272,41 +272,47 @@ class Sidebar(Vertical):
         yield Static("[b]最近运行[/b]", classes="section")
         yield self.runs_view
 
+    # Colours are applied as Text styles, never through markup: command text is
+    # user data and "[" appears in it constantly (printf, awk, globs), which used
+    # to raise MarkupError and kill the whole TUI.
+    STATUS_COLOR = {
+        "running": "yellow", "idle": "yellow", "exited": "red",
+        "success": "green", "failed": "red", "cancelled": "magenta",
+    }
+
     def update_sessions(self, sessions: List[Dict[str, Any]], active: Optional[str]) -> None:
-        lines: List[str] = []
+        text = Text()
         for index, session in enumerate(sessions[:9], start=1):
+            if index > 1:
+                text.append("\n")
             marker = "▸" if session["id"] == active else " "
             state = session.get("status", "?")
-            colour = {"running": "green", "idle": "yellow", "exited": "red"}.get(state, "white")
-            lines.append("%s %d %s  [%s]%s" % (
-                marker, index, escape(str(session.get("name", session["id"]))), colour, state))
-        if not lines:
-            lines.append("(无终端)")
-        self.sessions_view.update("\n".join(lines))
+            text.append("%s %d %s  " % (marker, index, session.get("name", session["id"])))
+            text.append("[%s]" % state, style=self.STATUS_COLOR.get(state, "white"))
+        if not sessions:
+            text.append("(无终端)")
+        self.sessions_view.update(text)
 
     def update_runs(self, runs: List[Dict[str, Any]]) -> None:
-        lines: List[str] = []
-        for run in runs[:12]:
+        text = Text()
+        for index, run in enumerate(runs[:12]):
+            if index:
+                text.append("\n")
             status = run.get("status", "?")
-            colour = {"success": "green", "failed": "red", "running": "yellow",
-                      "cancelled": "magenta"}.get(status, "white")
-            # Command text is user data: it routinely contains "[" (printf, awk,
-            # globs) and would otherwise be parsed as rich markup and crash the app.
-            command = escape((run.get("command") or "")[:22])
-            lines.append("[%s]%s[/] %s %s" % (
-                colour, status[:4], escape(str(run.get("started_text", ""))), command))
-        if not lines:
-            lines.append("(暂无运行记录)")
-        self.runs_view.update("\n".join(lines))
+            text.append("[%s]" % status[:4], style=self.STATUS_COLOR.get(status, "white"))
+            text.append(" %s %s" % (run.get("started_text", ""), (run.get("command") or "")[:22]))
+        if not runs:
+            text.append("(暂无运行记录)")
+        self.runs_view.update(text)
 
 
 class AgentPane(Vertical):
     """Agent transcript + input.
 
-    Uses one ``Static`` per message in a real scroll container instead of a
-    ``RichLog``: RichLog mis-measures the height of wrapped lines when messages
-    are written before the widget has its final width, which showed up as
-    overlapping text in the agent column.
+    Messages are built as ``rich.text.Text`` objects rather than markup strings:
+    agent replies, command text and error messages are user data, and parsing
+    them as markup both mangles them and can raise MarkupError (which killed the
+    whole application).
     """
 
     DEFAULT_CSS = """
@@ -317,9 +323,12 @@ class AgentPane(Vertical):
     AgentPane #agent-scroll { height: 1fr; }
     AgentPane Input { dock: bottom; }
     AgentPane .agent-msg { padding: 0 1; }
-    AgentPane .agent-user { color: $text; }
-    AgentPane .agent-bot { color: $text; }
     """
+
+    KIND_STYLE = {
+        "user": "bold cyan", "bot": "green", "ok": "green",
+        "warn": "yellow", "error": "bold red", "help": "", "info": "",
+    }
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -328,13 +337,15 @@ class AgentPane(Vertical):
         self.messages: List[str] = []
 
     def compose(self):
-        yield Static("[b]Agent[/b]  (Ctrl+J 聚焦 · Esc 回到终端)", classes="section")
+        yield Static(Text("Agent  (F2 聚焦 · Esc 回到终端)", style="bold"), classes="section")
         yield self.scroll
         yield self.prompt
 
     def write_line(self, text: str, kind: str = "bot") -> None:
         self.messages.append(text)
-        widget = Static(text, classes="agent-msg agent-%s" % kind, markup=True)
+        body = Text(text)
+        body.stylize(self.KIND_STYLE.get(kind, ""))
+        widget = Static(body, classes="agent-msg")
         self.scroll.mount(widget)
         self.scroll.scroll_end(animate=False, immediate=True)
 

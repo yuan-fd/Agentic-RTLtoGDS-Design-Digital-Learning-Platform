@@ -6,7 +6,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Optional
 
-from rich.markup import escape
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -15,17 +15,20 @@ from textual.widgets import Static
 from .client import DaemonClient
 from .widgets import AgentPane, Sidebar, StatusBar, TerminalPane
 
-HELP = """[b]OpenROAD Workbench[/b]
+HELP = """OpenROAD Workbench — 主终端就是真实 shell
 
-主终端就是真实 shell：任意命令、管道、重定向、Ctrl-C 都可用。
-（Ctrl-C 会发到终端，不会退出本程序）
+任意命令、管道、重定向、Ctrl-C 都可用；Ctrl-C 会发到终端，
+不会退出本程序。
 
  Ctrl+N      新建终端          Ctrl+W      关闭当前终端
- Ctrl+1..9   切换终端          Ctrl+B      显示/隐藏侧栏
- Ctrl+J      聚焦 Agent 输入    Esc         回到终端\n Ctrl+E      显示/隐藏 Agent 面板
+ Ctrl+1..9   切换终端          F4          显示/隐藏侧栏
+ F2          聚焦 Agent 输入    Esc         回到终端
+ F3          显示/隐藏 Agent 面板
  Ctrl+G      把 Agent 的代码块填入终端（不执行）
- Ctrl+U/D    向上/向下翻屏      Ctrl+Y      回到最底部
+ Alt+U/D     向上/向下翻屏      Alt+B       回到最底部
  F1          本帮助            Ctrl+Q      退出（后台任务继续运行）
+
+ Ctrl-C/Ctrl-D/Ctrl-U/Ctrl-B 等仍然是终端的，不会被抢走。
 """
 
 
@@ -92,7 +95,7 @@ class WorkbenchTUI(App):
     # ----------------------------------------------------------------- lifecycle
     async def on_mount(self) -> None:
         self.pane.focus()
-        self.agent.write_line(HELP)
+        self.agent.write_line(HELP, kind="help")
         self._tasks.append(asyncio.create_task(self._input_pump()))
         self._tasks.append(asyncio.create_task(self._event_loop()))
         await self.refresh_state(initial=True)
@@ -110,7 +113,9 @@ class WorkbenchTUI(App):
         try:
             self.state = await self.client.state()
         except Exception as exc:
-            self.query_one("#status", StatusBar).update("daemon unreachable: %s" % exc)
+            # The status bar may not be composed yet (this runs before mount).
+            for node in self.query("#status"):
+                node.update(Text("daemon unreachable: %s" % exc))
             return
         sessions = self.state.get("sessions") or []
         if self.active_session is None or all(s["id"] != self.active_session for s in sessions):
@@ -143,37 +148,32 @@ class WorkbenchTUI(App):
         session = self._active() or {}
         runs = status.get("runs") or []
         run = runs[0] if runs else {}
-        # Every dynamic value is escaped: design names, terminal names, command
-        # text, cwd and paths all come from the user and can contain "[".
-        bits = [
-            "[b]OpenROAD Workbench[/b]",
-            "设计 %s" % escape(str(design.get("name") or "-")),
-            "终端 %s" % escape(str(session.get("name") or "-")),
-            "状态 %s" % escape(str(session.get("status") or "-")),
-        ]
+
+        bar = Text()
+        bar.append("OpenROAD Workbench", style="bold")
+        bar.append("  ·  设计 %s" % (design.get("name") or "-"))
+        bar.append("  ·  终端 %s" % (session.get("name") or "-"))
+        bar.append("  ·  状态 %s" % (session.get("status") or "-"))
         if run and run.get("status") == "running":
-            bits.append("运行 %s" % escape(str(run.get("command") or "")[:30]))
+            bar.append("  ·  运行 %s" % (run.get("command") or "")[:30])
             if run.get("stages"):
-                bits.append("阶段 %s" % escape(str(run["stages"][-1])))
-            bits.append("耗时 %s" % escape(str(run.get("elapsed_text", "-"))))
-        self.query_one("#topbar", Static).update("  ·  ".join(bits))
+                bar.append("  ·  阶段 %s" % run["stages"][-1])
+            bar.append("  ·  耗时 %s" % run.get("elapsed_text", "-"))
+        self.query_one("#topbar", Static).update(bar)
 
         counts = status.get("artifacts") or {}
         stage = (run.get("stages") or ["-"])[-1] if run else "-"
         running = bool(run) and run.get("status") == "running"
-        self.query_one("#status", StatusBar).update(
-            "cwd %s   pid %s   %s   %s   stage %s   结果[报告%s 图%s 日志%s]   Ctrl+N 新终端 · Ctrl+J Agent"
-            % (
-                escape(str(session.get("cwd") or "-")),
-                session.get("pid") or "-",
-                "RUNNING" if session.get("status") == "running" else "IDLE",
-                ("run " + escape(str(run.get("command") or "")[:24])) if running else "空闲",
-                escape(str(stage)),
-                counts.get("report", 0),
-                counts.get("image", 0),
-                counts.get("log", 0),
-            )
-        )
+        line = Text()
+        line.append("cwd %s" % (session.get("cwd") or "-"))
+        line.append("   pid %s" % (session.get("pid") or "-"))
+        line.append("   %s" % ("RUNNING" if session.get("status") == "running" else "IDLE"))
+        line.append("   %s" % (("run " + (run.get("command") or "")[:24]) if running else "空闲"))
+        line.append("   stage %s" % stage)
+        line.append("   结果[报告%s 图%s 日志%s]" % (
+            counts.get("report", 0), counts.get("image", 0), counts.get("log", 0)))
+        line.append("   Ctrl+N 新终端 · F2 Agent · F1 帮助")
+        self.query_one("#status", StatusBar).update(line)
 
     # --------------------------------------------------------------- terminal
     async def _connect_terminal(self) -> None:
@@ -188,7 +188,7 @@ class WorkbenchTUI(App):
         try:
             self._ws = await self.client.terminal_socket(self.active_session, lines=2000)
         except Exception as exc:
-            self.agent.write_line("[red]终端连接失败：%s[/red]" % escape(str(exc)))
+            self.agent.write_line("终端连接失败：%s" % exc, kind="error")
             return
         self.pane.session_id = self.active_session
         self.pane.focus()
@@ -256,7 +256,7 @@ class WorkbenchTUI(App):
             try:
                 await self.client.send_input(self.active_session, payload)
             except Exception as exc:
-                self.agent.write_line("[red]输入失败：%s[/red]" % escape(str(exc)))
+                self.agent.write_line("输入失败：%s" % exc, kind="error")
 
     # ------------------------------------------------------------------ events
     async def _event_loop(self) -> None:
@@ -295,9 +295,9 @@ class WorkbenchTUI(App):
             await self.refresh_state()
             self.active_session = (session.get("session") or {}).get("id") or self.active_session
             await self._connect_terminal()
-            self.agent.write_line("新终端：%s" % escape(str((session.get("session") or {}).get("name"))))
+            self.agent.write_line("新终端：%s" % (session.get("session") or {}).get("name"), kind="info")
         except Exception as exc:
-            self.agent.write_line("[red]新建终端失败：%s[/red]" % escape(str(exc)))
+            self.agent.write_line("新建终端失败：%s" % exc, kind="error")
 
     async def action_close_session(self) -> None:
         if not self.active_session:
@@ -305,7 +305,7 @@ class WorkbenchTUI(App):
         try:
             await self.client.close_session(self.active_session)
         except Exception as exc:
-            self.agent.write_line("[red]关闭失败：%s[/red]" % escape(str(exc)))
+            self.agent.write_line("关闭失败：%s" % exc, kind="error")
         self.active_session = None
         await self.refresh_state()
         await self._connect_terminal()
@@ -326,19 +326,19 @@ class WorkbenchTUI(App):
     async def action_send_proposal(self) -> None:
         proposal = _first_code_block(self._last_reply)
         if not proposal:
-            self.agent.write_line("[yellow]Agent 最近回复里没有可填入的代码块[/yellow]")
+            self.agent.write_line("Agent 最近回复里没有可填入的代码块", kind="warn")
             return
         result = await self.client.fill(self.active_session, proposal)
         mode = result.get("mode")
         if mode == "insert":
-            self.agent.write_line("[green]已填入终端输入栏，未执行。[/green]确认后按回车执行。")
+            self.agent.write_line("已填入终端输入栏，未执行。确认后按回车执行。", kind="ok")
         elif mode == "bracketed":
             self.agent.write_line(
-                "[green]已用括号粘贴填入多行脚本，未执行。[/green]检查无误后按回车执行。")
+                "已用括号粘贴填入多行脚本，未执行。检查无误后按回车执行。", kind="ok")
         elif mode == "refused":
             self.agent.write_line(
-                "[yellow]没有自动填入：%s[/yellow] 请手动复制上面的代码块。"
-                % escape(str(result.get("reason") or "")))
+                "没有自动填入：%s 请手动复制上面的代码块。" % (result.get("reason") or ""),
+                kind="warn")
         self.pane.focus()
 
     def action_scroll_bottom(self) -> None:
@@ -378,22 +378,22 @@ class WorkbenchTUI(App):
         if not question or self._agent_busy:
             return
         self._agent_busy = True
-        self.agent.write_user("[b cyan]你[/b cyan]  %s" % escape(question))
+        self.agent.write_user("你  %s" % question)
         collected: List[str] = []
         try:
             async for chunk in self.client.ask(question, session_id=self.active_session):
                 if chunk.get("type") == "start":
-                    self.agent.write_line("[dim]provider=%s corpus=%s[/dim]" % (
-                        chunk.get("provider"), (chunk.get("corpus") or {}).get("records")))
+                    self.agent.write_line("provider=%s corpus=%s" % (
+                        chunk.get("provider"), (chunk.get("corpus") or {}).get("records")), kind="info")
                 elif chunk.get("type") == "delta":
                     collected.append(chunk.get("text") or "")
                 elif chunk.get("type") == "done":
                     pass
             text = "".join(collected) or "(空回复)"
             self._last_reply = text
-            self.agent.write_line("[b green]Agent[/b green]\n%s" % escape(text))
+            self.agent.write_line("Agent\n%s" % text, kind="bot")
         except Exception as exc:
-            self.agent.write_line("[red]Agent 调用失败：%s[/red]" % escape(str(exc)))
+            self.agent.write_line("Agent 调用失败：%s" % exc, kind="error")
         finally:
             self._agent_busy = False
             self.agent.prompt.focus()
