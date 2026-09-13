@@ -31,6 +31,7 @@ OpenROAD-MCP 是一个 MCP Server，把 OpenROAD/ORFS 能力提供给支持 MCP 
 - 保留 MCP 原始结构化输出，方便排查；
 - 提供移动端响应式布局和空/错误状态；
 - 使用服务器端长驻 stdio MCP 进程，支持同一 App 内的 Session 连续操作。
+- Tools 页面提供通用 Tool Runner，因此 15 个工具都可以从网页选择并传入 JSON 参数，不只停留在目录展示。
 
 ## 真实验证
 
@@ -38,3 +39,4 @@ OpenROAD-MCP 是一个 MCP Server，把 OpenROAD/ORFS 能力提供给支持 MCP 
 - `list_interactive_sessions`、`get_session_metrics`、`list_report_images`、`read_orfs_metrics` 均通过 App 网关调用成功；
 - `sky130hd/ibex/base` 返回 10 张报告图；
 - Firefox 实际点击 Sessions、Reports、ORFS Runs、Tools 页面，无 JavaScript 错误；Tools 页面显示 15 项，Reports 页面显示 10 个图像按钮。
+- Firefox 实际加载 Tools 页面显示 15 个可选工具和 15 个目录条目，无 JavaScript 错误。
