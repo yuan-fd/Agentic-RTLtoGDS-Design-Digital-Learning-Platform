@@ -329,4 +329,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except BrokenPipeError:
+        # e.g. `... | head`; stdout is gone, so exit quietly.
+        try:
+            sys.stdout.close()
+        except Exception:
+            pass
+        os._exit(0)
