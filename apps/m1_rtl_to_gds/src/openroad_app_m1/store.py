@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from .models import M1Session, RTLVersion
+from openroad_platform_contracts.rtl_frontend import VerificationPackage
 
 
 class M1Store:
@@ -17,6 +18,10 @@ class M1Store:
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS m1_rtl_versions "
             "(version_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
+        )
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS m1_verification_packages "
+            "(spec_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
         )
         self.connection.commit()
 
@@ -33,6 +38,14 @@ class M1Store:
         self.connection.execute(
             "INSERT OR REPLACE INTO m1_rtl_versions(version_id, payload) VALUES (?, ?)",
             (version.version_id, payload),
+        )
+        self.connection.commit()
+
+    def put_verification_package(self, package: VerificationPackage, payload: str) -> None:
+        package.validate()
+        self.connection.execute(
+            "INSERT OR REPLACE INTO m1_verification_packages(spec_id, payload) VALUES (?, ?)",
+            (package.spec_id, payload),
         )
         self.connection.commit()
 
@@ -59,6 +72,12 @@ class M1Store:
     def all_version_payloads(self) -> tuple[str, ...]:
         rows = self.connection.execute(
             "SELECT payload FROM m1_rtl_versions ORDER BY version_id"
+        ).fetchall()
+        return tuple(str(row["payload"]) for row in rows)
+
+    def all_verification_package_payloads(self) -> tuple[str, ...]:
+        rows = self.connection.execute(
+            "SELECT payload FROM m1_verification_packages ORDER BY spec_id"
         ).fetchall()
         return tuple(str(row["payload"]) for row in rows)
 

@@ -12,7 +12,11 @@ if str(M1_SRC) not in sys.path:
 from openroad_app_m1.models import M1State, VerificationStatus  # noqa: E402
 from openroad_app_m1.service import M1Service  # noqa: E402
 
-from openroad_platform_contracts.rtl_frontend import PortSpec, SpecIR  # noqa: E402
+from openroad_platform_contracts.rtl_frontend import (  # noqa: E402
+    PortSpec,
+    SpecIR,
+    VerificationPackage,
+)
 
 
 def spec_ir() -> SpecIR:
@@ -99,6 +103,16 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
         frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
     )
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1",
+            spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint", "yosys-check"),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            coverage_targets={"mutation_score": 0.8},
+        ),
+    )
 
     request = service.build_rtl_to_gds_request(version.version_id, "sky130hd")
 
@@ -110,6 +124,7 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
     assert request["staged_inputs"][0]["input_id"] == "rtl-1"
     assert request["schema_version"] == 3
     assert request["inputs"]["clock_period_ns"] == 5.0
+    assert request["inputs"]["verification_id"] == "verify-counter-v1"
     assert request["expected_artifacts"] == ["report", "gds", "def", "netlist", "odb"]
 
 
@@ -128,6 +143,19 @@ def test_clocked_spec_without_a_period_requires_clarification() -> None:
     assert any("period" in question for question in session.clarification_questions)
 
 
+def test_passed_rtl_without_a_frozen_verification_package_cannot_submit() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+
+    with pytest.raises(ValueError, match="VerificationPackage"):
+        service.build_rtl_to_gds_request(version.version_id, "nangate45")
+
+
 def test_m1_state_survives_reopening_its_own_database(tmp_path: Path) -> None:
     database = tmp_path / "m1.sqlite"
     first_service = M1Service.open(str(database))
@@ -136,10 +164,20 @@ def test_m1_state_survives_reopening_its_own_database(tmp_path: Path) -> None:
     version = first_service.create_rtl_version(
         frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
     )
+    first_service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1",
+            spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint",),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+        ),
+    )
     first_service.store.close()
 
     second_service = M1Service.open(str(database))
 
     assert second_service.get_rtl_version(version.version_id).rtl_sha256 == version.rtl_sha256
     assert second_service.get_session(frozen.spec_id).state is M1State.FROZEN
+    assert second_service.get_verification_package(frozen.spec_id).verification_id == "verify-counter-v1"
     second_service.store.close()

@@ -8,7 +8,7 @@ import uuid
 from dataclasses import replace
 from typing import Any
 
-from openroad_platform_contracts.rtl_frontend import SpecIR
+from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 
 from .models import M1Session, M1State, RTLVersion, VerificationStatus
 from .store import M1Store
@@ -26,6 +26,11 @@ class M1Service:
             version.version_id: version
             for version in (RTLVersion.from_dict(json.loads(payload))
                             for payload in store.all_version_payloads())
+        }
+        self._verification_packages = {
+            package.spec_id: package
+            for package in (VerificationPackage.from_dict(json.loads(payload))
+                            for payload in store.all_verification_package_payloads())
         }
 
     @classmethod
@@ -142,6 +147,23 @@ class M1Service:
         self._save_version(updated)
         return updated
 
+    def register_verification_package(
+        self, spec_id: str, package: VerificationPackage
+    ) -> VerificationPackage:
+        session = self._session(spec_id)
+        if session.state is not M1State.FROZEN:
+            raise ValueError("VerificationPackage requires a frozen spec")
+        if package.spec_id != spec_id:
+            raise ValueError("VerificationPackage belongs to another spec")
+        package.validate()
+        if spec_id in self._verification_packages:
+            raise ValueError("VerificationPackage is already frozen for this spec")
+        self._verification_packages[spec_id] = package
+        self.store.put_verification_package(
+            package, json.dumps(package.to_dict(), sort_keys=True)
+        )
+        return package
+
     def build_rtl_to_gds_request(self, version_id: str, pdk: str) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
         if version.verification_status is not VerificationStatus.PASSED:
@@ -153,6 +175,9 @@ class M1Service:
         session = self._session(version.spec_id)
         if session.state is not M1State.FROZEN or session.spec is None:
             raise ValueError("RTL-to-GDS requires a frozen spec")
+        package = self._verification_packages.get(version.spec_id)
+        if package is None:
+            raise ValueError("RTL-to-GDS requires a frozen VerificationPackage")
         return {
             "schema_version": 3,
             "task_id": f"m1-gds-{version.version_id}-{pdk}",
@@ -163,6 +188,7 @@ class M1Service:
                 "spec_fingerprint": session.spec.fingerprint,
                 "rtl_sha256": version.rtl_sha256,
                 "verification_run_id": version.verification_run_id,
+                "verification_id": package.verification_id,
                 "rtl_path": f"rtl/{session.spec.top}.sv",
                 "platform": pdk,
                 "top": session.spec.top,
@@ -194,6 +220,12 @@ class M1Service:
 
     def get_session(self, spec_id: str) -> M1Session:
         return self._session(spec_id)
+
+    def get_verification_package(self, spec_id: str) -> VerificationPackage:
+        try:
+            return self._verification_packages[spec_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown VerificationPackage for spec: {spec_id}") from exc
 
     def _session(self, spec_id: str) -> M1Session:
         try:
