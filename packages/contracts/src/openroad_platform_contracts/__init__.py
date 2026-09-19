@@ -93,6 +93,8 @@ from .recovery import (
 from .benchmark_evaluation import (
     DiagnosticDecision, PostEDADiagnosisPrediction, PostEDADiagnosisScore,
 )
+from .evidence_exchange import EvidenceRef
+from .teaching_catalog import CapabilityStatus, CourseExercise, PdkCapability, ScriptProposal
 
 __all__ = [
     "Artifact",
@@ -165,4 +167,5 @@ __all__ = [
     "RecoveryDecision", "RollbackCheckpoint", "RTLCheckpointRestorePlan",
     "RuntimeFailureClass",
     "DiagnosticDecision", "PostEDADiagnosisPrediction", "PostEDADiagnosisScore",
+    "EvidenceRef", "CapabilityStatus", "CourseExercise", "PdkCapability", "ScriptProposal",
 ]

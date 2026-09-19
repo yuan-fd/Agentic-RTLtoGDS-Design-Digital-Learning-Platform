@@ -1,58 +1,84 @@
-# OpenROAD 平台
+# Agentic RTL-to-GDS 教学平台
 
 > [English](README.md) · **中文**
 
-一个面向可复现实验的、证据优先的插件化芯片设计控制平面。
-
-## 当前产品边界
-
-平台只负责版本化契约、受控 Runtime、Artifact 与溯源、受保护 QoR
-评估、公平实验协议和插件准入；它不重写上游研究算法。
-
-当前支持的产品路径为：
+本项目是面向数字电路教学和工程演示的 Agentic RTL-to-GDS Learning
+Platform，核心演示链路为：
 
 ```text
-自然语言规格 → SpecIR → 平台托管 RTLScout → 独立验证 → 已验证 RTL
-→ DesignGoal / typed policy → 已准入 ORFS-Agent 插件 → immutable TaskSpec
-→ Workflow Runtime → 原始 artifacts → 受保护 QoR
+自然语言规格 → RTL → 验证 → ORFS → GDS → 可追溯证据
 ```
 
-- RTLScout 是唯一的产品 RTL 创建后端；自然语言绝不直接变成 shell/Tcl。
-- ORFS-Agent 是唯一的 L2 产品设计空间探索插件；本地 BO/GP、stateful
-  portfolio、ORFS AutoTuner 和 seeded random 仅可用于预注册、同预算的研究比较。
-- TaiWei 3D 是独立插件工作流，不属于 2D 的 L1/L2 状态机。
-- L3/L4 白盒修复、源码修改和算法演化仅保留未来契约与历史证据，不在当前产品中开放。
-- 现有 Web workspace 是冻结的 legacy UI；新的 L1 trace workspace 尚待建设。
+它不再定位为论文研究平台、优化算法发表平台，也不是组内所有项目的
+总入口。历史实验和既有集成会按目录归类为展示内容或历史证据，不会默默
+成为新的产品主链路。
 
-## 当前能力状态
+## 执行底座与边界
 
-| 能力 | 状态 | 边界 |
+`openroad-platform-v2` 是独立执行底座。教学层只通过 HTTP 与 v2 通信，
+不导入 v2 源码、不打开 v2 数据库、不复制 Runtime，也不持有原始 RTL、
+GDS、日志和报告。v2 保持领域中立，负责：
+
+- Task、输入 staging 和隔离工作区；
+- 进程生命周期、取消和超时；
+- artifact、metric、evidence 和 provenance；
+- identity/session 与 Toolkit 准入。
+
+教学层负责 `SpecIR`、RTLVersion、VerificationPackage、CandidateRecord、
+PDKCapability、ScriptProposal 和 EvidenceRef。浏览器不接收模型 API key；
+无认证模式只允许本机开发，不能用于课堂服务器。
+
+## 教学模块
+
+| 模块 | 作用 | 阶段 |
 | --- | --- | --- |
-| 2D ORFS Runtime | 已验证 | Runtime、原始产物和 protected evaluator 是唯一事实来源 |
-| 自然语言 SpecIR / RTLScout | 已验证 | 需经过独立验证后才是目标产品 RTL 路径 |
-| ORFS-Agent L2 | 已准入 | 固定源码、受限适配器、Runtime 与 protected QoR |
-| TaiWei 3D | 独立插件 | 需使用其独立工具链与准入记录 |
-| 本地 BO/GP / 演化代码 | 历史研究 | 不得成为产品默认算法或 L1/L2 fallback |
-| L1 Dashboard | 计划中 | 将展示 Goal、ToolCall、Runtime、证据和结构化反思 |
+| Teaching Hub | 入口、题库、历史和 Evidence Exchange 视图 | 基础层 |
+| M1：LLM → RTL → GDS | 从冻结规格到真实 GDS 的完整教学实验 | 第一条完整切片 |
+| M2：Direct LLM vs RTLScout | 相同 SpecIR、验证包和后端协议下比较两个独立生成器 | M1 后 |
+| M3：Fixed Baseline vs ORFS-Agent | 固定协议下展示全部观测、失败、预算和 QoR 曲线 | M1 后 |
+| M4：Flow / Recipe Scripting Lab | 仅执行已登记且经用户确认的 Tcl/Python patch | M1 后 |
 
-## 重要的过渡限制
+第一阶段先完成 M1：一个固定 Course Lab 题目和一个自然语言单时钟 FSM，
+在 Nangate45 上真实跑通 RTL-to-GDS。生成、验证、工具链、PDK、评估器或
+GDS 任一步失败，都必须显示真实失败/不完整状态；禁止默认 PDK、旧结果、
+隐藏 fallback 或伪造 QoR。
 
-`POST /api/designs/import` 目前仍可被普通已认证用户调用；现有
-`/api/v2/external-optimizer-loops` 只校验登记设计和所有权，尚未强制
-RTLScout/独立验证来源。因此，该 legacy import 暂时仍可绕过“已验证 RTL”
-进入 L2。这不是批准的第二产品路径，将由 P2 隔离为 research/fixture
-入口并在 L2 拒绝未验证来源。
+## 两类设计目录
 
-## 开发与治理
+**Course Lab** 首批十题：Mux/Decoder、Priority Encoder、Adder/Subtractor、
+ALU、Edge Detector、Counter、Shift Register、FIFO、UART TX、
+Sequence Detector/Moore-Mealy FSM。每题都有冻结 Spec、人工冻结 oracle、
+参考 RTL、recipe、难度、PDK 支持和真实 smoke 状态。
 
-- Contracts 不依赖应用、Runtime 或具体插件。
-- LLM 只能提出 `DesignGoal` / `SemanticToolCall`；Policy Gate 决定是否允许，
-  Runtime 决定实际执行，evaluator 决定官方 QoR。
-- 外部项目须有固定 commit、许可证结论、环境/安全审计、native smoke 和
-  bounded platform smoke；无许可证者仅可源码审计。
-- 旧代码、实验和文档先分类为 `ACTIVE`、`LEGACY`、`INVALID`、
-  `HISTORICAL_EVIDENCE` 或 `UNKNOWN`，不得为了整洁直接删除。
+**ORFS Showcase** 收录 GCD、AES、Ibex、RISC-V、JPEG、SPI、I2C GPIO、UART、
+Ethernet MAC、TinyRocket/CVA6 等固定 RTL。它们用于展示真实 IP、版图和
+工具链能力，不承诺可由任意自然语言稳定生成。
 
-详细规则见 [AGENTS.md](AGENTS.md)、[架构说明](ARCHITECTURE.md)、
-[插件指南](docs/PLUGINS.md) 与
-[P0 产品边界冻结记录](docs/governance/P0_PRODUCT_BOUNDARY_FREEZE.md)。
+## UI 原则
+
+采用紧凑的 Teaching Hub + 工作台布局：左侧 Spec/RTL，中间阶段流程和
+当前运行，右侧证据/错误/解释/下一步，底部网表、真实 DEF/GDS、报告和 QoR。
+
+视觉上使用白底、黑字、高对比度等宽代码字体和少量状态色；去除蓝色大底、
+模糊灰字、渐变、装饰性阴影和无限长页面。所有图形都引用真实 artifact
+hash；缺少 KLayout 或其他渲染依赖时显示明确的不可用状态，不生成假图。
+
+## Slice 0 文档
+
+- [教学平台规格](docs/TEACHING_PLATFORM_SPEC.md)
+- [模块目录](docs/TEACHING_MODULE_CATALOG.md)
+- [PDK 能力矩阵](docs/PDK_CAPABILITY_MATRIX.md)
+- [Evidence Exchange](docs/EVIDENCE_EXCHANGE.md)
+- [旧代码清理清单](docs/governance/LEGACY_CLEANUP_INVENTORY.md)
+- [HTTP 边界 ADR](docs/adr/ADR-0004-teaching-layer-over-v2-http.md)
+
+## 开发验证
+
+```bash
+python3 -m pytest -q tests/test_teaching_contracts.py
+python3 -m pytest -q
+```
+
+教学模块按增量方式建设。每个模块最终必须有独立的 `pyproject.toml`、
+进程入口、数据库、smoke、contract tests 和 integration tests；模块之间
+不能互相导入，也不能直接打开 v2 数据库。

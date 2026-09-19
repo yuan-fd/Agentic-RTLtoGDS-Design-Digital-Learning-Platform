@@ -1,5 +1,30 @@
 # Historical logic and cleanup inventory
 
+## Teaching rebaseline (2026-09-19)
+
+The table below is the current product classification for the teaching
+rebuild. It is authoritative for navigation and new work; the older inventory
+that follows is retained as audit history and is not a second product roadmap.
+
+| Scope | Classification | Decision |
+| --- | --- | --- |
+| `packages/contracts/.../teaching_catalog.py`, `evidence_exchange.py` | ACTIVE | Stable teaching contracts; no execution or database access. |
+| Teaching Hub (to be extracted as an independent app) | TEACHING_MODULE | Navigation, catalog, history and evidence read model only. |
+| M1 Course Lab | TEACHING_MODULE | First vertical slice: Direct LLM → verification → ORFS → GDS. |
+| M2 Direct LLM vs RTLScout | TEACHING_MODULE | Independent generator comparison after M1. |
+| M3 baseline vs ORFS-Agent | TEACHING_MODULE | Protocol-faithful backend comparison after M1. |
+| M4 Flow / Recipe Scripting Lab | TEACHING_MODULE | Allowlisted, confirmed patches only. |
+| Course Lab ten-exercise catalog | TEACHING_MODULE | Frozen specs, oracles, reference RTL and smoke records. |
+| GCD/AES/Ibex/RISC-V/JPEG/SPI/I2C/UART/Ethernet/TinyRocket/CVA6 | SHOWCASE | Fixed RTL demonstrations, separate from Course Lab. |
+| `openroad-platform-v2` HTTP boundary | ACTIVE | Only execution, identity, artifact and provenance authority. |
+| Existing research/optimization and 3D entry points | LEGACY | Remove from Teaching Hub navigation after consumer audit. |
+| Prior acceptance reports, campaign outputs and raw run records | HISTORICAL_EVIDENCE | Preserve for provenance; never claim as current module capability. |
+| Unclassified scripts, demos and assets | UNKNOWN | Require owner, caller and evidence review before reuse or archival. |
+
+No item is deleted by this classification. A route is removed from product
+navigation only after its active consumers are recorded. A retained route must
+not be extended as a compatibility path for the new Teaching Hub.
+
 Audit date: 2026-08-30.  Classification is an operational instruction, not a
 claim that an item is useless.  Nothing in this inventory is deleted, moved,
 or rewritten by this governance phase.

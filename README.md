@@ -1,247 +1,111 @@
-# OpenROAD Self-Evolving EDA Platform
+# Agentic RTL-to-GDS Learning Platform
 
 > **English** · [中文](README.zh-CN.md)
 
-An evidence-first, plugin-based control plane for reproducible chip-design experiments.
-
----
-
-## What is this
-
-Turning chip design from a manual flow into an **automated + self-learning** open platform:
-
-- **Typed interaction**: natural language becomes a reviewed SpecIR/DesignGoal and typed tool calls, never arbitrary shell text.
-- **Product path**: platform-managed RTLScout produces independently verified RTL; A2-ORFO is the sole L2 product optimizer and uses the admitted ORFS-Agent as its complete 12-D variable-clock EDA executor.
-- **Open extension**: plugins execute through bounded adapters, Runtime and protected evaluation; 3D and specialty tools remain independent capabilities.
-
-**In one sentence: approved intent enters, independently verified evidence returns, and the platform never substitutes itself for an upstream research algorithm.**
-
----
-
-## Architecture
-
-![Platform architecture](docs/images/architecture.png)
-
-*Overall: typed interaction → approved capability → durable Runtime → raw artifacts → protected QoR and provenance.*
-
-![Design workflow](docs/images/workflow.png)
-
-*Natural-language SpecIR → platform-managed RTLScout → independent verification → verified RTL → DesignGoal/typed policy → A2-ORFO policy → complete ORFS-Agent executor → immutable TaskSpec → Runtime → raw artifacts → protected QoR. TaiWei 3D is a separate plugin workflow; research comparators are not product modes.*
-
-### Product architecture
-
-```mermaid
-graph TD
-    U[User · design intent] -->|natural-language spec| FE[Frontend · spec-to-rtl agent]
-    FE -->|verified RTL| L1[DesignGoal + typed policy]
-    L1 -->|approved capability| L2[A2-ORFO policy]
-    L2 --> EX[ORFS-Agent · complete 12-D executor]
-    EX -->|immutable TaskSpec| RT[Workflow Runtime]
-    RT -->|raw artifacts| EV[Protected evaluator]
-    EV --> OBS[(canonical QoR + provenance)]
-    OBS -->|evidence only| L1[L1 trace and typed policy]
-```
-
-### Product execution boundary
-
-```mermaid
-graph LR
-    subgraph Product[Approved product path]
-        A1[SpecIR / DesignGoal] --> A2[Typed policy gate]
-        A2 --> A3[Admitted plugin capability]
-        A3 --> A4[Workflow Runtime]
-        A4 --> A5[Raw artifacts + protected QoR]
-    end
-    A5 --> TR[(Durable evidence trace)]
-```
-
----
-
-## Feature Status
-
-| Feature | Status | Notes |
-| --- | --- | --- |
-| 2D physical design (ORFS 6-stage) | ✅ Working | Nangate45 RTL→GDS verified end-to-end |
-| 3D physical design (TaiWei) | Independent plugin | Separately admitted capability; not part of the 2D product state machine |
-| Web workspace | Legacy UI | Frozen from product growth; it remains a transitional historical/developer surface pending P3 isolation |
-| Natural-language RTL generation | ✅ Available | Server Codex parses SpecIR; a separate verification agent freezes a testbench/oracle before RTLScout candidate search |
-| Frontend LLM entry | ✅ Available | Three entry buttons (upload / LLM spec / examples), agent run trace dashboard |
-| Product control plane | ✅ Working | Durable Goal/IR, typed Policy/tool calls, Runtime attempts, diagnostics, recovery, artifact provenance and protected evaluation |
-| L2 design-space exploration | Bounded loop accepted | A2-ORFO is the sole product optimizer; ORFS-Agent executes all 12 dimensions including variable clock; the 151-run campaign is configured but not started |
-| Agent trace dashboard | ✅ Terminal workbench | Durable Goal → ToolCall/Policy → Runtime → Evidence/Reflection panels; no hidden chain-of-thought or arbitrary shell |
-| Plugin ecosystem | Governed admission | Every plugin requires a pinned source, license conclusion and bounded smoke |
-| No-auth internal mode | ✅ Available | `OPENROAD_PLATFORM_NO_AUTH=1` skips registration |
-| Platform model | ✅ Server managed | Fixed internal Codex model; browser accepts no Provider or API key |
-
-> Full capability map: Overview page + [Tutorial 01](docs/tutorials/01_openroad_platform_overview.md).
-
----
-
-## Repository Layout
+An educational platform for showing how an LLM participates in digital design:
 
 ```text
-openroad-platform/
-├── apps/
-│   ├── api/                 # Backend: HTTP API, design/task/learning services
-│   └── web/                 # Frontend web workspace (bilingual)
-├── packages/
-│   ├── contracts/           # Data contracts: TaskSpec / PluginManifest / artifact rules
-│   ├── scheduler/           # Scheduling: SQLite queue, Runtime, worker; research campaigns stay outside the product API
-│   ├── execution/           # Execution: plugin registry, 2D/3D adapters, process isolation
-│   ├── analysis/            # Analysis + learning: metrics, knowledge, GP/BO, suggestions
-│   └── visualization/       # Visualization: Graphviz, KLayout, 3D views
-├── integrations/            # Plugin manifests and pinned source audits
-├── workflows/               # Standard flow guides (spec-to-gds / three_d / ...)
-├── scripts/                 # Launch, worker, acceptance, toolchain build
-├── tests/                   # Automated tests (pytest)
-├── docs/                    # Docs: architecture, HTML tutorials, operations, plugins
-├── knowledge/               # Public knowledge corpus
-├── project_kb/              # Technical decisions and lessons
-├── var/                     # Runtime evidence (git-ignored, do not delete)
-└── .tools/  .external-src/  # Local toolchains / pinned third-party sources (ignored)
+natural-language specification → RTL → verification → ORFS → GDS → evidence
 ```
 
----
+This repository is a teaching product, not a paper-research platform, an
+optimizer publication platform, or a general entry point for every group
+project. Earlier experiments and integrations remain available as classified
+showcase or historical evidence; they are not silently promoted to the new
+product path.
 
-## Development Model
+## Execution boundary
 
-- **Plugin development**: each plugin is an independently reviewed manifest,
-  source/environment lock and bounded adapter.  Admission occurs through the
-  Plugin Registry and capability contract; adding a plugin must not require an
-  API route branch, an `execution/__init__.py` export, or a change to the
-  protected evaluator.  Developers of different plugins do not share private
-  dependencies.
-- **Branch flow**: feature branch → commit → full test suite → merge to main.
-- **Testing**: `python3 -m pytest -q` (currently 233 passed).
+`openroad-platform-v2` is the execution base. The teaching layer communicates
+with it over HTTP and does not import its source, open its database, duplicate
+its Runtime, or own its raw artifacts. v2 remains domain-neutral and owns:
 
-> Plugin guide: [docs/PLUGINS.md](docs/PLUGINS.md) · [CONTRIBUTING.md](CONTRIBUTING.md)
+- tasks, staged inputs and isolated workspaces;
+- process lifecycle, cancellation and timeout;
+- artifacts, metrics, evidence and provenance;
+- identity/session and Toolkit admission.
 
----
+The teaching layer owns `SpecIR`, RTL versions, frozen verification packages,
+candidate records, PDK capability records, script proposals and evidence
+references. The browser receives no model API key. No-auth mode is for local
+development only.
 
-## API & Plugins
+## Teaching modules
 
-REST API (every web feature is callable via API):
-
-| Endpoint | Purpose |
-| --- | --- |
-| `/api/auth/*` | Login / register (skippable in no-auth mode) |
-| `/api/spec/sessions` → `/api/rtl/specs/<id>/run-to-baseline` | Sole natural-language SpecIR → independently verified RTLScout path |
-| `/api/designs/*` | Registered design evidence; direct RTL intake remains a reachable legacy route that can still bypass verified-RTL provenance into L2 pending P2 isolation, and is not a supported product path |
-| `/api/runtime/runs/*` | Internal child-run progress, cancel, evidence, and artifacts |
-| `/api/v2/external-optimizer-loops` | The only 2D product start endpoint: repeated baseline → pinned ORFS-Agent GP/EI → repeated QoR evaluation |
-| `/api/v2/external-optimizer-loops/<id>/advance` | Records a safe controller transition; the worker, never the browser, executes tools |
-| `/api/agent/traces` | Agent run traces (every LLM/agent operation, auditable) |
-| `/api/extensions/taiwei/run` | Independent 3D plugin task submit |
-| `/api/extensions/edacraft/*` | Specialist tools (TCAD / SPICE / ...) |
-| `/api/platform/results` | Projects and results |
-| `/api/learning/observations` | Read-only evidence learned automatically by the closed loop |
-
-**Plugin three pieces**: ① `plugin.json` (identity: capabilities/tools/artifact rules)
-② `xxx_plugin.py` (TaskSpec builder) ③ `xxx_adapter.py` (runs the tool, collects outputs).
-See [docs/PLUGINS.md](docs/PLUGINS.md).
-
----
-
-## Quick Start
-
-### Same server (no clone needed)
-
-The repo lives at `/share/home/yuanwenjie/openroad-platform` on this cluster (`~` expands to each user's own home directory, so the exact path differs per user — run `echo $HOME` to find yours):
-
-```bash
-cd /share/home/yuanwenjie/openroad-platform
-HOST=127.0.0.1 PORT=8000 ./scripts/run_demo.sh
-# optional internal no-auth mode: export OPENROAD_PLATFORM_NO_AUTH=1 before starting
-```
-
-Open `http://127.0.0.1:8000` (remote machine: use SSH tunnel):
-
-```bash
-ssh -N -L 8000:127.0.0.1:8000 <user>@<server>
-```
-
-### Fresh machine (clone)
-
-```bash
-git clone https://github.com/CODA-Team/ChipEvolve.git
-cd ChipEvolve
-python3 -m pip install -e '.[test,visualization,optimization,distributed]'
-./scripts/run_demo.sh
-```
-
-### Run worker and web separately (recommended)
-
-```bash
-export PLATFORM_STATE=/tmp/openroad-platform-$UID
-mkdir -p "$PLATFORM_STATE"
-
-# Terminal 1: generic plugin worker (non-DSE jobs)
-python3 scripts/run_runtime_worker.py \
-  --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
-  --runtime-db "$PLATFORM_STATE/runtime.db"
-
-# Terminal 2: durable DSE controller (owns v2 quick/full Runtime jobs)
-python3 scripts/run_dse_controller_worker.py \
-  --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
-  --runtime-db "$PLATFORM_STATE/runtime.db"
-
-# Terminal 3: web
-python3 apps/api/app.py --host 127.0.0.1 --port 8000 \
-  --db var/platform.db --orfs-root ../OpenROAD-flow-scripts \
-  --runtime-db "$PLATFORM_STATE/runtime.db"
-```
-
-### Transitional development note
-
-The existing Web workspace is legacy presentation, not the product workflow
-guide.  Until P3 and the new L1 trace workspace are complete, use the approved
-API path: create a natural-language SpecIR session, complete independent
-verification and RTLScout, then start the admitted ORFS-Agent L2 loop from the
-verified RTL evidence.  TaiWei 3D and specialist extensions are independent
-plugin workflows.  Direct RTL import remains temporarily reachable for legacy
-fixtures/provenance and will be isolated in P2; it is not an alternative
-product RTL-creation route.  Until P2 lands, that legacy import can still
-reach the L2 endpoint, so it must not be treated as proof that product RTL
-provenance is already enforced.
-
----
-
-## Requirements
-
-| Component | Notes | Details |
+| Module | Purpose | Status |
 | --- | --- | --- |
-| System | ARM64 / openEuler 22.03 (verified), Python ≥ 3.9 | — |
-| Platform core | **Zero runtime deps**; optional visualization: KLayout(pya)/Graphviz/Matplotlib/NumPy; test: pytest | [docs/ENVIRONMENT_BASELINE.md](docs/ENVIRONMENT_BASELINE.md) |
-| 2D toolchain | ORFS + OpenROAD + Yosys (`../OpenROAD-flow-scripts`) | same doc |
-| 3D toolchain | TaiWei-specific ORFS-Research/OpenROAD/Yosys (`.tools/taiwei-official-3d`, LD_LIBRARY_PATH configured) | [integrations/taiwei_pin_3d/environment.lock.json](integrations/taiwei_pin_3d/environment.lock.json) |
-| Plugin tools | RTLScout: verilator+yosys; AgenticPD: source-audit-only (no license); DPLEvolve: bash/git/python3 | [docs/PLUGINS.md](docs/PLUGINS.md) |
+| Teaching Hub | Navigation, exercise catalog, history and Evidence Exchange read model | foundation |
+| M1 · LLM → RTL → GDS | Complete guided flow from a frozen specification to real GDS | first vertical slice |
+| M2 · Direct LLM vs RTLScout | Same SpecIR, verification package and RTL-to-GDS protocol | planned after M1 |
+| M3 · Fixed baseline vs ORFS-Agent | Full observation and budget comparison under a frozen protocol | planned after M1 |
+| M4 · Flow / Recipe Scripting Lab | Confirmed, allowlisted Tcl/Python recipe proposals | planned after M1 |
 
-**Environment management**: `.tools/` isolates toolchains and Python venvs
-(per-plugin venv + pinned commits); package paths injected via `PYTHONPATH`;
-git ignores `.tools/`, `.external-src/`, `var/` so the repo stays clean.
+The first product milestone is M1: one fixed Course Lab exercise and one
+natural-language single-clock FSM must complete through Nangate45 to GDS. A
+failed generation, verification, toolchain, PDK, evaluator or GDS step is a
+real failed/incomplete state; the UI never substitutes a default PDK, old run,
+fallback image or fabricated QoR.
 
-> Full details: [docs/ENVIRONMENT_BASELINE.md](docs/ENVIRONMENT_BASELINE.md)
+## Design directories
 
----
+**Course Lab** contains ten bounded exercises—mux/decoder, priority encoder,
+adder/subtractor, ALU, edge detector, counter, shift register, FIFO, UART TX,
+and sequence detector/FSM. Every exercise has a frozen specification, oracle,
+reference RTL, recipe, difficulty, PDK support and real smoke status.
 
-## Tutorials
+**ORFS Showcase** contains larger fixed designs such as GCD, AES, Ibex,
+RISC-V, JPEG, SPI, I2C GPIO, UART, Ethernet MAC and TinyRocket/CVA6. Showcase
+designs demonstrate real IP and layout/tool capabilities; they are not
+promises that arbitrary natural language can generate them.
 
-| Tutorial | Topic | Link |
-| --- | --- | --- |
-| Platform overview | positioning, layout, API, collaboration, knowledge | [01_openroad_platform_overview.md](docs/tutorials/01_openroad_platform_overview.md) |
-| TaiWei 3D internals | how 3D works, 20 stages, inputs/outputs | [02_taiwei_3d_how_it_works.md](docs/tutorials/02_taiwei_3d_how_it_works.md) |
-| Self-evolution deep dive | collection flow, root-cause analysis | [03_self_evolution_issue.md](docs/tutorials/03_self_evolution_issue.md) |
-| Collaboration | Git flow, module ownership, adding a plugin | [04_collaboration_guide.md](docs/tutorials/04_collaboration_guide.md) |
-| Why self-evolution works | GP/BO, offline RL explained | [05_why_self_evolution.md](docs/tutorials/05_why_self_evolution.md) |
-| AI for EDA mapping | Si2 standard data mapping | [06_ai_for_eda_si2_mapping.md](docs/tutorials/06_ai_for_eda_si2_mapping.md) |
+## UI direction
 
-> Tutorials are **Markdown** — GitHub renders them natively, so each link opens in the browser directly. No extra setup needed.
+The product UI is a compact Teaching Hub and workbench, not an infinite
+dashboard:
 
----
+- left: frozen Spec and editable RTL;
+- center: stage timeline and current run;
+- right: evidence, errors, explanations and next action;
+- bottom: netlist, real DEF/GDS rendering, reports and QoR.
 
-## More Docs
+The visual system is white, high-contrast and restrained: black text, clear
+sans-serif headings, monospace code/logs, few status colors, no blue full-page
+background, gradients, decorative shadows, or fake visualizations. Every
+rendered result points to an artifact hash; unavailable rendering dependencies
+produce an explicit unavailable state.
 
-- [docs/PLUGINS.md](docs/PLUGINS.md) — plugin authoring guide
-- [docs/OPERATIONS.md](docs/OPERATIONS.md) — backup / recovery / cancellation / toolchain upgrade
-- [docs/self_evolution_report.md](docs/self_evolution_report.md) — self-evolution audit (technical)
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution checklist
+## Repository map
+
+```text
+packages/contracts/       teaching and execution boundary contracts
+apps/                     existing services, being separated by module
+integrations/             admitted external tool intake records
+docs/                     product specification, module catalog and governance
+tests/                    contract and regression tests
+```
+
+Canonical Slice 0 documents:
+
+- [Teaching platform specification](docs/TEACHING_PLATFORM_SPEC.md)
+- [Module catalog](docs/TEACHING_MODULE_CATALOG.md)
+- [PDK capability matrix](docs/PDK_CAPABILITY_MATRIX.md)
+- [Evidence Exchange](docs/EVIDENCE_EXCHANGE.md)
+- [Cleanup inventory](docs/governance/LEGACY_CLEANUP_INVENTORY.md)
+- [HTTP boundary ADR](docs/adr/ADR-0004-teaching-layer-over-v2-http.md)
+
+## Development and verification
+
+```bash
+python3 -m pytest -q tests/test_teaching_contracts.py
+python3 -m pytest -q
+```
+
+The second command includes historical/integration checks that depend on local
+toolchain fixtures. A complete run must report those environmental failures
+explicitly; they must not be hidden by compatibility paths or skipped result
+substitution.
+
+Changes are developed in small slices. Each teaching module will eventually
+have its own `pyproject.toml`, process entrypoint, database, smoke test,
+contract tests and integration tests. A module may communicate with v2 through
+the HTTP client only and may not import a sibling app or open the v2 database.
