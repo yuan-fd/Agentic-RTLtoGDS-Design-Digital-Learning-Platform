@@ -1,5 +1,29 @@
 # Teaching migration progress
 
+## Rebaseline for the independent teaching platform (2026-09-19)
+
+The product authority is now `docs/TEACHING_PLATFORM_SPEC.md`. Slice 0 added
+the teaching catalog, PDK capability/evidence contracts, and the HTTP-boundary
+ADR. The first Slice 1 increment added `apps/m1_rtl_to_gds/` as an independent
+M1 state module. It persists only spec/RTL-version metadata in its own SQLite
+store and reaches v2 through `V2Client`; it does not import v2 code or open a
+v2 database.
+
+Focused evidence:
+
+- `16 passed` across teaching contracts, M1 state transitions and v2 HTTP
+  client contract tests;
+- offline `m1_rtl_to_gds smoke: ok` (state/submission gate only, not a GDS
+  acceptance);
+- clocked specs without an explicit period remain `needs_clarification`;
+- user edits create a new RTL version and invalidate the previous verification
+  binding; unverified RTL cannot produce an ORFS submission request;
+- ORFS requests use v2 schema version 3, explicit selected PDK, staged input,
+  and required GDS/DEF/ODB/netlist/report artifacts.
+
+The real v2 verification Toolkit admission and Nangate45 end-to-end evidence
+remain open gates. They cannot be represented by the offline smoke.
+
 Updated: 2026-09-11
 
 ## Completed slices

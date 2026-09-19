@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=59.4"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openroad-app-m1-rtl-to-gds"
+version = "0.1.0"
+description = "M1 teaching module for a bounded LLM RTL-to-GDS experiment"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+openroad-m1 = "openroad_app_m1.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["openroad_app_m1*"]
