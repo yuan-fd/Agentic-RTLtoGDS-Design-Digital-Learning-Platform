@@ -68,14 +68,15 @@ def spec_payload():
     }
 
 
-def request(base, method, path, payload=None):
+def request(base, method, path, payload=None, *, raw=False):
     data = None if payload is None else json.dumps(payload).encode()
     request = Request(base + path, data=data, method=method)
     if data is not None:
         request.add_header("Content-Type", "application/json")
     try:
         with urlopen(request, timeout=5) as response:
-            return response.status, json.loads(response.read())
+            body = response.read()
+            return response.status, body.decode() if raw else json.loads(body)
     except HTTPError as exc:
         return exc.code, json.loads(exc.read())
 
@@ -91,6 +92,10 @@ def running_server():
 def test_m1_http_api_freezes_spec_and_creates_v2_staged_rtl_version():
     server, fake, base = running_server()
     try:
+        status, page = request(base, "GET", "/", raw=True)
+        assert status == 200
+        assert "RTL-to-GDS Workbench" in page
+
         status, health = request(base, "GET", "/api/m1/health")
         assert status == 200
         assert health["status"] == "ok"
