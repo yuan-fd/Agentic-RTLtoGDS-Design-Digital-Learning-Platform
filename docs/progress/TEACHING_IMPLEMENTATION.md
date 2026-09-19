@@ -20,9 +20,20 @@ Focused evidence:
   binding; unverified RTL cannot produce an ORFS submission request;
 - ORFS requests use v2 schema version 3, explicit selected PDK, staged input,
   and required GDS/DEF/ODB/netlist/report artifacts.
+- `integrations/rtl_verify/` is a first-party v2 Toolkit candidate. Its
+  manifest validates against the v2 protocol; its adapter runs only fixed
+  Verilator/Yosys compile/lint checks and preserves a failure log as partial
+  evidence. It is deliberately not admitted until operator review and native
+  toolchain smoke.
 
 The real v2 verification Toolkit admission and Nangate45 end-to-end evidence
 remain open gates. They cannot be represented by the offline smoke.
+
+Latest regression: `883 passed, 1 deselected, 2 failed`. The two failures are
+pre-existing environment/baseline failures: the paper ORFS checkout is dirty
+including submodule state, and the historical frontend clarity test still
+expects `v=20260828d` while the committed page uses `v=20260913b`. No focused
+teaching test failed.
 
 Updated: 2026-09-11
 
