@@ -277,7 +277,7 @@ def test_simulation_submission_binds_the_frozen_oracle_artifact() -> None:
 
     assert task["plugin_id"] == "rtl-sim"
     assert task["staged_inputs"] == [
-        {"destination": "rtl/counter.sv", "input_id": "rtl-1", "required": True},
+        {"destination": "inputs/counter.sv", "input_id": "rtl-1", "required": True},
         {"destination": "verification/oracle.sv", "artifact_id": "oracle-counter-v1", "required": True},
     ]
     assert task["expected_artifacts"] == ["simulation_report", "log"]

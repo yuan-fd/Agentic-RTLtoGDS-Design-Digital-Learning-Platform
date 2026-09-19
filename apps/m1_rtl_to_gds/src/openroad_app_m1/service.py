@@ -217,7 +217,7 @@ class M1Service:
             "design_id": f"m1-{version.version_id}",
             "plugin_id": "rtl-verify",
             "inputs": {
-                "rtl_path": f"rtl/{session.spec.top}.sv",
+                "rtl_path": f"inputs/{session.spec.top}.sv",
                 "top": session.spec.top,
                 "spec_id": version.spec_id,
                 "verification_id": package.verification_id,
@@ -276,7 +276,7 @@ class M1Service:
             "design_id": f"m1-{version.version_id}",
             "plugin_id": "rtl-sim",
             "inputs": {
-                "rtl_path": f"rtl/{session.spec.top}.sv",
+                "rtl_path": f"inputs/{session.spec.top}.sv",
                 "testbench_path": "verification/oracle.sv",
                 "top": session.spec.top,
                 "simulation_top": package.simulation_top,
@@ -284,7 +284,7 @@ class M1Service:
                 "verification_id": package.verification_id,
             },
             "staged_inputs": [
-                {"destination": f"rtl/{session.spec.top}.sv",
+                {"destination": f"inputs/{session.spec.top}.sv",
                  "input_id": version.source_ref.removeprefix("input:"), "required": True},
                 {"destination": "verification/oracle.sv",
                  **oracle_stage, "required": True},
@@ -369,7 +369,7 @@ class M1Service:
                 "stage_timeout_seconds": 7200,
             },
             "staged_inputs": [{
-                "destination": f"rtl/{session.spec.top}.sv",
+                "destination": f"inputs/{session.spec.top}.sv",
                 "input_id": version.source_ref.removeprefix("input:"),
                 "required": True,
             }],
