@@ -329,6 +329,10 @@ class M1Service:
         except KeyError as exc:
             raise KeyError(f"unknown RTL version: {version_id}") from exc
 
+    def list_rtl_versions(self, spec_id: str) -> tuple[RTLVersion, ...]:
+        self._session(spec_id)
+        return tuple(version for version in self._versions.values() if version.spec_id == spec_id)
+
     @staticmethod
     def _submit_task(task: dict[str, Any], v2_client: Any) -> str:
         reply = v2_client.submit(task, idempotency_key=task["task_id"])
