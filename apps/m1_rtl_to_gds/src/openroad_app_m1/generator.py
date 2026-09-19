@@ -39,7 +39,8 @@ class CodexCLIProvider:
             "SpecIR object under spec. The SpecIR object has schema_version=1 and fields "
             "spec_id, design_id, top, functionality, objective, ports, clock, reset, "
             "constraints, and acceptance_criteria. Each port has name, direction, and "
-            "width. Put clock_period_ns in constraints when a timing period is given. "
+            "width, and schema_version=1. Put clock_period_ns in constraints when a "
+            "timing period is given. "
             "For needs_clarification include questions. "
             "Do not invent missing clock, reset, ports, timing, or acceptance behavior.\n\n"
             + description

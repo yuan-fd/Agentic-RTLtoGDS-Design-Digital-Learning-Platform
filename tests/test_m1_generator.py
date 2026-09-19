@@ -57,6 +57,7 @@ def test_codex_assessment_prompt_names_the_m1_specir_contract(monkeypatch: pytes
 
     prompt = str(captured["command"][-1])
     assert "schema_version=1" in prompt
+    assert "Each port has name, direction, and width, and schema_version=1" in prompt
     assert "acceptance_criteria" in prompt
 
 
