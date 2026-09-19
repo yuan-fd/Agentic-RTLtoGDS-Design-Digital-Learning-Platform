@@ -93,7 +93,7 @@ def test_unverified_rtl_cannot_submit_rtl_to_gds() -> None:
     )
 
     with pytest.raises(ValueError, match="verification"):
-        service.build_rtl_to_gds_request(version.version_id, "nangate45")
+        service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
 
 
 def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
@@ -115,7 +115,11 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
         ),
     )
 
-    request = service.build_rtl_to_gds_request(version.version_id, "sky130hd")
+    request = service.build_rtl_to_gds_request(
+        version.version_id, "sky130hd",
+        _Plugins([{"plugin_id": "orfs", "executable": True,
+                   "admission": "admitted", "capabilities": ["eda.rtl_to_gds"]}]),
+    )
 
     assert request["parameters"]["pdk"] == "sky130hd"
     assert request["plugin_id"] == "orfs"
@@ -127,6 +131,26 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
     assert request["inputs"]["clock_period_ns"] == 5.0
     assert request["inputs"]["verification_id"] == "verify-counter-v1"
     assert request["expected_artifacts"] == ["report", "gds", "def", "netlist", "odb"]
+
+
+def test_rtl_to_gds_requires_an_admitted_orfs_toolkit() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1", spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint",),
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+
+    with pytest.raises(ValueError, match="orfs.*admitted"):
+        service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
 
 
 def test_clocked_spec_without_a_period_requires_clarification() -> None:
@@ -154,7 +178,7 @@ def test_passed_rtl_without_a_frozen_verification_package_cannot_submit() -> Non
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
 
     with pytest.raises(ValueError, match="VerificationPackage"):
-        service.build_rtl_to_gds_request(version.version_id, "nangate45")
+        service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
 
 
 def test_verification_submission_requires_an_admitted_v2_toolkit() -> None:

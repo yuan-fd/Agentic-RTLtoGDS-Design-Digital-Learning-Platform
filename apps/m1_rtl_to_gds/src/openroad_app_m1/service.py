@@ -272,10 +272,10 @@ class M1Service:
         return self._submit_task(task, v2_client)
 
     def submit_rtl_to_gds(self, version_id: str, pdk: str, v2_client: Any) -> str:
-        task = self.build_rtl_to_gds_request(version_id, pdk)
+        task = self.build_rtl_to_gds_request(version_id, pdk, v2_client)
         return self._submit_task(task, v2_client)
 
-    def build_rtl_to_gds_request(self, version_id: str, pdk: str) -> dict[str, Any]:
+    def build_rtl_to_gds_request(self, version_id: str, pdk: str, v2_client: Any) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
         if version.verification_status is not VerificationStatus.PASSED:
             raise ValueError("RTL-to-GDS requires passed verification")
@@ -289,6 +289,15 @@ class M1Service:
         package = self._verification_packages.get(version.spec_id)
         if package is None:
             raise ValueError("RTL-to-GDS requires a frozen VerificationPackage")
+        admitted = any(
+            item.get("plugin_id") == "orfs"
+            and item.get("admission") == "admitted"
+            and item.get("executable") is True
+            and "eda.rtl_to_gds" in (item.get("capabilities") or ())
+            for item in v2_client.plugins()
+        )
+        if not admitted:
+            raise ValueError("orfs Toolkit is not admitted by v2")
         return {
             "schema_version": 3,
             "task_id": f"m1-gds-{version.version_id}-{pdk}",
