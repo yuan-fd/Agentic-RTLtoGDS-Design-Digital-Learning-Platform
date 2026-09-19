@@ -36,7 +36,11 @@ class CodexCLIProvider:
             "Convert this digital-design description into the M1 SpecIR JSON contract. "
             "Return exactly one JSON object with status set to specified, "
             "needs_clarification, or unsupported_scope. For specified include a complete "
-            "SpecIR object under spec. For needs_clarification include questions. "
+            "SpecIR object under spec. The SpecIR object has schema_version=1 and fields "
+            "spec_id, design_id, top, functionality, objective, ports, clock, reset, "
+            "constraints, and acceptance_criteria. Each port has name, direction, and "
+            "width. Put clock_period_ns in constraints when a timing period is given. "
+            "For needs_clarification include questions. "
             "Do not invent missing clock, reset, ports, timing, or acceptance behavior.\n\n"
             + description
         )

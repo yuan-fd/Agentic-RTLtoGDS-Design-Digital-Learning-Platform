@@ -9,7 +9,7 @@ M1_SRC = Path(__file__).parents[1] / "apps/m1_rtl_to_gds/src"
 if str(M1_SRC) not in sys.path:
     sys.path.insert(0, str(M1_SRC))
 
-from openroad_app_m1.generator import DirectLLMGenerator  # noqa: E402
+from openroad_app_m1.generator import CodexCLIProvider, DirectLLMGenerator  # noqa: E402
 from openroad_app_m1.models import M1State  # noqa: E402
 from openroad_app_m1.service import M1Service  # noqa: E402
 from openroad_platform_contracts.rtl_frontend import PortSpec, SpecIR  # noqa: E402
@@ -41,6 +41,23 @@ class Provider:
 class UploadClient:
     def upload_rtl(self, rtl: str) -> dict[str, str]:
         return {"input_id": "input-generated-1"}
+
+
+def test_codex_assessment_prompt_names_the_m1_specir_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def run(command: list[str], **_kwargs: object) -> object:
+        captured["command"] = command
+        output = Path(command[command.index("--output-last-message") + 1])
+        output.write_text('{"status":"needs_clarification","questions":["name the top"]}', encoding="utf-8")
+        return type("Completed", (), {"returncode": 0, "stderr": ""})()
+
+    monkeypatch.setattr("openroad_app_m1.generator.subprocess.run", run)
+    CodexCLIProvider().assess("a sequence detector")
+
+    prompt = str(captured["command"][-1])
+    assert "schema_version=1" in prompt
+    assert "acceptance_criteria" in prompt
 
 
 def test_direct_llm_requires_a_frozen_spec_and_stages_new_rtl() -> None:
