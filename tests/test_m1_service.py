@@ -186,6 +186,38 @@ def test_verification_submission_requires_an_admitted_v2_toolkit() -> None:
     assert task["inputs"]["verification_id"] == "verify-counter-v1"
 
 
+def test_simulation_submission_binds_the_frozen_oracle_artifact() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1",
+            spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint", "yosys-check"),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+
+    task = service.build_simulation_request(
+        version.version_id,
+        _Plugins([{"plugin_id": "rtl-sim", "executable": True,
+                   "admission": "admitted", "capabilities": ["eda.rtl.simulate"]}]),
+    )
+
+    assert task["plugin_id"] == "rtl-sim"
+    assert task["staged_inputs"] == [
+        {"destination": "rtl/counter.sv", "input_id": "rtl-1", "required": True},
+        {"destination": "verification/oracle.sv", "artifact_id": "oracle-counter-v1", "required": True},
+    ]
+    assert task["expected_artifacts"] == ["simulation_report", "log"]
+
+
 class _Plugins:
     def __init__(self, plugins: list[dict[str, object]]) -> None:
         self._plugins = plugins

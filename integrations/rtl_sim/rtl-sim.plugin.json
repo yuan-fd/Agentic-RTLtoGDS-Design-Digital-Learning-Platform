@@ -1,0 +1,15 @@
+{
+  "schema_version": 3,
+  "plugin_id": "rtl-sim",
+  "plugin_version": "1.0.0",
+  "adapter_entry": ["python3", "./adapter.py"],
+  "capabilities": ["eda.rtl.simulate"],
+  "supported_arch": ["aarch64", "x86_64", "arm64"],
+  "default_timeout_seconds": 600,
+  "artifact_rules": [
+    {"kind": "simulation_report", "required": true},
+    {"kind": "log", "required": true}
+  ],
+  "progress_marker": "[progress]",
+  "environment": {}
+}

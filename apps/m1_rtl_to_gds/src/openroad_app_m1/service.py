@@ -206,6 +206,57 @@ class M1Service:
             "max_attempts": 1,
         }
 
+    def build_simulation_request(self, version_id: str, v2_client: Any) -> dict[str, Any]:
+        version = self.get_rtl_version(version_id)
+        session = self._session(version.spec_id)
+        package = self._verification_packages.get(version.spec_id)
+        if session.state is not M1State.FROZEN or session.spec is None:
+            raise ValueError("simulation requires a frozen spec")
+        if version.verification_status is not VerificationStatus.PASSED:
+            raise ValueError("simulation requires passed compile/lint verification")
+        if not version.source_ref:
+            raise ValueError("RTL source must be staged in v2 before simulation")
+        if package is None:
+            raise ValueError("simulation requires a frozen VerificationPackage")
+        if len(package.simulation_oracle_refs) != 1:
+            raise ValueError("simulation requires exactly one frozen oracle artifact")
+        oracle_ref = package.simulation_oracle_refs[0]
+        oracle_id = oracle_ref.removeprefix("artifact:")
+        if not oracle_id:
+            raise ValueError("simulation oracle artifact reference is empty")
+        admitted = any(
+            item.get("plugin_id") == "rtl-sim"
+            and item.get("admission") == "admitted"
+            and item.get("executable") is True
+            and "eda.rtl.simulate" in (item.get("capabilities") or ())
+            for item in v2_client.plugins()
+        )
+        if not admitted:
+            raise ValueError("rtl-sim Toolkit is not admitted by v2")
+        return {
+            "schema_version": 3,
+            "task_id": f"m1-sim-{version.version_id}",
+            "project_id": "teaching-m1",
+            "design_id": f"m1-{version.version_id}",
+            "plugin_id": "rtl-sim",
+            "inputs": {
+                "rtl_path": f"rtl/{session.spec.top}.sv",
+                "testbench_path": "verification/oracle.sv",
+                "top": session.spec.top,
+                "spec_id": version.spec_id,
+                "verification_id": package.verification_id,
+            },
+            "staged_inputs": [
+                {"destination": f"rtl/{session.spec.top}.sv",
+                 "input_id": version.source_ref.removeprefix("input:"), "required": True},
+                {"destination": "verification/oracle.sv",
+                 "artifact_id": oracle_id, "required": True},
+            ],
+            "expected_artifacts": ["simulation_report", "log"],
+            "timeout_seconds": 600,
+            "max_attempts": 1,
+        }
+
     def build_rtl_to_gds_request(self, version_id: str, pdk: str) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
         if version.verification_status is not VerificationStatus.PASSED:

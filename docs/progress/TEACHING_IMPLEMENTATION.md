@@ -25,6 +25,10 @@ Focused evidence:
   Verilator/Yosys compile/lint checks and preserves a failure log as partial
   evidence. It is deliberately not admitted until operator review and native
   toolchain smoke.
+- `integrations/rtl_sim/` is a separate first-party v2 Toolkit candidate for
+  Icarus/vvp against a frozen oracle artifact. Compile/lint evidence is not
+  accepted as a simulation result; the candidate remains unadmitted until
+  native toolchain smoke.
 
 The real v2 verification Toolkit admission and Nangate45 end-to-end evidence
 remain open gates. They cannot be represented by the offline smoke.
