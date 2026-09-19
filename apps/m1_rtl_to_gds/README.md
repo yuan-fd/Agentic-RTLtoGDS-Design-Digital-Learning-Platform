@@ -25,7 +25,7 @@ EDA command.
 ```bash
 PYTHONPATH=packages/contracts/src:apps/m1_rtl_to_gds/src \
   python3 -m openroad_app_m1 --serve --database .local/m1.sqlite \
-  --v2-url http://127.0.0.1:8000
+  --v2-url http://127.0.0.1:8700
 ```
 
 The API is intentionally small:
@@ -42,6 +42,16 @@ The API is intentionally small:
 All mutating requests derive the owner from the v2 session. `SpecIR` and
 `VerificationPackage` payloads remain versioned contracts; a missing or
 incomplete specification produces a validation response and no v2 task.
+
+For private acceptance, start v2 on `127.0.0.1:8700`, then run:
+
+```bash
+OPENROAD_V2_URL=http://127.0.0.1:8700 \
+  bash scripts/start_teaching_platform.sh
+```
+
+The M1 UI listens on `127.0.0.1:8101`. Keep both services private and use an
+SSH tunnel for browser acceptance.
 
 The offline smoke proves state and submission gates only. It is not a GDS
 claim. A real end-to-end acceptance must be recorded from the v2 HTTP service

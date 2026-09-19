@@ -100,6 +100,25 @@ python3 -m pytest -q tests/test_teaching_contracts.py
 python3 -m pytest -q
 ```
 
+## Private M1 acceptance
+
+Start `openroad-platform-v2` on `127.0.0.1:8700`, then from this repository:
+
+```bash
+OPENROAD_V2_URL=http://127.0.0.1:8700 \
+  bash scripts/start_teaching_platform.sh
+```
+
+M1 listens on `127.0.0.1:8101`. From an operator workstation, expose only the
+two private ports through SSH:
+
+```bash
+ssh -L 18101:127.0.0.1:8101 -L 18700:127.0.0.1:8700 user@server
+```
+
+Then open `http://127.0.0.1:18101`. The v2 token stays on the server; no-auth
+mode is for local development only.
+
 The second command includes historical/integration checks that depend on local
 toolchain fixtures. A complete run must report those environmental failures
 explicitly; they must not be hidden by compatibility paths or skipped result
