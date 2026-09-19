@@ -56,6 +56,9 @@ class V2Client:
             raise V2ClientError("v2 returned an input response without input_id", body=reply)
         return input_record
 
+    def input(self, input_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/kernel/inputs/{_segment(input_id)}")
+
     def submit(self, task: Mapping[str, Any], *, idempotency_key: str) -> dict[str, Any]:
         if not isinstance(task, Mapping) or not idempotency_key.strip():
             raise ValueError("submit requires a task object and idempotency key")
@@ -75,6 +78,9 @@ class V2Client:
 
     def artifacts(self, run_id: str) -> list[dict[str, Any]]:
         return self._call("GET", f"/kernel/runs/{_segment(run_id)}/artifacts")["artifacts"]
+
+    def logs(self, run_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/kernel/runs/{_segment(run_id)}/logs")["logs"]
 
     def _call(
         self,

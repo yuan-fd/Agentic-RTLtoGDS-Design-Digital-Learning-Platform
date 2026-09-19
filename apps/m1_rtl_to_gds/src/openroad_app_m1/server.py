@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from openroad_platform_contracts.rtl_frontend import SpecIR
+from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 
 from .generator import CodexCLIProvider, DirectLLMGenerator
 from .service import M1Service
@@ -38,12 +38,36 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                 if path == "/api/m1/health":
                     self._json(HTTPStatus.OK, self._health())
                     return
+                if path.startswith("/api/m1/rtl/") and "/" not in path.removeprefix("/api/m1/rtl/"):
+                    version_id = path.removeprefix("/api/m1/rtl/")
+                    self._owned_version(version_id)
+                    version = service.get_rtl_version(version_id)
+                    source = v2_client.input(version.source_ref.removeprefix("input:"))
+                    self._json(HTTPStatus.OK, {
+                        "rtl_version": version.to_dict(),
+                        "source": source["content"],
+                    })
+                    return
                 if path.startswith("/api/m1/runs/"):
+                    if path.endswith("/timeline"):
+                        run_id = path.removeprefix("/api/m1/runs/").removesuffix("/timeline")
+                        self._json(HTTPStatus.OK, {"timeline": v2_client.timeline(run_id)})
+                        return
+                    if path.endswith("/artifacts"):
+                        run_id = path.removeprefix("/api/m1/runs/").removesuffix("/artifacts")
+                        self._json(HTTPStatus.OK, {"artifacts": v2_client.artifacts(run_id)})
+                        return
+                    if path.endswith("/metrics"):
+                        run_id = path.removeprefix("/api/m1/runs/").removesuffix("/metrics")
+                        self._json(HTTPStatus.OK, {"metrics": v2_client.metrics(run_id)})
+                        return
                     run_id = path.removeprefix("/api/m1/runs/")
                     if not run_id or "/" in run_id:
                         raise ValueError("run_id is required")
                     observation = v2_client.run(run_id)
-                    self._json(HTTPStatus.OK, {"run": observation.get("run", observation)})
+                    run = observation.get("run", observation)
+                    service.observe_run(run_id, run.get("status"))
+                    self._json(HTTPStatus.OK, {"run": run})
                     return
                 if path in {"/", "/index.html"}:
                     self._file(WEB_ROOT / "index.html", "text/html; charset=utf-8")
@@ -70,6 +94,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/freeze")
                     self._owned_spec(spec_id)
                     session = service.freeze_spec(spec_id)
+                    self._register_teaching_package(session)
                     self._json(HTTPStatus.OK, {"session": session.to_dict()})
                     return
                 if path.startswith("/api/m1/specs/") and path.endswith("/generate"):
@@ -163,6 +188,74 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                 unsupported_reason=unsupported,
             )
             self._json(HTTPStatus.CREATED, {"session": session.to_dict()})
+
+        def _register_teaching_package(self, session: Any) -> None:
+            if session.spec is None or session.state.value != "specified":
+                return
+            if session.spec.top == "counter":
+                oracle = """module counter_tb;
+reg clk = 0;
+reg rst_n = 0;
+reg enable = 0;
+wire [7:0] q;
+counter dut(.clk(clk), .rst_n(rst_n), .enable(enable), .q(q));
+always #1 clk = ~clk;
+initial begin
+  #2 rst_n = 1; enable = 1;
+  #2 if (q !== 8'h01) $fatal(1, \"counter mismatch\");
+  $display(\"TB_SUMMARY total=1 errors=0\");
+  $display(\"PASS\");
+  $finish;
+end
+endmodule
+"""
+                oracle_ref = self._upload_oracle(oracle)
+                service.register_verification_package(
+                    session.spec_id,
+                    VerificationPackage(
+                        verification_id="counter-v1",
+                        spec_id=session.spec_id,
+                        compile_checks=("verilator-lint", "yosys-check"),
+                        simulation_oracle_refs=(f"source:{oracle_ref}",),
+                        simulation_top="counter_tb",
+                    ),
+                )
+            elif session.spec.top == "sequence_detector":
+                oracle = """module sequence_detector_tb;
+reg clk = 0;
+reg rst_n = 0;
+reg din = 0;
+wire hit;
+sequence_detector dut(.clk(clk), .rst_n(rst_n), .din(din), .hit(hit));
+always #1 clk = ~clk;
+task tick(input bit value);
+begin din = value; #2; end
+endtask
+initial begin
+  #2 rst_n = 1;
+  tick(1); tick(0); tick(1);
+  if (!hit) $fatal(1, \"sequence mismatch\");
+  $display(\"TB_SUMMARY total=1 errors=0\");
+  $display(\"PASS\");
+  $finish;
+end
+endmodule
+"""
+                oracle_ref = self._upload_oracle(oracle)
+                service.register_verification_package(
+                    session.spec_id,
+                    VerificationPackage(
+                        verification_id="sequence-detector-v1",
+                        spec_id=session.spec_id,
+                        compile_checks=("verilator-lint", "yosys-check"),
+                        simulation_oracle_refs=(f"source:{oracle_ref}",),
+                        simulation_top="sequence_detector_tb",
+                    ),
+                )
+
+        def _upload_oracle(self, source: str) -> str:
+            record = v2_client.upload_rtl(source)
+            return record["input_id"]
 
         def _create_rtl(self, spec_id: str, payload: dict[str, Any]) -> None:
             source = payload.get("rtl_source")

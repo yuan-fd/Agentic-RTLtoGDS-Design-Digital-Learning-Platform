@@ -27,7 +27,14 @@ class FakeV2:
         return {"user_id": self.user_id, "username": "student"}
 
     def upload_rtl(self, source):
-        return {"input_id": f"input-{len(source)}"}
+        input_id = f"input-{len(source)}"
+        self.inputs = getattr(self, "inputs", {})
+        self.inputs[input_id] = source
+        return {"input_id": input_id}
+
+    def input(self, input_id):
+        source = self.inputs[input_id]
+        return {"input": {"input_id": input_id}, "content": source}
 
     def plugins(self):
         return [
@@ -44,10 +51,22 @@ class FakeV2:
     def run(self, run_id):
         return {"run": {"run_id": run_id, "status": "queued"}}
 
+    def timeline(self, run_id):
+        return [{"run_id": run_id, "event_type": "stage.started"}]
+
+    def artifacts(self, run_id):
+        return [{"artifact_id": "artifact-1", "kind": "gds", "sha256": "a" * 64}]
+
+    def metrics(self, run_id):
+        return [{"name": "area", "value": 1.0, "unit": "um2"}]
+
 
 class FakeLLM:
     def generate(self, payload):
         return "module counter(input logic clk, input logic rst_n, input logic enable, output logic [7:0] q); endmodule"
+
+    def assess(self, description):
+        return {"status": "needs_clarification", "questions": ["What is the input sequence?"]}
 
 
 def spec_payload():
@@ -139,6 +158,40 @@ def test_m1_http_api_generates_rtl_through_the_direct_llm_boundary():
         assert status == 201
         assert generated["rtl_version"]["generator"] == "direct_llm"
         assert generated["rtl_version"]["source_ref"].startswith("input:input-")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_assesses_natural_language_before_freeze():
+    server, fake, base = running_server()
+    try:
+        status, created = request(base, "POST", "/api/m1/specs", {"description": "sequence detector"})
+
+        assert status == 201
+        assert created["session"]["state"] == "needs_clarification"
+        assert created["session"]["clarification_questions"] == ["What is the input sequence?"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_reads_rtl_and_v2_observations():
+    server, fake, base = running_server()
+    try:
+        _, created = request(base, "POST", "/api/m1/specs", spec_payload())
+        spec_id = created["session"]["spec_id"]
+        request(base, "POST", f"/api/m1/specs/{spec_id}/freeze", {})
+        _, generated = request(base, "POST", f"/api/m1/specs/{spec_id}/generate", {})
+        version_id = generated["rtl_version"]["version_id"]
+
+        status, rtl = request(base, "GET", f"/api/m1/rtl/{version_id}")
+        assert status == 200
+        assert "module counter" in rtl["source"]
+
+        assert request(base, "GET", "/api/m1/runs/run-42/timeline")[1]["timeline"]
+        assert request(base, "GET", "/api/m1/runs/run-42/artifacts")[1]["artifacts"]
+        assert request(base, "GET", "/api/m1/runs/run-42/metrics")[1]["metrics"]
     finally:
         server.shutdown()
         server.server_close()

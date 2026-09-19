@@ -250,9 +250,16 @@ class M1Service:
         if not package.simulation_top:
             raise ValueError("simulation requires a frozen simulation_top")
         oracle_ref = package.simulation_oracle_refs[0]
-        oracle_id = oracle_ref.removeprefix("artifact:")
+        if oracle_ref.startswith("artifact:"):
+            oracle_id = oracle_ref.removeprefix("artifact:")
+            oracle_stage = {"artifact_id": oracle_id}
+        elif oracle_ref.startswith("source:"):
+            oracle_id = oracle_ref.removeprefix("source:")
+            oracle_stage = {"input_id": oracle_id}
+        else:
+            raise ValueError("simulation oracle reference must be an artifact or source")
         if not oracle_id:
-            raise ValueError("simulation oracle artifact reference is empty")
+            raise ValueError("simulation oracle reference is empty")
         admitted = any(
             item.get("plugin_id") == "rtl-sim"
             and item.get("admission") == "admitted"
@@ -280,7 +287,7 @@ class M1Service:
                 {"destination": f"rtl/{session.spec.top}.sv",
                  "input_id": version.source_ref.removeprefix("input:"), "required": True},
                 {"destination": "verification/oracle.sv",
-                 "artifact_id": oracle_id, "required": True},
+                 **oracle_stage, "required": True},
             ],
             "expected_artifacts": ["simulation_report", "log"],
             "timeout_seconds": 600,
@@ -289,11 +296,23 @@ class M1Service:
 
     def submit_verification(self, version_id: str, v2_client: Any) -> str:
         task = self.build_verification_request(version_id, v2_client)
-        return self._submit_task(task, v2_client)
+        run_id = self._submit_task(task, v2_client)
+        version = self.get_rtl_version(version_id)
+        self._save_version(replace(version, verification_status=VerificationStatus.RUNNING,
+                                   verification_run_id=run_id))
+        self._versions[version_id] = replace(version, verification_status=VerificationStatus.RUNNING,
+                                             verification_run_id=run_id)
+        return run_id
 
     def submit_simulation(self, version_id: str, v2_client: Any) -> str:
         task = self.build_simulation_request(version_id, v2_client)
-        return self._submit_task(task, v2_client)
+        run_id = self._submit_task(task, v2_client)
+        version = self.get_rtl_version(version_id)
+        updated = replace(version, simulation_status=SimulationStatus.RUNNING,
+                          simulation_run_id=run_id)
+        self._versions[version_id] = updated
+        self._save_version(updated)
+        return run_id
 
     def submit_rtl_to_gds(self, version_id: str, pdk: str, v2_client: Any) -> str:
         task = self.build_rtl_to_gds_request(version_id, pdk, v2_client)
@@ -417,6 +436,17 @@ class M1Service:
             return self._evidence[evidence_id]
         except KeyError as exc:
             raise KeyError(f"unknown evidence: {evidence_id}") from exc
+
+    def observe_run(self, run_id: str, status: str) -> None:
+        if status not in {"succeeded", "failed", "cancelled", "timed_out"}:
+            return
+        result = VerificationStatus.PASSED if status == "succeeded" else VerificationStatus.FAILED
+        simulation_result = SimulationStatus.PASSED if status == "succeeded" else SimulationStatus.FAILED
+        for version_id, version in tuple(self._versions.items()):
+            if version.verification_run_id == run_id and version.verification_status is VerificationStatus.RUNNING:
+                self.record_verification(version_id, result, run_id)
+            if version.simulation_run_id == run_id and version.simulation_status is SimulationStatus.RUNNING:
+                self.record_simulation(version_id, simulation_result, run_id)
 
     def _session(self, spec_id: str) -> M1Session:
         try:

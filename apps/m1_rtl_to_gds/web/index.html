@@ -46,6 +46,7 @@
         <textarea id="specInput" rows="8" placeholder="Example: a single-clock sequence detector…"></textarea>
         <p class="field-note">An incomplete clock, reset, interface, or acceptance condition produces clarification questions. It does not create an execution task.</p>
         <button class="button primary" id="freezeButton" type="button">Assess specification</button>
+        <div class="message" id="clarificationQuestions" role="status"></div>
         <div class="message" id="specMessage" role="status">No specification assessed.</div>
       </aside>
 
@@ -55,7 +56,11 @@
           <div class="editor-toolbar"><span>SystemVerilog</span><span id="rtlHash">No staged input</span></div>
           <textarea id="rtlEditor" aria-label="SystemVerilog editor" spellcheck="false" placeholder="Generated RTL will appear here after a frozen specification."></textarea>
         </div>
-        <div class="editor-actions"><button class="button quiet" id="newVersionButton" type="button" disabled>Save new RTL version</button><span class="field-note">Every edit creates a new version and invalidates prior verification evidence.</span></div>
+        <div class="editor-actions">
+          <button class="button quiet" id="generateButton" type="button" disabled>Generate RTL</button>
+          <button class="button quiet" id="newVersionButton" type="button" disabled>Save new RTL version</button>
+          <span class="field-note">Every edit creates a new version and invalidates prior verification evidence.</span>
+        </div>
       </section>
 
       <aside class="panel evidence-panel">
@@ -65,6 +70,10 @@
           <li><span class="check-mark">—</span><span><strong>Simulation</strong><small>Frozen oracle required</small></span></li>
           <li><span class="check-mark">—</span><span><strong>Mutation quality</strong><small>Evidence will be linked to this version</small></span></li>
         </ol>
+        <div class="editor-actions">
+          <button class="button quiet" id="verifyButton" type="button" disabled>Run compile / lint</button>
+          <button class="button quiet" id="simulateButton" type="button" disabled>Run simulation</button>
+        </div>
         <div class="callout unavailable" id="evidenceMessage"><strong>No evidence yet</strong><span>Verification artifacts will appear here after v2 returns a run.</span></div>
       </aside>
     </section>
@@ -75,9 +84,10 @@
         <label for="pdkSelect">PDK</label>
         <select id="pdkSelect" disabled>
           <option value="nangate45">Nangate45</option>
-          <option value="sky130hd">Sky130HD</option>
-          <option value="asap7">ASAP7</option>
+          <option value="sky130hd" disabled>Sky130HD · not available</option>
+          <option value="asap7" disabled>ASAP7 · not available</option>
         </select>
+        <button class="button primary" id="gdsButton" type="button" disabled>Run Nangate45 to GDS</button>
         <dl class="metadata-list">
           <div><dt>RTL version</dt><dd id="selectedRtlVersion">No version selected</dd></div>
           <div><dt>Verification gate</dt><dd id="verificationGate">Not verified</dd></div>
@@ -105,6 +115,7 @@
           <li><span>Netlist</span><span class="artifact-state">Unavailable</span></li>
           <li><span>Reports</span><span class="artifact-state">Unavailable</span></li>
         </ul>
+        <ul class="artifact-list" id="metricsList"></ul>
         <p class="field-note">Artifact hashes and evidence status will be shown only from a completed v2 run.</p>
       </section>
     </section>
