@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from openroad_platform_contracts.rtl_frontend import SpecIR
 
+from .generator import CodexCLIProvider, DirectLLMGenerator
 from .service import M1Service
 from .v2_client import V2ClientError, V2Unavailable
 
@@ -23,7 +24,11 @@ class AuthorizationError(PermissionError):
     """The v2 identity is valid but does not own the requested M1 record."""
 
 
-def build_server(host: str, port: int, service: M1Service, v2_client: Any) -> ThreadingHTTPServer:
+def build_server(host: str, port: int, service: M1Service, v2_client: Any,
+                 *, llm_provider: Any | None = None) -> ThreadingHTTPServer:
+    provider = llm_provider or CodexCLIProvider()
+    generator = DirectLLMGenerator(service)
+
     class M1Handler(BaseHTTPRequestHandler):
         server_version = "OpenROAD-M1/0.1"
 
@@ -50,7 +55,8 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any) -> Th
                     self._file(WEB_ROOT / "app.js", "text/javascript; charset=utf-8")
                     return
                 self._error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "resource not found")
-            except Exception as exc:  # boundary conversion only; domain code remains strict
+            except (AuthorizationError, PermissionError, KeyError, ValueError,
+                    V2Unavailable, V2ClientError) as exc:
                 self._handle_error(exc)
 
         def do_POST(self) -> None:  # noqa: N802
@@ -65,6 +71,12 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any) -> Th
                     self._owned_spec(spec_id)
                     session = service.freeze_spec(spec_id)
                     self._json(HTTPStatus.OK, {"session": session.to_dict()})
+                    return
+                if path.startswith("/api/m1/specs/") and path.endswith("/generate"):
+                    spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/generate")
+                    self._owned_spec(spec_id)
+                    version = generator.generate(spec_id, provider, v2_client)
+                    self._json(HTTPStatus.CREATED, {"rtl_version": version.to_dict()})
                     return
                 if path.startswith("/api/m1/specs/") and path.endswith("/rtl"):
                     spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/rtl")
@@ -93,7 +105,8 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any) -> Th
                     self._json(HTTPStatus.ACCEPTED, {"run_id": run_id, "state": "submitted", "pdk": pdk})
                     return
                 self._error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "resource not found")
-            except Exception as exc:  # boundary conversion only; domain code remains strict
+            except (AuthorizationError, PermissionError, KeyError, ValueError,
+                    V2Unavailable, V2ClientError) as exc:
                 self._handle_error(exc)
 
         def _health(self) -> dict[str, Any]:
@@ -115,6 +128,29 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any) -> Th
             if "owner_id" in payload:
                 raise ValueError("owner_id is derived from the v2 identity")
             raw_spec = payload.get("spec")
+            description = payload.get("description")
+            if raw_spec is not None and description is not None:
+                raise ValueError("spec and description are exclusive")
+            if description is not None:
+                if not isinstance(description, str) or not description.strip():
+                    raise ValueError("description must be non-empty text")
+                assessment = provider.assess(description)
+                state = assessment.get("status")
+                if state == "needs_clarification":
+                    questions = tuple(assessment.get("questions") or ())
+                    session = service.assess_spec(owner_id, clarification_questions=questions)
+                    self._json(HTTPStatus.CREATED, {"session": session.to_dict()})
+                    return
+                if state == "unsupported_scope":
+                    reason = assessment.get("reason")
+                    if not isinstance(reason, str) or not reason.strip():
+                        raise ValueError("unsupported_scope requires a reason")
+                    session = service.assess_spec(owner_id, unsupported_reason=reason)
+                    self._json(HTTPStatus.CREATED, {"session": session.to_dict()})
+                    return
+                if state != "specified" or not isinstance(assessment.get("spec"), dict):
+                    raise ValueError("Codex assessment did not return a SpecIR")
+                raw_spec = assessment["spec"]
             spec = SpecIR.from_dict(raw_spec) if isinstance(raw_spec, dict) else None
             questions = tuple(payload.get("clarification_questions", ()))
             if not all(isinstance(item, str) and item.strip() for item in questions):

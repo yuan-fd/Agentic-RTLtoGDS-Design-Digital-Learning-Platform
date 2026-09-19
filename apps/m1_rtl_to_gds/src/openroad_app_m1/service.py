@@ -15,6 +15,12 @@ from .models import M1Session, M1State, RTLVersion, SimulationStatus, Verificati
 from .store import M1Store
 
 
+M1_ORFS_ROOT = "/share/home/yuanwenjie/OpenROAD-flow-scripts"
+M1_OPENROAD_BIN = "/share/home/yuanwenjie/bin/openroad"
+M1_YOSYS_BIN = "/share/home/yuanwenjie/bin/yosys"
+M1_KLAYOUT_BIN = "/share/home/yuanwenjie/bin/klayout"
+
+
 class M1Service:
     def __init__(self, store: M1Store) -> None:
         self.store = store
@@ -218,7 +224,7 @@ class M1Service:
                 "compile_checks": list(package.compile_checks),
             },
             "staged_inputs": [{
-                "destination": f"rtl/{session.spec.top}.sv",
+                "destination": f"inputs/{session.spec.top}.sv",
                 "input_id": version.source_ref.removeprefix("input:"),
                 "required": True,
             }],
@@ -299,8 +305,8 @@ class M1Service:
             raise ValueError("RTL-to-GDS requires passed verification")
         if not version.source_ref:
             raise ValueError("RTL source must be staged in v2 before submission")
-        if pdk not in {"nangate45", "sky130hd", "asap7"}:
-            raise ValueError(f"unsupported PDK: {pdk}")
+        if pdk != "nangate45":
+            raise ValueError(f"PDK is not available in M1: {pdk}")
         session = self._session(version.spec_id)
         if session.state is not M1State.FROZEN or session.spec is None:
             raise ValueError("RTL-to-GDS requires a frozen spec")
@@ -329,13 +335,19 @@ class M1Service:
                 "rtl_sha256": version.rtl_sha256,
                 "verification_run_id": version.verification_run_id,
                 "verification_id": package.verification_id,
-                "rtl_path": f"rtl/{session.spec.top}.sv",
+                "rtl_path": f"inputs/{session.spec.top}.sv",
                 "platform": pdk,
+                "design": session.spec.design_id,
                 "top": session.spec.top,
                 "clock": session.spec.clock,
                 "clock_period_ns": session.spec.constraints["clock_period_ns"]
                 if session.spec.clock is not None else None,
                 "target_stage": "finish",
+                "orfs_root": M1_ORFS_ROOT,
+                "openroad_bin": M1_OPENROAD_BIN,
+                "yosys_bin": M1_YOSYS_BIN,
+                "klayout_bin": M1_KLAYOUT_BIN,
+                "stage_timeout_seconds": 7200,
             },
             "staged_inputs": [{
                 "destination": f"rtl/{session.spec.top}.sv",
@@ -347,8 +359,9 @@ class M1Service:
                 "rtl_version_id": version.version_id,
                 "top": session.spec.top,
             },
-            "expected_artifacts": ["report", "gds", "def", "netlist", "odb"],
-            "timeout_seconds": 3600,
+            "resources": {"cpu_cores": 4, "memory_bytes": 8589934592, "processes": 256},
+            "expected_artifacts": ["gds", "odb", "def", "netlist", "report"],
+            "timeout_seconds": 7200,
             "max_attempts": 1,
         }
 

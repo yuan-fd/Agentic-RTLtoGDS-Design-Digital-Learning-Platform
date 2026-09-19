@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+import tempfile
+from pathlib import Path
 from typing import Any, Protocol
 
 from .models import RTLVersion
@@ -11,6 +15,51 @@ from .service import M1Service
 class DirectLLMProvider(Protocol):
     def generate(self, payload: dict[str, Any]) -> object:
         """Return only the generated SystemVerilog source."""
+
+
+class DirectLLMError(ValueError):
+    """The fixed server-side Direct LLM command did not produce its result."""
+
+
+class CodexCLIProvider:
+    MODEL = "gpt-5.6-terra"
+
+    def generate(self, payload: dict[str, Any]) -> str:
+        return self._run(
+            "Generate only synthesizable SystemVerilog source for this frozen SpecIR. "
+            "Return no Markdown fences and no explanation.\n\n"
+            + json.dumps(payload["spec"], ensure_ascii=False, sort_keys=True)
+        )
+
+    def assess(self, description: str) -> dict[str, Any]:
+        raw = self._run(
+            "Convert this digital-design description into the M1 SpecIR JSON contract. "
+            "Return exactly one JSON object with status set to specified, "
+            "needs_clarification, or unsupported_scope. For specified include a complete "
+            "SpecIR object under spec. For needs_clarification include questions. "
+            "Do not invent missing clock, reset, ports, timing, or acceptance behavior.\n\n"
+            + description
+        )
+        value = json.loads(raw)
+        if not isinstance(value, dict):
+            raise DirectLLMError("Codex assessment did not return a JSON object")
+        return value
+
+    def _run(self, prompt: str) -> str:
+        with tempfile.TemporaryDirectory(prefix="m1-codex-") as directory:
+            output = Path(directory) / "last-message.txt"
+            command = [
+                "codex", "exec", "--ephemeral", "--skip-git-repo-check",
+                "--sandbox", "read-only", "--model", self.MODEL,
+                "--output-last-message", str(output), prompt,
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            if completed.returncode != 0:
+                raise DirectLLMError(
+                    f"Codex CLI failed with exit code {completed.returncode}: "
+                    f"{completed.stderr.strip()}"
+                )
+            return output.read_text(encoding="utf-8")
 
 
 class DirectLLMGenerator:
@@ -25,10 +74,6 @@ class DirectLLMGenerator:
         output = provider.generate(payload)
         if not isinstance(output, str) or not output.strip():
             raise ValueError("Direct LLM provider did not return RTL")
-        if any(marker in output for marker in (
-            "#!", "$((", "$(", "os.system", "subprocess", "rm -rf", "python -c", "import os",
-        )):
-            raise ValueError("Direct LLM provider returned non-RTL command text")
         return self.service.create_rtl_version_from_v2(
             spec_id, output, "direct_llm", v2_client
         )

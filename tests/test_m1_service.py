@@ -118,21 +118,28 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
     )
 
     request = service.build_rtl_to_gds_request(
-        version.version_id, "sky130hd",
+        version.version_id, "nangate45",
         _Plugins([{"plugin_id": "orfs", "executable": True,
                    "admission": "admitted", "capabilities": ["eda.rtl_to_gds"]}]),
     )
 
-    assert request["parameters"]["pdk"] == "sky130hd"
+    assert request["parameters"]["pdk"] == "nangate45"
     assert request["plugin_id"] == "orfs"
-    assert request["inputs"]["rtl_path"] == "rtl/counter.sv"
+    assert request["inputs"]["rtl_path"] == "inputs/counter.sv"
+    assert request["inputs"]["design"] == "course-counter"
+    assert request["inputs"]["orfs_root"] == "/share/home/yuanwenjie/OpenROAD-flow-scripts"
+    assert request["inputs"]["openroad_bin"] == "/share/home/yuanwenjie/bin/openroad"
+    assert request["inputs"]["yosys_bin"] == "/share/home/yuanwenjie/bin/yosys"
+    assert request["inputs"]["klayout_bin"] == "/share/home/yuanwenjie/bin/klayout"
+    assert request["inputs"]["stage_timeout_seconds"] == 7200
     assert request["parameters"]["rtl_version_id"] == version.version_id
     assert version.version_id in request["design_id"]
     assert request["staged_inputs"][0]["input_id"] == "rtl-1"
+    assert request["resources"] == {"cpu_cores": 4, "memory_bytes": 8589934592, "processes": 256}
     assert request["schema_version"] == 3
     assert request["inputs"]["clock_period_ns"] == 5.0
     assert request["inputs"]["verification_id"] == "verify-counter-v1"
-    assert request["expected_artifacts"] == ["report", "gds", "def", "netlist", "odb"]
+    assert request["expected_artifacts"] == ["gds", "odb", "def", "netlist", "report"]
 
 
 def test_rtl_to_gds_requires_an_admitted_orfs_toolkit() -> None:

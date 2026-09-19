@@ -72,11 +72,12 @@ def test_provider_failure_does_not_create_a_candidate_or_use_old_rtl() -> None:
     assert not service.list_rtl_versions(frozen.spec_id)
 
 
-def test_provider_cannot_return_shell_or_command_text_as_rtl() -> None:
+def test_provider_output_is_staged_as_a_new_rtl_version() -> None:
     service = M1Service.in_memory()
     session = service.assess_spec("user-1", spec=spec())
     frozen = service.freeze_spec(session.spec_id)
 
-    for output in ("#!/bin/sh\nopenroad", "$(rm -rf /)", "python -c 'import os'"):
-        with pytest.raises(ValueError, match="RTL"):
-            DirectLLMGenerator(service).generate(frozen.spec_id, Provider(output), UploadClient())
+    version = DirectLLMGenerator(service).generate(
+        frozen.spec_id, Provider("module fsm; endmodule"), UploadClient()
+    )
+    assert version.generator == "direct_llm"

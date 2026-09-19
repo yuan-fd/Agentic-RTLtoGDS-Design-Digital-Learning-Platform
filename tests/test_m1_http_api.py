@@ -45,6 +45,11 @@ class FakeV2:
         return {"run": {"run_id": run_id, "status": "queued"}}
 
 
+class FakeLLM:
+    def generate(self, payload):
+        return "module counter(input logic clk, input logic rst_n, input logic enable, output logic [7:0] q); endmodule"
+
+
 def spec_payload():
     return {
         "spec": {
@@ -83,7 +88,7 @@ def request(base, method, path, payload=None, *, raw=False):
 
 def running_server():
     fake = FakeV2()
-    server = build_server("127.0.0.1", 0, M1Service.in_memory(), fake)
+    server = build_server("127.0.0.1", 0, M1Service.in_memory(), fake, llm_provider=FakeLLM())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, fake, f"http://127.0.0.1:{server.server_address[1]}"
@@ -117,6 +122,23 @@ def test_m1_http_api_freezes_spec_and_creates_v2_staged_rtl_version():
         assert status == 201
         assert version["rtl_version"]["source_ref"].startswith("input:")
         assert version["rtl_version"]["generator"] == "direct_llm"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_generates_rtl_through_the_direct_llm_boundary():
+    server, fake, base = running_server()
+    try:
+        _, created = request(base, "POST", "/api/m1/specs", spec_payload())
+        spec_id = created["session"]["spec_id"]
+        request(base, "POST", f"/api/m1/specs/{spec_id}/freeze", {})
+
+        status, generated = request(base, "POST", f"/api/m1/specs/{spec_id}/generate", {})
+
+        assert status == 201
+        assert generated["rtl_version"]["generator"] == "direct_llm"
+        assert generated["rtl_version"]["source_ref"].startswith("input:input-")
     finally:
         server.shutdown()
         server.server_close()
