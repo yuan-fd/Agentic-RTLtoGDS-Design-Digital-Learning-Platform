@@ -88,6 +88,12 @@ class V2Client:
             f"{_segment(artifact_id)}/preview"
         )
 
+    def artifact_excerpt(self, run_id: str, artifact_id: str) -> dict[str, Any]:
+        return self._call(
+            "GET", f"/kernel/runs/{_segment(run_id)}/artifacts/"
+            f"{_segment(artifact_id)}/excerpt", query={"max_bytes": "12000"}
+        )
+
     def _call(
         self,
         method: str,

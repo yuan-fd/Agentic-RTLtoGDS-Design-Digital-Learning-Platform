@@ -49,6 +49,15 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     })
                     return
                 if path.startswith("/api/m1/runs/"):
+                    if path.endswith("/excerpt"):
+                        excerpt_path = path.removesuffix("/excerpt")
+                        prefix, artifact_id = excerpt_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
+                        if not prefix or not artifact_id:
+                            raise ValueError("run_id and artifact_id are required")
+                        self._json(HTTPStatus.OK, {
+                            "excerpt": v2_client.artifact_excerpt(prefix, artifact_id)
+                        })
+                        return
                     if path.endswith("/preview"):
                         preview_path = path.removesuffix("/preview")
                         prefix, artifact_id = preview_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)

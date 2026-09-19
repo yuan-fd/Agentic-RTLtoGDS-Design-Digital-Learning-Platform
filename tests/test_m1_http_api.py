@@ -63,6 +63,9 @@ class FakeV2:
     def artifact_preview(self, run_id, artifact_id):
         return {"status": "ready", "artifact_id": artifact_id, "mime_type": "image/svg+xml", "content": "<svg/>"}
 
+    def artifact_excerpt(self, run_id, artifact_id):
+        return {"artifact_id": artifact_id, "text": "module counter;\nendmodule"}
+
 
 class FakeLLM:
     def generate(self, payload):
@@ -214,6 +217,19 @@ def test_m1_http_api_proxies_v2_artifact_preview():
         assert status == 200
         assert preview["preview"]["status"] == "ready"
         assert preview["preview"]["artifact_id"] == "artifact-1"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_proxies_v2_artifact_excerpt():
+    server, fake, base = running_server()
+    try:
+        status, excerpt = request(
+            base, "GET", "/api/m1/runs/run-42/artifacts/artifact-1/excerpt"
+        )
+        assert status == 200
+        assert excerpt["excerpt"]["text"].startswith("module counter")
     finally:
         server.shutdown()
         server.server_close()

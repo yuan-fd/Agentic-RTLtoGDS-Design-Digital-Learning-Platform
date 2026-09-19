@@ -103,5 +103,8 @@ select:disabled { color: var(--muted); cursor: not-allowed; }
 .output-panel { padding: 16px 18px; min-height: 142px; }
 .output-panel .panel-heading { margin-bottom: 10px; }
 .empty-output { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 14px; }
+pre.empty-output { white-space: pre-wrap; overflow: auto; max-height: 220px; font: 10px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+#layoutOutput { overflow: auto; min-height: 100px; }
+#layoutOutput svg { display: block; width: 100%; height: auto; max-height: 220px; }
 @media (max-width: 1050px) { .workspace, .workbench-layout { grid-template-columns: 1fr 1fr; } .evidence-panel, .workbench-evidence { grid-column: span 2; } .timeline { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 700px) { .topbar { padding: 0 16px; gap: 14px; } .brand { min-width: auto; } .topnav { display: none; } .shell { padding: 24px 16px 40px; } .page-head { display: block; } .head-actions { margin-top: 16px; } .workspace, .workbench-layout, .outputs { grid-template-columns: 1fr; } .evidence-panel, .workbench-evidence { grid-column: auto; } .timeline { grid-template-columns: 1fr; } .timeline li:not(:last-child)::after { display: none; } }

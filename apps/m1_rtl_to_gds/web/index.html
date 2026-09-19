@@ -132,9 +132,9 @@
     </section>
 
     <section class="outputs" aria-label="Measured outputs">
-      <article class="output-panel"><div class="panel-heading"><h2>Netlist</h2><span class="status-pill neutral">Unavailable</span></div><div class="empty-output">A verified run is required before a netlist can be rendered.</div></article>
-      <article class="output-panel"><div class="panel-heading"><h2>Layout</h2><span class="status-pill neutral">Unavailable</span></div><div class="empty-output">GDS / DEF renderings will cite their v2 artifact hash.</div></article>
-      <article class="output-panel"><div class="panel-heading"><h2>QoR</h2><span class="status-pill neutral">No measurement</span></div><div class="empty-output">No area, timing, power or DRC values are available.</div></article>
+      <article class="output-panel"><div class="panel-heading"><h2>Netlist</h2><span class="status-pill neutral" id="netlistStatus">Unavailable</span></div><pre class="empty-output" id="netlistOutput">A verified run is required before the netlist can be read.</pre></article>
+      <article class="output-panel"><div class="panel-heading"><h2>Layout</h2><span class="status-pill neutral" id="layoutStatus">Unavailable</span></div><div class="empty-output" id="layoutOutput">GDS / DEF renderings will cite their v2 artifact hash.</div></article>
+      <article class="output-panel"><div class="panel-heading"><h2>QoR</h2><span class="status-pill neutral" id="qorStatus">No measurement</span></div><div class="empty-output" id="qorOutput">No area, timing, power or DRC values are available.</div></article>
     </section>
   </main>
   <script src="app.js" defer></script>

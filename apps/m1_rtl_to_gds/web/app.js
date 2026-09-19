@@ -80,12 +80,34 @@
       requestJson("/api/m1/runs/" + id + "/artifacts"),
       requestJson("/api/m1/runs/" + id + "/metrics"),
     ]);
-    $("artifactList").innerHTML = values[1].artifacts.map((item) =>
+    const artifacts = values[1].artifacts;
+    $("artifactList").innerHTML = artifacts.map((item) =>
       "<li><span>" + item.kind + "</span><span class=\"artifact-state\">" + item.sha256 + "</span></li>"
     ).join("");
-    $("metricsList").innerHTML = values[2].metrics.map((item) =>
+    const metrics = values[2].metrics;
+    $("metricsList").innerHTML = metrics.map((item) =>
       "<li><span>" + item.name + "</span><span class=\"artifact-state\">" + item.value + " " + (item.unit || "") + "</span></li>"
     ).join("");
+    const netlist = artifacts.find((item) => item.kind === "netlist");
+    if (netlist) {
+      const excerpt = await requestJson("/api/m1/runs/" + id + "/artifacts/" + netlist.artifact_id + "/excerpt");
+      $("netlistOutput").textContent = excerpt.excerpt.text;
+      $("netlistStatus").textContent = "Measured · " + netlist.sha256.slice(0, 12);
+    }
+    const layout = artifacts.find((item) => item.kind === "gds") || artifacts.find((item) => item.kind === "def");
+    if (layout) {
+      const preview = await requestJson("/api/m1/runs/" + id + "/artifacts/" + layout.artifact_id + "/preview");
+      if (preview.preview.status === "ready") {
+        $("layoutOutput").innerHTML = preview.preview.content;
+        $("layoutStatus").textContent = "Rendered · " + layout.sha256.slice(0, 12);
+      } else {
+        $("layoutOutput").textContent = "Unavailable: " + preview.preview.reason;
+      }
+    }
+    if (metrics.length) {
+      $("qorOutput").textContent = metrics.map((item) => item.name + ": " + item.value).join("\n");
+      $("qorStatus").textContent = "Measured";
+    }
     $("timeline").dataset.events = values[0].timeline.length;
   }
 
