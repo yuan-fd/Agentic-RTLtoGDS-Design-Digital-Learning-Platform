@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Agentic RTL-to-GDS teaching experiment">
+  <title>M1 · RTL-to-GDS Studio</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#studio" aria-label="Teaching Hub home">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span><strong>Teaching Hub</strong><small>Agentic RTL-to-GDS</small></span>
+    </a>
+    <nav class="topnav" aria-label="Primary navigation">
+      <a class="active" href="#studio">M1 Studio</a>
+      <a href="#catalog">Course Lab</a>
+      <a href="#history">Run history</a>
+    </nav>
+    <span class="identity" id="identityState">v2 session unavailable</span>
+  </header>
+
+  <main id="app" class="shell">
+    <section class="page-head" aria-labelledby="pageTitle">
+      <div>
+        <p class="eyebrow">MODULE M1 · GUIDED EXPERIMENT</p>
+        <h1 id="pageTitle">Spec / RTL Studio</h1>
+        <p class="lede">Turn an executable digital-design specification into verified RTL, then measure one real RTL-to-GDS run.</p>
+      </div>
+      <div class="head-actions">
+        <span class="status-pill neutral" id="serviceState">Checking v2…</span>
+        <button class="button quiet" id="refreshButton" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <div class="mode-tabs" role="tablist" aria-label="M1 workspaces">
+      <button class="mode-tab selected" id="studioTab" role="tab" aria-selected="true" aria-controls="studioPanel" type="button">Spec / RTL Studio</button>
+      <button class="mode-tab" id="workbenchTab" role="tab" aria-selected="false" aria-controls="workbenchPanel" type="button">RTL-to-GDS Workbench</button>
+    </div>
+
+    <section class="workspace" id="studioPanel" role="tabpanel" aria-labelledby="studioTab">
+      <aside class="panel spec-panel">
+        <div class="panel-heading"><div><p class="eyebrow">01 · INTENT</p><h2>Specification</h2></div><span class="state-dot pending" id="specState">Draft</span></div>
+        <label for="specInput">Describe the circuit</label>
+        <textarea id="specInput" rows="8" placeholder="Example: a single-clock sequence detector…"></textarea>
+        <p class="field-note">An incomplete clock, reset, interface, or acceptance condition produces clarification questions. It does not create an execution task.</p>
+        <button class="button primary" id="freezeButton" type="button">Assess specification</button>
+        <div class="message" id="specMessage" role="status">No specification assessed.</div>
+      </aside>
+
+      <section class="panel rtl-panel">
+        <div class="panel-heading"><div><p class="eyebrow">02 · CANDIDATE</p><h2>RTL version</h2></div><span class="state-label" id="rtlState">No version</span></div>
+        <div class="editor-shell">
+          <div class="editor-toolbar"><span>SystemVerilog</span><span id="rtlHash">No staged input</span></div>
+          <textarea id="rtlEditor" aria-label="SystemVerilog editor" spellcheck="false" placeholder="Generated RTL will appear here after a frozen specification."></textarea>
+        </div>
+        <div class="editor-actions"><button class="button quiet" id="newVersionButton" type="button" disabled>Save new RTL version</button><span class="field-note">Every edit creates a new version and invalidates prior verification evidence.</span></div>
+      </section>
+
+      <aside class="panel evidence-panel">
+        <div class="panel-heading"><div><p class="eyebrow">03 · GATE</p><h2>Verification</h2></div><span class="status-pill neutral" id="verificationState">Not run</span></div>
+        <ol class="check-list" id="verificationList">
+          <li><span class="check-mark">—</span><span><strong>Compile / lint</strong><small>Waiting for a version</small></span></li>
+          <li><span class="check-mark">—</span><span><strong>Simulation</strong><small>Frozen oracle required</small></span></li>
+          <li><span class="check-mark">—</span><span><strong>Mutation quality</strong><small>Evidence will be linked to this version</small></span></li>
+        </ol>
+        <div class="callout unavailable" id="evidenceMessage"><strong>No evidence yet</strong><span>Verification artifacts will appear here after v2 returns a run.</span></div>
+      </aside>
+    </section>
+
+    <section class="workbench-layout" id="workbenchPanel" role="tabpanel" aria-labelledby="workbenchTab" hidden>
+      <section class="panel workbench-summary">
+        <div class="panel-heading"><div><p class="eyebrow">RUN CONFIGURATION</p><h2>Selected experiment</h2></div><span class="status-pill neutral" id="workbenchAvailability">Unavailable</span></div>
+        <label for="pdkSelect">PDK</label>
+        <select id="pdkSelect" disabled>
+          <option value="nangate45">Nangate45</option>
+          <option value="sky130hd">Sky130HD</option>
+          <option value="asap7">ASAP7</option>
+        </select>
+        <dl class="metadata-list">
+          <div><dt>RTL version</dt><dd id="selectedRtlVersion">No version selected</dd></div>
+          <div><dt>Verification gate</dt><dd id="verificationGate">Not verified</dd></div>
+          <div><dt>Run</dt><dd id="runStateDetail">No run selected</dd></div>
+        </dl>
+        <p class="field-note">A PDK is selectable only after its registered recipe and real smoke status are available.</p>
+      </section>
+
+      <section class="panel workbench-stage">
+        <div class="panel-heading"><div><p class="eyebrow">STAGE OBSERVATION</p><h2>RTL-to-GDS execution</h2></div><span class="state-label">v2-owned run</span></div>
+        <ol class="stage-list">
+          <li><span class="stage-number">01</span><div><strong>Stage RTL input</strong><small>Source reference from the selected RTL version</small></div><span class="status-pill neutral">Unavailable</span></li>
+          <li><span class="stage-number">02</span><div><strong>Run ORFS</strong><small>Fixed recipe, selected PDK and frozen constraints</small></div><span class="status-pill neutral">Unavailable</span></li>
+          <li><span class="stage-number">03</span><div><strong>Collect evidence</strong><small>Artifacts and metrics remain owned by v2</small></div><span class="status-pill neutral">Unavailable</span></li>
+        </ol>
+        <div class="callout unavailable"><strong>No execution started</strong><span>Verification, PDK readiness and a v2 session are required before submission.</span></div>
+      </section>
+
+      <section class="panel workbench-evidence">
+        <div class="panel-heading"><div><p class="eyebrow">EVIDENCE INSPECTOR</p><h2>Artifacts</h2></div><span class="state-label">No run</span></div>
+        <ul class="artifact-list" id="artifactList">
+          <li><span>GDS</span><span class="artifact-state">Unavailable</span></li>
+          <li><span>DEF</span><span class="artifact-state">Unavailable</span></li>
+          <li><span>ODB</span><span class="artifact-state">Unavailable</span></li>
+          <li><span>Netlist</span><span class="artifact-state">Unavailable</span></li>
+          <li><span>Reports</span><span class="artifact-state">Unavailable</span></li>
+        </ul>
+        <p class="field-note">Artifact hashes and evidence status will be shown only from a completed v2 run.</p>
+      </section>
+    </section>
+
+    <section class="panel timeline-panel" aria-labelledby="timelineTitle">
+      <div class="panel-heading"><div><p class="eyebrow">RUN STATE</p><h2 id="timelineTitle">Experiment timeline</h2></div><span class="state-label" id="runState">No run selected</span></div>
+      <ol class="timeline" id="timeline">
+        <li class="current"><span>1</span><div><strong>Specify</strong><small>Freeze intent before generation</small></div></li>
+        <li><span>2</span><div><strong>Generate / edit RTL</strong><small>Direct LLM candidate source</small></div></li>
+        <li><span>3</span><div><strong>Verify</strong><small>Compile, simulation and mutation</small></div></li>
+        <li><span>4</span><div><strong>RTL-to-GDS</strong><small>ORFS with selected PDK</small></div></li>
+        <li><span>5</span><div><strong>Inspect evidence</strong><small>Artifacts, reports and measured QoR</small></div></li>
+      </ol>
+    </section>
+
+    <section class="outputs" aria-label="Measured outputs">
+      <article class="output-panel"><div class="panel-heading"><h2>Netlist</h2><span class="status-pill neutral">Unavailable</span></div><div class="empty-output">A verified run is required before a netlist can be rendered.</div></article>
+      <article class="output-panel"><div class="panel-heading"><h2>Layout</h2><span class="status-pill neutral">Unavailable</span></div><div class="empty-output">GDS / DEF renderings will cite their v2 artifact hash.</div></article>
+      <article class="output-panel"><div class="panel-heading"><h2>QoR</h2><span class="status-pill neutral">No measurement</span></div><div class="empty-output">No area, timing, power or DRC values are available.</div></article>
+    </section>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>
