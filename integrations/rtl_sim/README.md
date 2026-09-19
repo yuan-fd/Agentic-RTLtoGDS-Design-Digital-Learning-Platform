@@ -1,7 +1,7 @@
 # `rtl-sim` v2 Toolkit
 
 This first-party Toolkit runs a frozen testbench/oracle against staged RTL
-using fixed Icarus Verilog and `vvp` entrypoints. The testbench is an artifact
+using Verilator `--binary`. The testbench is an artifact
 bound to the M1 `VerificationPackage`; it is never generated from candidate
 RTL and never accepted from a browser path.
 

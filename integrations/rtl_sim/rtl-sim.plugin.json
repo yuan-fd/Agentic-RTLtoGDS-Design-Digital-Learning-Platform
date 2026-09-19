@@ -11,5 +11,5 @@
     {"kind": "log", "required": true}
   ],
   "progress_marker": "[progress]",
-  "environment": {}
+  "environment": {"RTL_SIM_VERILATOR": "operator-configured"}
 }

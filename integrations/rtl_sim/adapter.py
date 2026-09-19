@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixed Icarus/vvp simulation Toolkit for the v2 foundation."""
+"""Fixed Verilator simulation Toolkit for the v2 foundation."""
 
 from __future__ import annotations
 
@@ -72,16 +72,17 @@ def main() -> int:
             raise ValueError("top must be a bounded identifier")
         rtl = staged(root, inputs["rtl_path"], "rtl_path")
         testbench = staged(root, inputs["testbench_path"], "testbench_path")
-        iverilog = executable("RTL_SIM_IVERILOG")
-        vvp = executable("RTL_SIM_VVP")
+        simulation_top = inputs["simulation_top"]
+        if not isinstance(simulation_top, str) or not IDENTIFIER.fullmatch(simulation_top):
+            raise ValueError("simulation_top must be a bounded identifier")
+        verilator = executable("RTL_SIM_VERILATOR")
         output = root / "outputs"
         output.mkdir(exist_ok=True)
-        compiled = output / "simulation.vvp"
+        compiled = output / "simulation.bin"
         log = output / "simulation.log"
-        commands = (
-            ("iverilog", [str(iverilog), "-g2012", "-s", top, "-o", str(compiled), str(rtl), str(testbench)]),
-            ("vvp", [str(vvp), str(compiled)]),
-        )
+        commands = (("verilator", [str(verilator), "--binary", "--sv", "--top-module",
+                                    simulation_top, "-o", str(compiled), str(rtl), str(testbench)]),
+                    ("simulation", [str(compiled)]))
         rows = []
         with log.open("w", encoding="utf-8") as stream:
             for name, command in commands:
@@ -93,12 +94,13 @@ def main() -> int:
                 if completed.returncode != 0:
                     return fail(result, started, "simulation_failed", f"{name} failed",
                                 completed.returncode or 1, [{"kind": "log", "path": "outputs/simulation.log"}])
-                if name == "iverilog" and (not compiled.is_file() or compiled.stat().st_size == 0):
+                if name == "verilator" and (not compiled.is_file() or compiled.stat().st_size == 0):
                     return fail(result, started, "simulation_failed",
-                                "iverilog completed without producing a simulation image", 1,
+                                "verilator completed without producing a simulation image", 1,
                                 [{"kind": "log", "path": "outputs/simulation.log"}])
         report = output / "simulation.json"
-        report.write_text(json.dumps({"top": top, "steps": rows, "status": "passed"}, indent=2), encoding="utf-8")
+        report.write_text(json.dumps({"top": top, "simulation_top": simulation_top,
+                                      "steps": rows, "status": "passed"}, indent=2), encoding="utf-8")
         write_result(result, {"status": "succeeded", "exit_code": 0,
                               "artifacts": [{"kind": "simulation_report", "path": "outputs/simulation.json"},
                                             {"kind": "log", "path": "outputs/simulation.log"}],

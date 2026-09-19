@@ -23,7 +23,8 @@ def write_request(workspace: Path) -> None:
         "task": {"schema_version": 3, "task_id": "sim-1", "project_id": "teaching-m1",
                  "design_id": "counter", "plugin_id": "rtl-sim", "inputs": {
                      "rtl_path": "rtl/counter.sv", "testbench_path": "verification/oracle.sv",
-                     "top": "counter", "spec_id": "spec-counter", "verification_id": "verify-counter-v1",
+                     "top": "counter", "simulation_top": "counter_tb",
+                     "spec_id": "spec-counter", "verification_id": "verify-counter-v1",
                  }, "parameters": {}, "expected_artifacts": ["simulation_report", "log"]},
     }), encoding="utf-8")
 
@@ -38,26 +39,26 @@ def run(workspace: Path, env: dict[str, str] | None = None) -> tuple[int, dict]:
     return completed.returncode, json.loads(result.read_text(encoding="utf-8"))
 
 
-def tools(tmp_path: Path, *, iverilog_code: int = 0, vvp_code: int = 0) -> dict[str, str]:
+def tools(tmp_path: Path, *, verilator_code: int = 0) -> dict[str, str]:
     root = tmp_path / "tools"
     root.mkdir()
-    values = {}
-    for name, code in (("iverilog", iverilog_code), ("vvp", vvp_code)):
-        path = root / name
-        script = "#!/bin/sh\n"
-        if name == "iverilog":
-            script += "while [ $# -gt 0 ]; do if [ \"$1\" = \"-o\" ]; then shift; echo compiled > \"$1\"; fi; shift; done\n"
-        script += f"exit {code}\n"
-        path.write_text(script, encoding="utf-8")
-        path.chmod(path.stat().st_mode | stat.S_IXUSR)
-        values[{"iverilog": "RTL_SIM_IVERILOG", "vvp": "RTL_SIM_VVP"}[name]] = str(path)
-    return values
+    path = root / "verilator"
+    path.write_text(
+        "#!/bin/sh\n"
+        "while [ $# -gt 0 ]; do\n"
+        "  if [ \"$1\" = \"-o\" ]; then shift; printf '#!/bin/sh\\necho TB_SUMMARY total=1 errors=0\\necho PASS\\n' > \"$1\"; chmod +x \"$1\"; fi\n"
+        "  shift\n"
+        f"done\nexit {verilator_code}\n",
+        encoding="utf-8",
+    )
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return {"RTL_SIM_VERILATOR": str(path)}
 
 
 def test_missing_tools_fail_closed(tmp_path: Path) -> None:
     write_request(tmp_path)
 
-    code, result = run(tmp_path, {"RTL_SIM_IVERILOG": "", "RTL_SIM_VVP": ""})
+    code, result = run(tmp_path, {"RTL_SIM_VERILATOR": ""})
 
     assert code == 3
     assert result["failure"]["category"] == "configuration_error"
@@ -76,7 +77,7 @@ def test_simulation_success_registers_report_and_log(tmp_path: Path) -> None:
 def test_simulation_tool_failure_is_not_a_pass(tmp_path: Path) -> None:
     write_request(tmp_path)
 
-    code, result = run(tmp_path, tools(tmp_path, iverilog_code=5))
+    code, result = run(tmp_path, tools(tmp_path, verilator_code=5))
 
     assert code == 5
     assert result["status"] == "failed"
@@ -87,14 +88,11 @@ def test_compiler_exit_zero_without_an_image_is_not_a_pass(tmp_path: Path) -> No
     write_request(tmp_path)
     tool_root = tmp_path / "empty-tools"
     tool_root.mkdir()
-    compiler = tool_root / "iverilog"
+    compiler = tool_root / "verilator"
     compiler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     compiler.chmod(compiler.stat().st_mode | stat.S_IXUSR)
-    runner = tool_root / "vvp"
-    runner.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    runner.chmod(runner.stat().st_mode | stat.S_IXUSR)
 
-    code, result = run(tmp_path, {"RTL_SIM_IVERILOG": str(compiler), "RTL_SIM_VVP": str(runner)})
+    code, result = run(tmp_path, {"RTL_SIM_VERILATOR": str(compiler)})
 
     assert code == 1
-    assert result["failure"]["message"] == "iverilog completed without producing a simulation image"
+    assert result["failure"]["message"] == "verilator completed without producing a simulation image"
