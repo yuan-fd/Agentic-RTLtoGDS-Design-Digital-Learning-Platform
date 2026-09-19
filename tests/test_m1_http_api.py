@@ -141,6 +141,11 @@ def test_m1_http_api_freezes_spec_and_creates_v2_staged_rtl_version():
         assert status == 201
         assert version["rtl_version"]["source_ref"].startswith("input:")
         assert version["rtl_version"]["generator"] == "direct_llm"
+        status, submitted = request(
+            base, "POST", f"/api/m1/rtl/{version['rtl_version']['version_id']}/verify", {}
+        )
+        assert status == 202
+        assert submitted["state"] == "submitted"
     finally:
         server.shutdown()
         server.server_close()

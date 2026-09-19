@@ -190,7 +190,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
             self._json(HTTPStatus.CREATED, {"session": session.to_dict()})
 
         def _register_teaching_package(self, session: Any) -> None:
-            if session.spec is None or session.state.value != "specified":
+            if session.spec is None or session.state.value != "frozen":
                 return
             if session.spec.top == "counter":
                 oracle = """module counter_tb;
