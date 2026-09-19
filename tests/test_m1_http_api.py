@@ -60,6 +60,9 @@ class FakeV2:
     def metrics(self, run_id):
         return [{"name": "area", "value": 1.0, "unit": "um2"}]
 
+    def artifact_preview(self, run_id, artifact_id):
+        return {"status": "ready", "artifact_id": artifact_id, "mime_type": "image/svg+xml", "content": "<svg/>"}
+
 
 class FakeLLM:
     def generate(self, payload):
@@ -197,6 +200,20 @@ def test_m1_http_api_reads_rtl_and_v2_observations():
         assert request(base, "GET", "/api/m1/runs/run-42/timeline")[1]["timeline"]
         assert request(base, "GET", "/api/m1/runs/run-42/artifacts")[1]["artifacts"]
         assert request(base, "GET", "/api/m1/runs/run-42/metrics")[1]["metrics"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_proxies_v2_artifact_preview():
+    server, fake, base = running_server()
+    try:
+        status, preview = request(
+            base, "GET", "/api/m1/runs/run-42/artifacts/artifact-1/preview"
+        )
+        assert status == 200
+        assert preview["preview"]["status"] == "ready"
+        assert preview["preview"]["artifact_id"] == "artifact-1"
     finally:
         server.shutdown()
         server.server_close()
