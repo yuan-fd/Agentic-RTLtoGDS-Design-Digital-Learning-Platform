@@ -144,7 +144,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
             return {
                 "app": "m1_rtl_to_gds",
                 "status": "ok" if health.get("ok", health.get("status") == "ok") else "unavailable",
-                "identity": session.get("user_id") if isinstance(session, dict) else None,
+                "identity": (session.get("user") or {}).get("id") if isinstance(session, dict) else None,
                 "v2": health,
             }
 
@@ -283,7 +283,8 @@ endmodule
 
         def _owner_id(self) -> str:
             session = v2_client.session()
-            owner_id = session.get("user_id") if isinstance(session, dict) else None
+            user = session.get("user") if isinstance(session, dict) else None
+            owner_id = user.get("id") if isinstance(user, dict) else None
             if not isinstance(owner_id, str) or not owner_id:
                 raise PermissionError("v2 identity is required")
             return owner_id

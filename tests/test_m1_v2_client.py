@@ -35,7 +35,7 @@ def test_v2_client_uses_kernel_http_contract(monkeypatch: pytest.MonkeyPatch) ->
     calls: list[tuple[str, str, bytes | None]] = []
     replies = iter((
         {"ok": True},
-        {"session": {"user_id": "user-1"}},
+        {"session": {"user": {"id": "user-1", "username": "student", "role": "member"}}},
         {"input": {"input_id": "input-1"}},
         {"run": {"run_id": "run-1", "status": "queued"}},
     ))
@@ -49,7 +49,7 @@ def test_v2_client_uses_kernel_http_contract(monkeypatch: pytest.MonkeyPatch) ->
     client = V2Client("http://v2.test/", token="token-1", timeout=3.0)
 
     assert client.health() == {"ok": True}
-    assert client.session() == {"user_id": "user-1"}
+    assert client.session() == {"user": {"id": "user-1", "username": "student", "role": "member"}}
     assert client.upload_rtl("module top; endmodule") == {"input_id": "input-1"}
     assert client.submit({"task_id": "task-1"}, idempotency_key="m1:task-1")["run"]["run_id"] == "run-1"
     assert calls[2][0] == "POST"

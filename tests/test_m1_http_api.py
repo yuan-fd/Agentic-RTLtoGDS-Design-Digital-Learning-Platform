@@ -24,7 +24,7 @@ class FakeV2:
         return {"ok": True, "status": "ok"}
 
     def session(self):
-        return {"user_id": self.user_id, "username": "student"}
+        return {"user": {"id": self.user_id, "username": "student", "role": "member"}}
 
     def upload_rtl(self, source):
         input_id = f"input-{len(source)}"
