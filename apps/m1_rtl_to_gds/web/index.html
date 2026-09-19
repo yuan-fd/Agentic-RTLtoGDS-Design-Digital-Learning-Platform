@@ -15,8 +15,6 @@
     </a>
     <nav class="topnav" aria-label="Primary navigation">
       <a class="active" href="#studio">M1 Studio</a>
-      <a href="#catalog">Course Lab</a>
-      <a href="#history">Run history</a>
     </nav>
     <span class="identity" id="identityState">v2 session unavailable</span>
   </header>
@@ -66,9 +64,9 @@
       <aside class="panel evidence-panel">
         <div class="panel-heading"><div><p class="eyebrow">03 · GATE</p><h2>Verification</h2></div><span class="status-pill neutral" id="verificationState">Not run</span></div>
         <ol class="check-list" id="verificationList">
-          <li><span class="check-mark">—</span><span><strong>Compile / lint</strong><small>Waiting for a version</small></span></li>
-          <li><span class="check-mark">—</span><span><strong>Simulation</strong><small>Frozen oracle required</small></span></li>
-          <li><span class="check-mark">—</span><span><strong>Mutation quality</strong><small>Evidence will be linked to this version</small></span></li>
+          <li><span class="check-mark" id="compileMark">—</span><span><strong>Compile / lint</strong><small id="compileDetail">Waiting for a version</small></span></li>
+          <li><span class="check-mark" id="simulationMark">—</span><span><strong>Simulation</strong><small id="simulationDetail">Frozen oracle required</small></span></li>
+          <li><span class="check-mark" id="mutationMark">—</span><span><strong>Mutation quality</strong><small id="mutationDetail">Evidence will be linked to this version</small></span></li>
         </ol>
         <div class="editor-actions">
           <button class="button quiet" id="verifyButton" type="button" disabled>Run compile / lint</button>
@@ -99,9 +97,9 @@
       <section class="panel workbench-stage">
         <div class="panel-heading"><div><p class="eyebrow">STAGE OBSERVATION</p><h2>RTL-to-GDS execution</h2></div><span class="state-label">v2-owned run</span></div>
         <ol class="stage-list">
-          <li><span class="stage-number">01</span><div><strong>Stage RTL input</strong><small>Source reference from the selected RTL version</small></div><span class="status-pill neutral">Unavailable</span></li>
-          <li><span class="stage-number">02</span><div><strong>Run ORFS</strong><small>Fixed recipe, selected PDK and frozen constraints</small></div><span class="status-pill neutral">Unavailable</span></li>
-          <li><span class="stage-number">03</span><div><strong>Collect evidence</strong><small>Artifacts and metrics remain owned by v2</small></div><span class="status-pill neutral">Unavailable</span></li>
+          <li><span class="stage-number">01</span><div><strong>Stage RTL input</strong><small>Source reference from the selected RTL version</small></div><span class="status-pill neutral" id="stageInputStatus">Unavailable</span></li>
+          <li><span class="stage-number">02</span><div><strong>Run ORFS</strong><small>Fixed recipe, selected PDK and frozen constraints</small></div><span class="status-pill neutral" id="stageOrfsStatus">Unavailable</span></li>
+          <li><span class="stage-number">03</span><div><strong>Collect evidence</strong><small>Artifacts and metrics remain owned by v2</small></div><span class="status-pill neutral" id="stageEvidenceStatus">Unavailable</span></li>
         </ol>
         <div class="callout unavailable"><strong>No execution started</strong><span>Verification, PDK readiness and a v2 session are required before submission.</span></div>
       </section>

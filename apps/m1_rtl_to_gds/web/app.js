@@ -42,8 +42,9 @@
             : state
       : "No specification assessed.";
     $("clarificationQuestions").textContent = (session && session.clarification_questions || []).join(" ");
-    $("freezeButton").textContent = state === "specified" ? "Freeze specification" : "Assess specification";
-    $("freezeButton").disabled = state === "needs_clarification" || state === "frozen";
+    $("freezeButton").textContent = state === "specified" ? "Freeze specification" :
+      state === "needs_clarification" ? "Re-assess specification" : "Assess specification";
+    $("freezeButton").disabled = state === "frozen";
     $("generateButton").disabled = state !== "frozen";
   }
 
@@ -58,7 +59,48 @@
     $("newVersionButton").disabled = !version;
     $("gdsButton").disabled = !version || version.simulation_status !== "passed";
     $("pdkSelect").disabled = !version || version.simulation_status !== "passed";
+    renderVerification();
     if (source !== null && source !== undefined) $("rtlEditor").value = source;
+  }
+
+  function renderVerification() {
+    const verification = version ? version.verification_status : "not_run";
+    const simulation = version ? version.simulation_status : "not_run";
+    const state = simulation === "passed" ? "Verified" :
+      verification === "passed" ? "Compile passed" :
+      ["failed", "invalidated"].includes(verification) ? verification.replaceAll("_", " ") :
+      verification === "running" ? "Running" : "Not run";
+    const kind = state === "Verified" || state === "Compile passed" ? "good" :
+      ["failed", "invalidated"].includes(verification) ? "warn" : "neutral";
+    $("verificationState").textContent = state;
+    $("verificationState").className = "status-pill " + kind;
+    $("compileMark").textContent = verification === "passed" ? "✓" : verification === "failed" ? "×" : "—";
+    $("compileDetail").textContent = version ? verification.replaceAll("_", " ") : "Waiting for a version";
+    $("simulationMark").textContent = simulation === "passed" ? "✓" : simulation === "failed" ? "×" : "—";
+    $("simulationDetail").textContent = version ? simulation.replaceAll("_", " ") : "Frozen oracle required";
+    $("mutationMark").textContent = "—";
+    $("mutationDetail").textContent = "Not registered for this M1 package";
+  }
+
+  function clearEvidence() {
+    $("runState").textContent = "No run selected";
+    $("runStateDetail").textContent = "No run selected";
+    $("workbenchAvailability").textContent = "Unavailable";
+    $("artifactList").innerHTML = "<li><span>GDS</span><span class=\"artifact-state\">Unavailable</span></li>" +
+      "<li><span>DEF</span><span class=\"artifact-state\">Unavailable</span></li>" +
+      "<li><span>ODB</span><span class=\"artifact-state\">Unavailable</span></li>" +
+      "<li><span>Netlist</span><span class=\"artifact-state\">Unavailable</span></li>" +
+      "<li><span>Reports</span><span class=\"artifact-state\">Unavailable</span></li>";
+    $("metricsList").innerHTML = "";
+    $("netlistOutput").textContent = "A verified run is required before the netlist can be read.";
+    $("layoutOutput").textContent = "GDS / DEF renderings will cite their v2 artifact hash.";
+    $("qorOutput").textContent = "No area, timing, power or DRC values are available.";
+    $("netlistStatus").textContent = "Unavailable";
+    $("layoutStatus").textContent = "Unavailable";
+    $("qorStatus").textContent = "No measurement";
+    setStage("stageInputStatus", version ? "Ready" : "Unavailable", version ? "good" : "neutral");
+    setStage("stageOrfsStatus", "Unavailable", "neutral");
+    setStage("stageEvidenceStatus", "Unavailable", "neutral");
   }
 
   async function refreshVersion() {
@@ -72,6 +114,17 @@
     $("runState").textContent = run.run_id + ": " + run.status;
     $("runStateDetail").textContent = run.status;
     $("workbenchAvailability").textContent = run.status === "succeeded" ? "Measured" : run.status;
+    const active = ["queued", "running", "retry_wait"].includes(run.status);
+    const terminal = ["succeeded", "failed", "cancelled", "timed_out"].includes(run.status);
+    setStage("stageInputStatus", version ? "Ready" : "Unavailable", version ? "good" : "neutral");
+    setStage("stageOrfsStatus", active ? "Running" : terminal ? run.status : "Unavailable", active ? "warn" : terminal && run.status === "succeeded" ? "good" : "neutral");
+    setStage("stageEvidenceStatus", run.status === "succeeded" ? "Ready" : "Unavailable", run.status === "succeeded" ? "good" : "neutral");
+  }
+
+  function setStage(id, label, kind) {
+    const element = $(id);
+    element.textContent = label;
+    element.className = "status-pill " + kind;
   }
 
   async function refreshEvidence(id) {
@@ -104,6 +157,8 @@
         $("layoutOutput").textContent = "Unavailable: " + preview.preview.reason;
       }
     }
+    $("stageEvidenceStatus").textContent = artifacts.length ? "Ready" : "Unavailable";
+    $("stageEvidenceStatus").className = "status-pill " + (artifacts.length ? "good" : "neutral");
     if (metrics.length) {
       $("qorOutput").textContent = metrics.map((item) => item.name + ": " + item.value).join("\n");
       $("qorStatus").textContent = "Measured";
@@ -130,15 +185,19 @@
     const data = await requestJson(path, { method: "POST", body: JSON.stringify(payload) });
     runKind = kind;
     $("runState").textContent = data.run_id + ": submitted";
+    renderRun({run_id: data.run_id, status: "queued"});
     pollRun(data.run_id).catch(showError);
   }
 
   async function assessOrFreeze() {
-    if (!session) {
+    if (!session || session.state === "needs_clarification") {
       session = (await requestJson("/api/m1/specs", {
         method: "POST",
         body: JSON.stringify({ description: $("specInput").value }),
       })).session;
+      version = null;
+      renderVersion(null);
+      clearEvidence();
     } else if (session.state === "specified") {
       session = (await requestJson("/api/m1/specs/" + session.spec_id + "/freeze", {
         method: "POST", body: "{}",
@@ -154,6 +213,7 @@
   $("generateButton").addEventListener("click", async () => {
     try {
       version = (await requestJson("/api/m1/specs/" + session.spec_id + "/generate", { method: "POST", body: "{}" })).rtl_version;
+      clearEvidence();
       await refreshVersion();
     } catch (error) { showError(error); }
   });
@@ -163,6 +223,7 @@
         method: "POST",
         body: JSON.stringify({ rtl_source: $("rtlEditor").value, generator: "user_edit", parent_version_id: version.version_id }),
       })).rtl_version;
+      clearEvidence();
       await refreshVersion();
     } catch (error) { showError(error); }
   });
