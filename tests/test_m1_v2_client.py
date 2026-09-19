@@ -69,3 +69,10 @@ def test_v2_client_exposes_http_failures_and_unavailability(monkeypatch: pytest.
 def test_v2_client_rejects_non_http_base_url() -> None:
     with pytest.raises(ValueError, match="http or https"):
         V2Client("file:///tmp/v2")
+
+
+def test_v2_client_rejects_malformed_plugin_catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs: Response({"plugins": {}}))
+
+    with pytest.raises(V2ClientError, match="plugin catalogue"):
+        V2Client("http://v2.test").plugins()

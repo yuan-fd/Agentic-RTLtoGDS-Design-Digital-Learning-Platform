@@ -2,6 +2,12 @@
 
 审计日期：2026-08-06
 
+## Teaching-platform rebaseline
+
+| Integration | Classification | Current boundary |
+| --- | --- | --- |
+| `rtl_verify/` | TEACHING_MODULE | First-party v2 Toolkit candidate for fixed Verilator/Yosys compile/lint; not admitted until operator review and native smoke. |
+
 本文件记录官方源码与项目补充材料的交叉核验结果。固定版本的机器可读真相源是 `plugins.lock.json`；第三方源码位于被 Git 忽略的 `.external-src/`，平台仓库不得复制第三方私有依赖。
 
 ## RTLScout

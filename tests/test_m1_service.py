@@ -156,6 +156,44 @@ def test_passed_rtl_without_a_frozen_verification_package_cannot_submit() -> Non
         service.build_rtl_to_gds_request(version.version_id, "nangate45")
 
 
+def test_verification_submission_requires_an_admitted_v2_toolkit() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1",
+            spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint", "yosys-check"),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+
+    with pytest.raises(ValueError, match="admitted"):
+        service.build_verification_request(version.version_id, _Plugins([]))
+
+    task = service.build_verification_request(
+        version.version_id, _Plugins([{"plugin_id": "rtl-verify", "executable": True,
+                                      "admission": "admitted", "capabilities": ["eda.rtl.verify"]}])
+    )
+
+    assert task["plugin_id"] == "rtl-verify"
+    assert task["staged_inputs"][0]["input_id"] == "rtl-1"
+    assert task["inputs"]["verification_id"] == "verify-counter-v1"
+
+
+class _Plugins:
+    def __init__(self, plugins: list[dict[str, object]]) -> None:
+        self._plugins = plugins
+
+    def plugins(self) -> list[dict[str, object]]:
+        return self._plugins
+
+
 def test_m1_state_survives_reopening_its_own_database(tmp_path: Path) -> None:
     database = tmp_path / "m1.sqlite"
     first_service = M1Service.open(str(database))

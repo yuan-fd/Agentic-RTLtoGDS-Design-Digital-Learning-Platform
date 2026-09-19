@@ -38,6 +38,13 @@ class V2Client:
         payload = self._call("GET", "/kernel/auth/session")
         return payload.get("session")
 
+    def plugins(self) -> list[dict[str, Any]]:
+        payload = self._call("GET", "/kernel/plugins")
+        plugins = payload.get("plugins")
+        if not isinstance(plugins, list) or not all(isinstance(item, dict) for item in plugins):
+            raise V2ClientError("v2 returned an invalid plugin catalogue", body=payload)
+        return plugins
+
     def upload_rtl(self, rtl_source: str) -> dict[str, Any]:
         if not isinstance(rtl_source, str) or not rtl_source.strip():
             raise ValueError("RTL source must be non-empty text")

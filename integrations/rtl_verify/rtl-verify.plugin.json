@@ -1,0 +1,16 @@
+{
+  "schema_version": 3,
+  "plugin_id": "rtl-verify",
+  "plugin_version": "1.0.0",
+  "adapter_entry": ["python3", "./adapter.py"],
+  "capabilities": ["eda.rtl.verify"],
+  "supported_arch": ["aarch64", "x86_64", "arm64"],
+  "default_timeout_seconds": 600,
+  "artifact_rules": [
+    {"kind": "rtl", "required": true},
+    {"kind": "verification_report", "required": true},
+    {"kind": "log", "required": true}
+  ],
+  "progress_marker": "[progress]",
+  "environment": {}
+}

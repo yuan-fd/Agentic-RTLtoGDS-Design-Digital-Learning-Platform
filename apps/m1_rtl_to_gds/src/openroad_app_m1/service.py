@@ -164,6 +164,48 @@ class M1Service:
         )
         return package
 
+    def build_verification_request(self, version_id: str, v2_client: Any) -> dict[str, Any]:
+        version = self.get_rtl_version(version_id)
+        session = self._session(version.spec_id)
+        if session.state is not M1State.FROZEN or session.spec is None:
+            raise ValueError("verification requires a frozen spec")
+        if not version.source_ref:
+            raise ValueError("RTL source must be staged in v2 before verification")
+        package = self._verification_packages.get(version.spec_id)
+        if package is None:
+            raise ValueError("verification requires a frozen VerificationPackage")
+        admitted = any(
+            item.get("plugin_id") == "rtl-verify"
+            and item.get("admission") == "admitted"
+            and item.get("executable") is True
+            and "eda.rtl.verify" in (item.get("capabilities") or ())
+            for item in v2_client.plugins()
+        )
+        if not admitted:
+            raise ValueError("rtl-verify Toolkit is not admitted by v2")
+        return {
+            "schema_version": 3,
+            "task_id": f"m1-verify-{version.version_id}",
+            "project_id": "teaching-m1",
+            "design_id": f"m1-{version.version_id}",
+            "plugin_id": "rtl-verify",
+            "inputs": {
+                "rtl_path": f"rtl/{session.spec.top}.sv",
+                "top": session.spec.top,
+                "spec_id": version.spec_id,
+                "verification_id": package.verification_id,
+                "compile_checks": list(package.compile_checks),
+            },
+            "staged_inputs": [{
+                "destination": f"rtl/{session.spec.top}.sv",
+                "input_id": version.source_ref.removeprefix("input:"),
+                "required": True,
+            }],
+            "expected_artifacts": ["rtl", "verification_report", "log"],
+            "timeout_seconds": 600,
+            "max_attempts": 1,
+        }
+
     def build_rtl_to_gds_request(self, version_id: str, pdk: str) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
         if version.verification_status is not VerificationStatus.PASSED:
