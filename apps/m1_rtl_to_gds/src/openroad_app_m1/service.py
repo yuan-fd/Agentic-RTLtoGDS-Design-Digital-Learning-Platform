@@ -9,6 +9,7 @@ from dataclasses import replace
 from typing import Any
 
 from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
+from openroad_platform_contracts.evidence_exchange import EvidenceRef
 
 from .models import M1Session, M1State, RTLVersion, VerificationStatus
 from .store import M1Store
@@ -31,6 +32,11 @@ class M1Service:
             package.spec_id: package
             for package in (VerificationPackage.from_dict(json.loads(payload))
                             for payload in store.all_verification_package_payloads())
+        }
+        self._evidence = {
+            evidence.evidence_id: evidence
+            for evidence in (EvidenceRef.from_dict(json.loads(payload))
+                             for payload in store.all_evidence_payloads())
         }
 
     @classmethod
@@ -257,6 +263,18 @@ class M1Service:
             "max_attempts": 1,
         }
 
+    def submit_verification(self, version_id: str, v2_client: Any) -> str:
+        task = self.build_verification_request(version_id, v2_client)
+        return self._submit_task(task, v2_client)
+
+    def submit_simulation(self, version_id: str, v2_client: Any) -> str:
+        task = self.build_simulation_request(version_id, v2_client)
+        return self._submit_task(task, v2_client)
+
+    def submit_rtl_to_gds(self, version_id: str, pdk: str, v2_client: Any) -> str:
+        task = self.build_rtl_to_gds_request(version_id, pdk)
+        return self._submit_task(task, v2_client)
+
     def build_rtl_to_gds_request(self, version_id: str, pdk: str) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
         if version.verification_status is not VerificationStatus.PASSED:
@@ -311,6 +329,15 @@ class M1Service:
         except KeyError as exc:
             raise KeyError(f"unknown RTL version: {version_id}") from exc
 
+    @staticmethod
+    def _submit_task(task: dict[str, Any], v2_client: Any) -> str:
+        reply = v2_client.submit(task, idempotency_key=task["task_id"])
+        run = reply.get("run") if isinstance(reply, dict) else None
+        run_id = run.get("run_id") if isinstance(run, dict) else None
+        if not isinstance(run_id, str) or not run_id:
+            raise ValueError("v2 returned a submission without run_id")
+        return run_id
+
     def get_session(self, spec_id: str) -> M1Session:
         return self._session(spec_id)
 
@@ -319,6 +346,31 @@ class M1Service:
             return self._verification_packages[spec_id]
         except KeyError as exc:
             raise KeyError(f"unknown VerificationPackage for spec: {spec_id}") from exc
+
+    def record_evidence(self, evidence: EvidenceRef) -> EvidenceRef:
+        evidence.validate()
+        session = self._session(evidence.spec_id)
+        version = self.get_rtl_version(evidence.candidate_id)
+        if session.owner_id != evidence.owner_id:
+            raise ValueError("evidence owner does not own the spec")
+        if version.spec_id != evidence.spec_id:
+            raise ValueError("evidence candidate belongs to another spec")
+        if evidence.evidence_kind == "rtl_to_gds" and evidence.status == "succeeded":
+            if not any(item.startswith("artifact:gds") for item in evidence.artifact_ids):
+                raise ValueError("successful rtl_to_gds evidence requires artifact:gds")
+            if version.verification_status is not VerificationStatus.PASSED:
+                raise ValueError("successful GDS evidence requires passed RTL verification")
+        if evidence.evidence_id in self._evidence:
+            raise ValueError("evidence_id is already registered")
+        self._evidence[evidence.evidence_id] = evidence
+        self.store.put_evidence(evidence, json.dumps(evidence.to_dict(), sort_keys=True))
+        return evidence
+
+    def get_evidence(self, evidence_id: str) -> EvidenceRef:
+        try:
+            return self._evidence[evidence_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown evidence: {evidence_id}") from exc
 
     def _session(self, spec_id: str) -> M1Session:
         try:

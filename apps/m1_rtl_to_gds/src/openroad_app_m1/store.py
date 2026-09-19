@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from .models import M1Session, RTLVersion
 from openroad_platform_contracts.rtl_frontend import VerificationPackage
+from openroad_platform_contracts.evidence_exchange import EvidenceRef
 
 
 class M1Store:
@@ -22,6 +23,10 @@ class M1Store:
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS m1_verification_packages "
             "(spec_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
+        )
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS m1_evidence "
+            "(evidence_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
         )
         self.connection.commit()
 
@@ -46,6 +51,14 @@ class M1Store:
         self.connection.execute(
             "INSERT OR REPLACE INTO m1_verification_packages(spec_id, payload) VALUES (?, ?)",
             (package.spec_id, payload),
+        )
+        self.connection.commit()
+
+    def put_evidence(self, evidence: EvidenceRef, payload: str) -> None:
+        evidence.validate()
+        self.connection.execute(
+            "INSERT OR REPLACE INTO m1_evidence(evidence_id, payload) VALUES (?, ?)",
+            (evidence.evidence_id, payload),
         )
         self.connection.commit()
 
@@ -78,6 +91,12 @@ class M1Store:
     def all_verification_package_payloads(self) -> tuple[str, ...]:
         rows = self.connection.execute(
             "SELECT payload FROM m1_verification_packages ORDER BY spec_id"
+        ).fetchall()
+        return tuple(str(row["payload"]) for row in rows)
+
+    def all_evidence_payloads(self) -> tuple[str, ...]:
+        rows = self.connection.execute(
+            "SELECT payload FROM m1_evidence ORDER BY evidence_id"
         ).fetchall()
         return tuple(str(row["payload"]) for row in rows)
 

@@ -17,6 +17,7 @@ from openroad_platform_contracts.rtl_frontend import (  # noqa: E402
     SpecIR,
     VerificationPackage,
 )
+from openroad_platform_contracts.evidence_exchange import EvidenceRef  # noqa: E402
 
 
 def spec_ir() -> SpecIR:
@@ -216,6 +217,96 @@ def test_simulation_submission_binds_the_frozen_oracle_artifact() -> None:
         {"destination": "verification/oracle.sv", "artifact_id": "oracle-counter-v1", "required": True},
     ]
     assert task["expected_artifacts"] == ["simulation_report", "log"]
+
+
+def test_gds_evidence_is_registered_only_for_the_matching_verified_candidate() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1", spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint",),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    evidence = EvidenceRef(
+        evidence_id="evidence:gds-1", owner_id="user-1", spec_id=frozen.spec_id,
+        candidate_id=version.version_id, run_id="run-gds-1",
+        artifact_ids=("artifact:gds-1", "artifact:def-1"), evidence_kind="rtl_to_gds",
+        status="succeeded", sha256="a" * 64, toolchain_digest="b" * 64,
+        protocol_digest="c" * 64, claim_boundary="One verified Nangate45 run.",
+        created_at="2026-09-19T00:00:00Z",
+    )
+
+    stored = service.record_evidence(evidence)
+
+    assert stored.evidence_id == evidence.evidence_id
+    assert service.get_evidence(evidence.evidence_id).complete is True
+
+
+def test_gds_evidence_without_gds_artifact_is_rejected() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    evidence = EvidenceRef(
+        evidence_id="evidence:no-gds", owner_id="user-1", spec_id=frozen.spec_id,
+        candidate_id=version.version_id, run_id="run-gds-1", artifact_ids=("artifact:def-1",),
+        evidence_kind="rtl_to_gds", status="succeeded", sha256="a" * 64,
+        toolchain_digest="b" * 64, protocol_digest="c" * 64,
+        claim_boundary="No complete layout.", created_at="2026-09-19T00:00:00Z",
+    )
+
+    with pytest.raises(ValueError, match="artifact:gds"):
+        service.record_evidence(evidence)
+
+
+def test_m1_submits_a_typed_task_to_v2_and_returns_only_the_kernel_run_id() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1", spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint",),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    fake_v2 = _Submitter()
+
+    task = service.submit_verification(version.version_id, fake_v2)
+
+    assert task == "run-verify-1"
+    assert fake_v2.submitted[0]["plugin_id"] == "rtl-verify"
+    assert fake_v2.keys == ["m1-verify-" + version.version_id]
+
+
+class _Submitter:
+    def __init__(self) -> None:
+        self._plugins = [{"plugin_id": "rtl-verify", "executable": True,
+                          "admission": "admitted", "capabilities": ["eda.rtl.verify"]}]
+        self.submitted: list[dict[str, object]] = []
+        self.keys: list[str] = []
+
+    def plugins(self) -> list[dict[str, object]]:
+        return self._plugins
+
+    def submit(self, task: dict[str, object], *, idempotency_key: str) -> dict[str, object]:
+        self.submitted.append(task)
+        self.keys.append(idempotency_key)
+        return {"run": {"run_id": "run-verify-1", "status": "queued"}}
 
 
 class _Plugins:
