@@ -78,7 +78,7 @@ produce an explicit unavailable state.
 
 ```text
 packages/contracts/       teaching and execution boundary contracts
-apps/                     existing services, being separated by module
+apps/m1_rtl_to_gds/       independent M1 teaching application
 integrations/             admitted external tool intake records
 docs/                     product specification, module catalog and governance
 tests/                    contract and regression tests
@@ -124,7 +124,8 @@ toolchain fixtures. A complete run must report those environmental failures
 explicitly; they must not be hidden by compatibility paths or skipped result
 substitution.
 
-Changes are developed in small slices. Each teaching module will eventually
-have its own `pyproject.toml`, process entrypoint, database, smoke test,
-contract tests and integration tests. A module may communicate with v2 through
-the HTTP client only and may not import a sibling app or open the v2 database.
+The active tree contains only the independent M1 module and teaching
+contracts. Earlier API, Web, Workbench, Runtime and research paths are kept in
+the Git history under `archive/pre-teaching-platform`; they are not active
+entrypoints or compatibility services. A teaching module communicates with v2
+through HTTP only and may not import a sibling app or open the v2 database.

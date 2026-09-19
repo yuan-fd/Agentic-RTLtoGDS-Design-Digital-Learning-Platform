@@ -79,6 +79,7 @@ python3 -m pytest -q tests/test_teaching_contracts.py
 python3 -m pytest -q
 ```
 
-教学模块按增量方式建设。每个模块最终必须有独立的 `pyproject.toml`、
-进程入口、数据库、smoke、contract tests 和 integration tests；模块之间
-不能互相导入，也不能直接打开 v2 数据库。
+当前 active 主干只保留独立的 M1 模块和教学 contracts。旧 API、旧 Web、
+旧 Workbench、旧 Runtime 与研究入口已从 active 主干移除，保存在 Git 标签
+`archive/pre-teaching-platform` 中，不作为兼容服务运行。教学模块只能通过
+HTTP 访问 v2，不能导入 sibling app，也不能打开 v2 数据库。

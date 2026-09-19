@@ -1,4 +1,10 @@
-# Repository Governance for OpenROAD Platform
+# Repository Governance for Agentic RTL-to-GDS Teaching Platform
+
+The active product is the independent M1 teaching module in
+`apps/m1_rtl_to_gds/`. `openroad-platform-v2` is the execution base and is
+reached only through its HTTP API. The old API, Web, Workbench, Runtime and
+research paths are historical and have been removed from active main; recover
+them only from `archive/pre-teaching-platform` when auditing old evidence.
 
 This repository is governed as a **thin platform for external research
 plugins**.  It is not a place to reimplement every EDA or AI algorithm.

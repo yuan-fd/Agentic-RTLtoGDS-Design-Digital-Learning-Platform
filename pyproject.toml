@@ -5,50 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openroad-platform"
 version = "0.1.0"
-description = "A durable control plane and isolated execution layer for OpenROAD workflows"
+description = "Teaching contracts and independent Agentic RTL-to-GDS modules"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
-[project.optional-dependencies]
-visualization = ["klayout>=0.30", "graphviz>=0.20", "matplotlib>=3.7", "numpy>=1.24"]
-test = ["pytest>=8"]
-optimization = [
-  "numpy>=1.24",
-  "scipy>=1.11",
-  "torch>=2.2",
-  "gpytorch>=1.11",
-  "botorch>=0.10",
-  "optuna>=4",
-]
-distributed = ["ray[default]>=2.51,<3"]
-
-[project.scripts]
-openroad-run = "openroad_platform_execution.cli:main"
-openroad-jobs = "openroad_platform_scheduler.cli:main"
-
 [tool.setuptools.packages.find]
-where = [
-  "packages/contracts/src",
-  "packages/execution/src",
-  "packages/scheduler/src",
-  "packages/analysis/src",
-  "packages/visualization/src",
-]
-include = ["openroad_platform_*"]
-
-[tool.setuptools.package-data]
-openroad_platform_analysis = ["assets/*.tcl"]
+where = ["packages/contracts/src"]
+include = ["openroad_platform_contracts*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [
-  "packages/contracts/src",
-  "packages/execution/src",
-  "packages/scheduler/src",
-  "packages/analysis/src",
-  "packages/visualization/src",
-]
+pythonpath = ["packages/contracts/src", "apps/m1_rtl_to_gds/src"]
 addopts = "-ra"
 markers = [
   "real_3d: real TaiWei 3D end-to-end flow (needs pinned toolchain)",
