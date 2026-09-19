@@ -11,7 +11,7 @@ from typing import Any
 from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 from openroad_platform_contracts.evidence_exchange import EvidenceRef
 
-from .models import M1Session, M1State, RTLVersion, VerificationStatus
+from .models import M1Session, M1State, RTLVersion, SimulationStatus, VerificationStatus
 from .store import M1Store
 
 
@@ -112,7 +112,8 @@ class M1Service:
                 raise ValueError("RTL parent belongs to another spec")
             self._versions[parent.version_id] = replace(
                 parent, verification_status=VerificationStatus.INVALIDATED,
-                verification_run_id=None,
+                verification_run_id=None, simulation_status=SimulationStatus.INVALIDATED,
+                simulation_run_id=None,
             )
             self._save_version(self._versions[parent.version_id])
         version = RTLVersion(
@@ -148,6 +149,20 @@ class M1Service:
         if status not in {VerificationStatus.PASSED, VerificationStatus.FAILED}:
             raise ValueError("verification result must be passed or failed")
         updated = replace(version, verification_status=status, verification_run_id=run_id)
+        updated.validate()
+        self._versions[version_id] = updated
+        self._save_version(updated)
+        return updated
+
+    def record_simulation(
+        self, version_id: str, status: SimulationStatus, run_id: str
+    ) -> RTLVersion:
+        version = self.get_rtl_version(version_id)
+        if version.verification_status is not VerificationStatus.PASSED:
+            raise ValueError("cannot record simulation before verification passes")
+        if status not in {SimulationStatus.PASSED, SimulationStatus.FAILED}:
+            raise ValueError("simulation result must be passed or failed")
+        updated = replace(version, simulation_status=status, simulation_run_id=run_id)
         updated.validate()
         self._versions[version_id] = updated
         self._save_version(updated)
@@ -226,6 +241,8 @@ class M1Service:
             raise ValueError("simulation requires a frozen VerificationPackage")
         if len(package.simulation_oracle_refs) != 1:
             raise ValueError("simulation requires exactly one frozen oracle artifact")
+        if not package.simulation_top:
+            raise ValueError("simulation requires a frozen simulation_top")
         oracle_ref = package.simulation_oracle_refs[0]
         oracle_id = oracle_ref.removeprefix("artifact:")
         if not oracle_id:
@@ -249,6 +266,7 @@ class M1Service:
                 "rtl_path": f"rtl/{session.spec.top}.sv",
                 "testbench_path": "verification/oracle.sv",
                 "top": session.spec.top,
+                "simulation_top": package.simulation_top,
                 "spec_id": version.spec_id,
                 "verification_id": package.verification_id,
             },
@@ -289,6 +307,8 @@ class M1Service:
         package = self._verification_packages.get(version.spec_id)
         if package is None:
             raise ValueError("RTL-to-GDS requires a frozen VerificationPackage")
+        if version.simulation_status is not SimulationStatus.PASSED:
+            raise ValueError("RTL-to-GDS requires passed simulation")
         admitted = any(
             item.get("plugin_id") == "orfs"
             and item.get("admission") == "admitted"

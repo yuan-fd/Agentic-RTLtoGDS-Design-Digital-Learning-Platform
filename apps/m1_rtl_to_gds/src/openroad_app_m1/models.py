@@ -31,6 +31,14 @@ class VerificationStatus(str, Enum):
     INVALIDATED = "invalidated"
 
 
+class SimulationStatus(str, Enum):
+    NOT_RUN = "not_run"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    INVALIDATED = "invalidated"
+
+
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -107,6 +115,8 @@ class RTLVersion:
     generator: str
     verification_status: VerificationStatus = VerificationStatus.NOT_RUN
     verification_run_id: str | None = None
+    simulation_status: SimulationStatus = SimulationStatus.NOT_RUN
+    simulation_run_id: str | None = None
     parent_version_id: str | None = None
     source_ref: str | None = None
 
@@ -117,8 +127,12 @@ class RTLVersion:
         _digest("rtl_sha256", self.rtl_sha256)
         if not isinstance(self.verification_status, VerificationStatus):
             raise ValueError("verification_status must be typed")
+        if not isinstance(self.simulation_status, SimulationStatus):
+            raise ValueError("simulation_status must be typed")
         if self.verification_run_id is not None:
             _id("verification_run_id", self.verification_run_id)
+        if self.simulation_run_id is not None:
+            _id("simulation_run_id", self.simulation_run_id)
         if self.parent_version_id is not None:
             _id("parent_version_id", self.parent_version_id)
             if self.parent_version_id == self.version_id:
@@ -135,6 +149,8 @@ class RTLVersion:
             "generator": self.generator,
             "verification_status": self.verification_status.value,
             "verification_run_id": self.verification_run_id,
+            "simulation_status": self.simulation_status.value,
+            "simulation_run_id": self.simulation_run_id,
             "parent_version_id": self.parent_version_id,
             "source_ref": self.source_ref,
         }
@@ -143,6 +159,7 @@ class RTLVersion:
     def from_dict(cls, payload: Mapping[str, Any]) -> "RTLVersion":
         value = dict(payload)
         value["verification_status"] = VerificationStatus(value["verification_status"])
+        value["simulation_status"] = SimulationStatus(value.get("simulation_status", "not_run"))
         result = cls(**value)
         result.validate()
         return result

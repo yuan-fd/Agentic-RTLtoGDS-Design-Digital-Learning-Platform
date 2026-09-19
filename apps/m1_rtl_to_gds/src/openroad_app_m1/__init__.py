@@ -1,6 +1,6 @@
 """M1 teaching application boundary."""
 
-from .models import M1State, M1Session, RTLVersion, VerificationStatus
+from .models import M1State, M1Session, RTLVersion, SimulationStatus, VerificationStatus
 from .service import M1Service
 from .generator import DirectLLMGenerator, DirectLLMProvider
 from .v2_client import V2Client, V2ClientError, V2Unavailable

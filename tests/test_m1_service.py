@@ -9,7 +9,7 @@ M1_SRC = Path(__file__).parents[1] / "apps/m1_rtl_to_gds/src"
 if str(M1_SRC) not in sys.path:
     sys.path.insert(0, str(M1_SRC))
 
-from openroad_app_m1.models import M1State, VerificationStatus  # noqa: E402
+from openroad_app_m1.models import M1State, SimulationStatus, VerificationStatus  # noqa: E402
 from openroad_app_m1.service import M1Service  # noqa: E402
 
 from openroad_platform_contracts.rtl_frontend import (  # noqa: E402
@@ -104,6 +104,7 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
         frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
     )
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
     service.register_verification_package(
         frozen.spec_id,
         VerificationPackage(
@@ -111,6 +112,7 @@ def test_verified_request_keeps_the_selected_pdk_and_version() -> None:
             spec_id=frozen.spec_id,
             compile_checks=("verilator-lint", "yosys-check"),
             simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
             coverage_targets={"mutation_score": 0.8},
         ),
     )
@@ -142,6 +144,31 @@ def test_rtl_to_gds_requires_an_admitted_orfs_toolkit() -> None:
         VerificationPackage(
             verification_id="verify-counter-v1", spec_id=frozen.spec_id,
             compile_checks=("verilator-lint",),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
+        ),
+    )
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
+
+    with pytest.raises(ValueError, match="orfs.*admitted"):
+        service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
+
+
+def test_rtl_to_gds_requires_passed_simulation() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    service.register_verification_package(
+        frozen.spec_id,
+        VerificationPackage(
+            verification_id="verify-counter-v1", spec_id=frozen.spec_id,
+            compile_checks=("verilator-lint",),
+            simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
         ),
     )
     version = service.create_rtl_version(
@@ -149,8 +176,12 @@ def test_rtl_to_gds_requires_an_admitted_orfs_toolkit() -> None:
     )
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
 
-    with pytest.raises(ValueError, match="orfs.*admitted"):
-        service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
+    with pytest.raises(ValueError, match="simulation"):
+        service.build_rtl_to_gds_request(
+            version.version_id, "nangate45",
+            _Plugins([{"plugin_id": "orfs", "executable": True,
+                       "admission": "admitted", "capabilities": ["eda.rtl_to_gds"]}]),
+        )
 
 
 def test_clocked_spec_without_a_period_requires_clarification() -> None:
@@ -192,6 +223,7 @@ def test_verification_submission_requires_an_admitted_v2_toolkit() -> None:
             spec_id=frozen.spec_id,
             compile_checks=("verilator-lint", "yosys-check"),
             simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
         ),
     )
     version = service.create_rtl_version(
@@ -222,6 +254,7 @@ def test_simulation_submission_binds_the_frozen_oracle_artifact() -> None:
             spec_id=frozen.spec_id,
             compile_checks=("verilator-lint", "yosys-check"),
             simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
         ),
     )
     version = service.create_rtl_version(
@@ -253,6 +286,7 @@ def test_gds_evidence_is_registered_only_for_the_matching_verified_candidate() -
             verification_id="verify-counter-v1", spec_id=frozen.spec_id,
             compile_checks=("verilator-lint",),
             simulation_oracle_refs=("artifact:oracle-counter-v1",),
+            simulation_top="counter_tb",
         ),
     )
     version = service.create_rtl_version(

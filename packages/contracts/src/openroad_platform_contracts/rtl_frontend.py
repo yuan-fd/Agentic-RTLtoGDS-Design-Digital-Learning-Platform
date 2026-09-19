@@ -123,6 +123,7 @@ class VerificationPackage:
     spec_id: str
     compile_checks: tuple[str, ...]
     simulation_oracle_refs: tuple[str, ...] = ()
+    simulation_top: str | None = None
     formal_property_refs: tuple[str, ...] = ()
     coverage_targets: dict[str, float] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
@@ -136,6 +137,8 @@ class VerificationPackage:
         for group in (self.simulation_oracle_refs, self.formal_property_refs):
             if not all(isinstance(item, str) and item.startswith(("artifact:", "source:")) for item in group):
                 raise ValueError("Verification oracle references must be durable artifact/source refs")
+        if self.simulation_top is not None:
+            _id("simulation_top", self.simulation_top)
         _validate_mapping("coverage_targets", self.coverage_targets)
         for key, value in self.coverage_targets.items():
             if not isinstance(key, str) or isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
