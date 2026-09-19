@@ -49,6 +49,14 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     })
                     return
                 if path.startswith("/api/m1/runs/"):
+                    if path.endswith("/preview"):
+                        prefix, artifact_id = path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
+                        if not prefix or not artifact_id:
+                            raise ValueError("run_id and artifact_id are required")
+                        self._json(HTTPStatus.OK, {
+                            "preview": v2_client.artifact_preview(prefix, artifact_id)
+                        })
+                        return
                     if path.endswith("/timeline"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/timeline")
                         self._json(HTTPStatus.OK, {"timeline": v2_client.timeline(run_id)})
@@ -67,7 +75,20 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     observation = v2_client.run(run_id)
                     run = observation.get("run", observation)
                     service.observe_run(run_id, run.get("status"))
+                    if run.get("status") == "succeeded" and run.get("task_id", "").startswith("m1-gds-"):
+                        version_id = run["task_id"].removeprefix("m1-gds-").rsplit("-", 1)[0]
+                        service.record_gds_evidence(
+                            version_id, run_id, v2_client.artifacts(run_id),
+                            pdk=run["task_id"].rsplit("-", 1)[1],
+                        )
                     self._json(HTTPStatus.OK, {"run": run})
+                    return
+                if path.startswith("/api/m1/evidence/"):
+                    evidence_id = path.removeprefix("/api/m1/evidence/")
+                    evidence = service.get_evidence(evidence_id)
+                    if evidence.owner_id != self._owner_id():
+                        raise AuthorizationError("evidence belongs to another v2 identity")
+                    self._json(HTTPStatus.OK, {"evidence": evidence.to_dict()})
                     return
                 if path in {"/", "/index.html"}:
                     self._file(WEB_ROOT / "index.html", "text/html; charset=utf-8")

@@ -82,6 +82,12 @@ class V2Client:
     def logs(self, run_id: str) -> dict[str, Any]:
         return self._call("GET", f"/kernel/runs/{_segment(run_id)}/logs")["logs"]
 
+    def artifact_preview(self, run_id: str, artifact_id: str) -> dict[str, Any]:
+        return self._call(
+            "GET", f"/kernel/runs/{_segment(run_id)}/artifacts/"
+            f"{_segment(artifact_id)}/preview"
+        )
+
     def _call(
         self,
         method: str,

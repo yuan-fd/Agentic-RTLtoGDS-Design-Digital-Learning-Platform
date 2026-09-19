@@ -160,6 +160,7 @@ def test_rtl_to_gds_requires_an_admitted_orfs_toolkit() -> None:
     )
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
     service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
 
     with pytest.raises(ValueError, match="orfs.*admitted"):
         service.build_rtl_to_gds_request(version.version_id, "nangate45", _Plugins([]))
@@ -331,6 +332,7 @@ def test_gds_evidence_is_registered_only_for_the_matching_verified_candidate() -
         frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
     )
     service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
     evidence = EvidenceRef(
         evidence_id="evidence:gds-1", owner_id="user-1", spec_id=frozen.spec_id,
         candidate_id=version.version_id, run_id="run-gds-1",
@@ -363,6 +365,26 @@ def test_gds_evidence_without_gds_artifact_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="artifact:gds"):
         service.record_evidence(evidence)
+
+
+def test_successful_gds_run_registers_metadata_only_evidence() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
+    artifacts = [
+        {"artifact_id": f"artifact-{kind}", "kind": kind, "sha256": "a" * 64,
+         "metadata": ({"format": "toolchain-snapshot"} if kind == "snapshot" else {}),
+         "store_key": "plan.json" if kind == "protocol" else f"{kind}.bin"}
+        for kind in ("gds", "def", "odb", "netlist", "report", "snapshot", "protocol")
+    ]
+    evidence = service.record_gds_evidence(version.version_id, "run-gds-1", artifacts, pdk="nangate45")
+    assert evidence.complete is True
+    assert evidence.toolchain_digest == "a" * 64
 
 
 def test_m1_submits_a_typed_task_to_v2_and_returns_only_the_kernel_run_id() -> None:

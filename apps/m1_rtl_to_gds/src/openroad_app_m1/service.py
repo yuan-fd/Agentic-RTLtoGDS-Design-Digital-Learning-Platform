@@ -6,6 +6,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any
 
 from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
@@ -425,11 +426,57 @@ class M1Service:
                 raise ValueError("successful rtl_to_gds evidence requires artifact:gds")
             if version.verification_status is not VerificationStatus.PASSED:
                 raise ValueError("successful GDS evidence requires passed RTL verification")
+            if version.simulation_status is not SimulationStatus.PASSED:
+                raise ValueError("successful GDS evidence requires passed simulation")
         if evidence.evidence_id in self._evidence:
             raise ValueError("evidence_id is already registered")
         self._evidence[evidence.evidence_id] = evidence
         self.store.put_evidence(evidence, json.dumps(evidence.to_dict(), sort_keys=True))
         return evidence
+
+    def record_gds_evidence(
+        self, version_id: str, run_id: str, artifacts: list[dict[str, Any]],
+        *, pdk: str,
+    ) -> EvidenceRef:
+        evidence_id = f"evidence:{run_id}"
+        if evidence_id in self._evidence:
+            return self._evidence[evidence_id]
+        required = {"gds", "def", "odb", "netlist", "report"}
+        by_kind = {item.get("kind"): item for item in artifacts}
+        if not required.issubset(by_kind):
+            raise ValueError("successful GDS run is missing required artifacts")
+        snapshot = next(
+            item for item in artifacts
+            if item.get("metadata", {}).get("format") == "toolchain-snapshot"
+        )
+        protocol = next(
+            item for item in artifacts
+            if item.get("store_key") == "plan.json"
+        )
+        artifact_ids = tuple(
+            f"artifact:{kind}:{by_kind[kind]['artifact_id']}"
+            for kind in ("gds", "def", "odb", "netlist", "report")
+        )
+        evidence_payload = json.dumps({
+            "candidate_id": version_id, "run_id": run_id,
+            "artifact_ids": artifact_ids, "pdk": pdk,
+        }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        evidence = EvidenceRef(
+            evidence_id=evidence_id,
+            owner_id=self._session(self.get_rtl_version(version_id).spec_id).owner_id,
+            spec_id=self.get_rtl_version(version_id).spec_id,
+            candidate_id=version_id,
+            run_id=run_id,
+            artifact_ids=artifact_ids,
+            evidence_kind="rtl_to_gds",
+            status="succeeded",
+            sha256=hashlib.sha256(evidence_payload).hexdigest(),
+            toolchain_digest=snapshot["sha256"],
+            protocol_digest=protocol["sha256"],
+            claim_boundary=f"Verified {pdk} RTL-to-GDS teaching run.",
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        return self.record_evidence(evidence)
 
     def get_evidence(self, evidence_id: str) -> EvidenceRef:
         try:
