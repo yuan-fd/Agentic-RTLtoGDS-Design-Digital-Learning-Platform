@@ -5,7 +5,8 @@
   const serviceState = $("serviceState");
   const identityState = $("identityState");
   let token = null;
-  let session = null;
+  let authSession = null;
+  let specSession = null;
   let version = null;
   let versions = [];
   let runKind = null;
@@ -22,8 +23,21 @@
     element.className = "status-pill " + kind;
   }
 
+  function setServiceState(label, kind = "neutral") {
+    serviceState.textContent = label;
+    serviceState.className = "status-pill " + kind;
+  }
+
   function clearNode(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function setSvg(id, source) {
+    const parsed = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+    if (parsed.nodeName.toLowerCase() !== "svg") throw new Error("v2 preview is not SVG");
+    const output = $(id);
+    clearNode(output);
+    output.append(document.importNode(parsed, true));
   }
 
   function appendArtifact(list, kind, value) {
@@ -63,30 +77,30 @@
   }
 
   function renderAuth() {
-    $("loginForm").hidden = Boolean(session);
-    $("logoutButton").hidden = !session;
-    identityState.textContent = session && session.user
-      ? session.user.username || session.user.id
+    $("loginForm").hidden = Boolean(authSession);
+    $("logoutButton").hidden = !authSession;
+    identityState.textContent = authSession && authSession.user
+      ? authSession.user.username || authSession.user.id
       : "v2 session unavailable";
   }
 
   function renderSession() {
-    const state = (session && session.state) || "draft";
+    const state = (specSession && specSession.state) || "draft";
     setText("specState", state.replaceAll("_", " "));
-    setText("specMessage", session
+    setText("specMessage", specSession
       ? state === "needs_clarification"
         ? "Clarification is required before the specification can be frozen."
         : state === "specified"
           ? "Specification is complete. Freeze it before RTL generation."
           : state === "frozen"
             ? "Specification frozen. Generate or edit RTL."
-            : session.unsupported_reason || state
+            : specSession.unsupported_reason || state
       : "No specification assessed.");
-    setText("clarificationQuestions", (session && session.clarification_questions || []).join(" "));
+    setText("clarificationQuestions", (specSession && specSession.clarification_questions || []).join(" "));
     $("freezeButton").textContent = state === "specified" ? "Freeze specification" :
       state === "needs_clarification" ? "Re-assess specification" : "Assess specification";
-    $("freezeButton").disabled = !session && !$("specInput").value.trim();
-    if (session) $("freezeButton").disabled = state === "frozen" || state === "unsupported_scope";
+    $("freezeButton").disabled = !specSession && !$("specInput").value.trim();
+    if (specSession) $("freezeButton").disabled = state === "frozen" || state === "unsupported_scope";
     $("generateButton").disabled = state !== "frozen";
   }
 
@@ -221,12 +235,12 @@
   }
 
   async function refreshVersions() {
-    if (!session) {
+    if (!specSession) {
       versions = [];
       renderVersionList();
       return;
     }
-    const data = await requestJson("/api/m1/specs/" + encodeURIComponent(session.spec_id) + "/versions");
+    const data = await requestJson("/api/m1/specs/" + encodeURIComponent(specSession.spec_id) + "/versions");
     versions = data.versions;
     renderVersionList();
   }
@@ -263,7 +277,7 @@
     if (netlist) {
       const rendered = await requestJson("/api/m1/runs/" + encodeURIComponent(id) + "/artifacts/" + encodeURIComponent(netlist.artifact_id) + "/netlist");
       if (rendered.status === "ready") {
-        $("netlistOutput").innerHTML = rendered.content;
+        setSvg("netlistOutput", rendered.content);
         setStatus("netlistStatus", "Rendered · " + (netlist.sha256 || "").slice(0, 12), "good");
       } else {
         setText("netlistOutput", "Unavailable: " + (rendered.reason || "renderer returned no content"));
@@ -275,7 +289,7 @@
       const preview = await requestJson("/api/m1/runs/" + encodeURIComponent(id) + "/artifacts/" + encodeURIComponent(layout.artifact_id) + "/preview");
       const value = preview.preview || preview;
       if (value.status === "ready") {
-        $("layoutOutput").innerHTML = value.content;
+        setSvg("layoutOutput", value.content);
         setStatus("layoutStatus", "Rendered · " + (layout.sha256 || "").slice(0, 12), "good");
       } else {
         setText("layoutOutput", "Unavailable: " + (value.reason || "v2 did not return a preview"));
@@ -319,16 +333,16 @@
   }
 
   async function assessOrFreeze() {
-    if (!session || session.state === "needs_clarification") {
-      session = (await requestJson("/api/m1/specs", {
+    if (!specSession || specSession.state === "needs_clarification") {
+      specSession = (await requestJson("/api/m1/specs", {
         method: "POST", body: JSON.stringify({ description: $("specInput").value }),
       })).session;
       version = null;
       versions = [];
       renderVersion(null);
       clearEvidence();
-    } else if (session.state === "specified") {
-      session = (await requestJson("/api/m1/specs/" + encodeURIComponent(session.spec_id) + "/freeze", {
+    } else if (specSession.state === "specified") {
+      specSession = (await requestJson("/api/m1/specs/" + encodeURIComponent(specSession.spec_id) + "/freeze", {
         method: "POST", body: "{}",
       })).session;
     }
@@ -369,13 +383,13 @@
 
   async function refreshSession() {
     const data = await requestJson("/api/auth/session");
-    session = data.session;
+    authSession = data.session;
     renderAuth();
-    if (session) {
+    if (authSession) {
       const records = await requestJson("/api/m1/specs");
-      session = records.sessions[0] || null;
-      if (session) {
-        $("specInput").value = session.spec ? session.spec.functionality : "";
+      specSession = records.sessions[0] || null;
+      if (specSession) {
+        $("specInput").value = specSession.spec ? specSession.spec.functionality : "";
         renderSession();
         await refreshVersions();
       }
@@ -415,7 +429,7 @@
         username: $("usernameInput").value, password: $("passwordInput").value,
       }) });
       token = result.token;
-      session = result.session;
+      authSession = result.session;
       renderAuth();
       await refresh();
     } catch (error) { showError(error); }
@@ -423,7 +437,8 @@
   $("logoutButton").addEventListener("click", async () => {
     await requestJson("/api/auth/logout", { method: "POST", body: "{}" });
     token = null;
-    session = null;
+    authSession = null;
+    specSession = null;
     version = null;
     versions = [];
     renderAuth();
@@ -434,7 +449,7 @@
   $("freezeButton").addEventListener("click", () => assessOrFreeze().catch(showError));
   $("generateButton").addEventListener("click", async () => {
     try {
-      version = (await requestJson("/api/m1/specs/" + encodeURIComponent(session.spec_id) + "/generate", { method: "POST", body: "{}" })).rtl_version;
+      version = (await requestJson("/api/m1/specs/" + encodeURIComponent(specSession.spec_id) + "/generate", { method: "POST", body: "{}" })).rtl_version;
       clearEvidence();
       await refreshVersion();
       await refreshVersions();
@@ -442,7 +457,7 @@
   });
   $("newVersionButton").addEventListener("click", async () => {
     try {
-      version = (await requestJson("/api/m1/specs/" + encodeURIComponent(session.spec_id) + "/rtl", {
+      version = (await requestJson("/api/m1/specs/" + encodeURIComponent(specSession.spec_id) + "/rtl", {
         method: "POST", body: JSON.stringify({ rtl_source: $("rtlEditor").value, generator: "user_edit", parent_version_id: version.version_id }),
       })).rtl_version;
       clearEvidence();
