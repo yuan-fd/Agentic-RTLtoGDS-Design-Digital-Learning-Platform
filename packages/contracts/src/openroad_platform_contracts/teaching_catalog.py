@@ -90,6 +90,30 @@ class CourseExercise:
 
 
 @dataclass(frozen=True)
+class CourseLabRecord:
+    exercise: CourseExercise
+    spec_ref: str
+    reference_rtl_ref: str
+    oracle_ref: str
+    recipe_id: str
+    teaching_notes: str
+    schema_version: int = SCHEMA_VERSION
+
+    def validate(self) -> None:
+        _validate_version(self.schema_version)
+        self.exercise.validate()
+        _ref("spec_ref", self.spec_ref, "spec:")
+        _ref("reference_rtl_ref", self.reference_rtl_ref, "source:")
+        _ref("oracle_ref", self.oracle_ref, "source:")
+        _validate_identifier("recipe_id", self.recipe_id)
+        _text("teaching_notes", self.teaching_notes)
+
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        return _primitive(self)
+
+
+@dataclass(frozen=True)
 class PdkCapability:
     exercise_id: str
     pdk_id: str

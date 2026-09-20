@@ -19,12 +19,24 @@ class FakeV2:
     def __init__(self):
         self.submissions = []
         self.user_id = "user-1"
+        self.auth_calls = []
 
     def health(self):
         return {"ok": True, "status": "ok"}
 
     def session(self):
         return {"user": {"id": self.user_id, "username": "student", "role": "member"}}
+
+    def login(self, username, password):
+        self.auth_calls.append(("login", username, password))
+        return {"token": "token-1", "session": {"user": {"id": self.user_id}}}
+
+    def logout(self):
+        self.auth_calls.append(("logout",))
+        return {"ok": True}
+
+    def with_token(self, token):
+        return self
 
     def upload_rtl(self, source):
         input_id = f"input-{len(source)}"
@@ -203,6 +215,8 @@ def test_m1_http_api_reads_rtl_and_v2_observations():
         assert request(base, "GET", "/api/m1/runs/run-42/timeline")[1]["timeline"]
         assert request(base, "GET", "/api/m1/runs/run-42/artifacts")[1]["artifacts"]
         assert request(base, "GET", "/api/m1/runs/run-42/metrics")[1]["metrics"]
+        assert len(request(base, "GET", "/api/m1/catalog/courses")[1]["courses"]) == 10
+        assert len(request(base, "GET", "/api/m1/catalog/pdks")[1]["capabilities"]) == 30
     finally:
         server.shutdown()
         server.server_close()
@@ -230,6 +244,28 @@ def test_m1_http_api_proxies_v2_artifact_excerpt():
         )
         assert status == 200
         assert excerpt["excerpt"]["text"].startswith("module counter")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_exposes_login_session_and_logout_boundaries():
+    server, fake, base = running_server()
+    try:
+        status, login = request(
+            base, "POST", "/api/auth/login",
+            {"username": "student", "password": "secret"},
+        )
+        assert status == 200
+        assert login["session"]["user"]["id"] == "user-1"
+        assert fake.auth_calls == [("login", "student", "secret")]
+        status, session = request(base, "GET", "/api/auth/session")
+        assert status == 200
+        assert session["session"]["user"]["id"] == "user-1"
+        status, logged_out = request(base, "POST", "/api/auth/logout", {})
+        assert status == 200
+        assert logged_out["ok"] is True
+        assert fake.auth_calls[-1] == ("logout",)
     finally:
         server.shutdown()
         server.server_close()

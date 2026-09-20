@@ -43,6 +43,7 @@ def test_v2_client_uses_kernel_http_contract(monkeypatch: pytest.MonkeyPatch) ->
     def open_url(request: object, timeout: float) -> Response:
         calls.append((request.method, request.full_url, request.data))  # type: ignore[attr-defined]
         assert timeout == 3.0
+        assert request.headers.get("Authorization") == "Bearer token-1"  # type: ignore[attr-defined]
         return Response(next(replies))
 
     monkeypatch.setattr("urllib.request.urlopen", open_url)

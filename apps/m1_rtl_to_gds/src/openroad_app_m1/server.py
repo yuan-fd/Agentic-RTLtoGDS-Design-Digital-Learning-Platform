@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 
 from .generator import CodexCLIProvider, DirectLLMGenerator
+from .catalog import course_records, pdk_capabilities
+from .oracles import oracle_for_top
 from .service import M1Service
 from .v2_client import V2ClientError, V2Unavailable
 
@@ -34,15 +36,48 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
 
         def do_GET(self) -> None:  # noqa: N802
             path = urlsplit(self.path).path
+            client = self._client()
             try:
                 if path == "/api/m1/health":
-                    self._json(HTTPStatus.OK, self._health())
+                    self._json(HTTPStatus.OK, self._health(client))
+                    return
+                if path == "/api/auth/session":
+                    self._json(HTTPStatus.OK, {"session": client.session()})
+                    return
+                if path == "/api/m1/specs":
+                    owner_id = self._owner_id(client)
+                    self._json(HTTPStatus.OK, {
+                        "sessions": [item.to_dict() for item in service.list_sessions(owner_id)]
+                    })
+                    return
+                if path == "/api/m1/catalog/courses":
+                    self._json(HTTPStatus.OK, {
+                        "courses": [item.to_dict() for item in course_records()]
+                    })
+                    return
+                if path == "/api/m1/catalog/pdks":
+                    self._json(HTTPStatus.OK, {
+                        "capabilities": [item.to_dict() for item in pdk_capabilities()]
+                    })
+                    return
+                if path.startswith("/api/m1/specs/"):
+                    suffix = path.removeprefix("/api/m1/specs/")
+                    if suffix.endswith("/versions"):
+                        spec_id = suffix.removesuffix("/versions")
+                        self._owned_spec(spec_id, client)
+                        self._json(HTTPStatus.OK, {
+                            "versions": [item.to_dict() for item in service.list_rtl_versions(spec_id)]
+                        })
+                        return
+                    if "/" not in suffix:
+                        self._owned_spec(suffix, client)
+                        self._json(HTTPStatus.OK, {"session": service.get_session(suffix).to_dict()})
                     return
                 if path.startswith("/api/m1/rtl/") and "/" not in path.removeprefix("/api/m1/rtl/"):
                     version_id = path.removeprefix("/api/m1/rtl/")
-                    self._owned_version(version_id)
+                    self._owned_version(version_id, client)
                     version = service.get_rtl_version(version_id)
-                    source = v2_client.input(version.source_ref.removeprefix("input:"))
+                    source = client.input(version.source_ref.removeprefix("input:"))
                     self._json(HTTPStatus.OK, {
                         "rtl_version": version.to_dict(),
                         "source": source["content"],
@@ -55,7 +90,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                         if not prefix or not artifact_id:
                             raise ValueError("run_id and artifact_id are required")
                         self._json(HTTPStatus.OK, {
-                            "excerpt": v2_client.artifact_excerpt(prefix, artifact_id)
+                            "excerpt": client.artifact_excerpt(prefix, artifact_id)
                         })
                         return
                     if path.endswith("/preview"):
@@ -64,39 +99,40 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                         if not prefix or not artifact_id:
                             raise ValueError("run_id and artifact_id are required")
                         self._json(HTTPStatus.OK, {
-                            "preview": v2_client.artifact_preview(prefix, artifact_id)
+                            "preview": client.artifact_preview(prefix, artifact_id)
                         })
                         return
                     if path.endswith("/timeline"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/timeline")
-                        self._json(HTTPStatus.OK, {"timeline": v2_client.timeline(run_id)})
+                        self._json(HTTPStatus.OK, {"timeline": client.timeline(run_id)})
                         return
                     if path.endswith("/artifacts"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/artifacts")
-                        self._json(HTTPStatus.OK, {"artifacts": v2_client.artifacts(run_id)})
+                        self._json(HTTPStatus.OK, {"artifacts": client.artifacts(run_id)})
                         return
                     if path.endswith("/metrics"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/metrics")
-                        self._json(HTTPStatus.OK, {"metrics": v2_client.metrics(run_id)})
+                        self._json(HTTPStatus.OK, {"metrics": client.metrics(run_id)})
                         return
                     run_id = path.removeprefix("/api/m1/runs/")
                     if not run_id or "/" in run_id:
                         raise ValueError("run_id is required")
-                    observation = v2_client.run(run_id)
+                    observation = client.run(run_id)
                     run = observation.get("run", observation)
                     service.observe_run(run_id, run.get("status"))
                     if run.get("status") == "succeeded" and run.get("task_id", "").startswith("m1-gds-"):
                         version_id = run["task_id"].removeprefix("m1-gds-").rsplit("-", 1)[0]
                         service.record_gds_evidence(
-                            version_id, run_id, v2_client.artifacts(run_id),
+                            version_id, run_id, client.artifacts(run_id),
                             pdk=run["task_id"].rsplit("-", 1)[1],
+                            metrics=client.metrics(run_id),
                         )
                     self._json(HTTPStatus.OK, {"run": run})
                     return
                 if path.startswith("/api/m1/evidence/"):
                     evidence_id = path.removeprefix("/api/m1/evidence/")
                     evidence = service.get_evidence(evidence_id)
-                    if evidence.owner_id != self._owner_id():
+                    if evidence.owner_id != self._owner_id(client):
                         raise AuthorizationError("evidence belongs to another v2 identity")
                     self._json(HTTPStatus.OK, {"evidence": evidence.to_dict()})
                     return
@@ -116,48 +152,59 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
 
         def do_POST(self) -> None:  # noqa: N802
             path = urlsplit(self.path).path
+            client = self._client()
             try:
                 payload = self._body()
+                if path == "/api/auth/login":
+                    username = payload.get("username")
+                    password = payload.get("password")
+                    if not isinstance(username, str) or not isinstance(password, str):
+                        raise ValueError("username and password are required")
+                    self._json(HTTPStatus.OK, client.login(username, password))
+                    return
+                if path == "/api/auth/logout":
+                    self._json(HTTPStatus.OK, client.logout())
+                    return
                 if path == "/api/m1/specs":
-                    self._create_spec(payload)
+                    self._create_spec(payload, client)
                     return
                 if path.startswith("/api/m1/specs/") and path.endswith("/freeze"):
                     spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/freeze")
-                    self._owned_spec(spec_id)
+                    self._owned_spec(spec_id, client)
                     session = service.freeze_spec(spec_id)
-                    self._register_teaching_package(session)
+                    self._register_teaching_package(session, client)
                     self._json(HTTPStatus.OK, {"session": session.to_dict()})
                     return
                 if path.startswith("/api/m1/specs/") and path.endswith("/generate"):
                     spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/generate")
-                    self._owned_spec(spec_id)
-                    version = generator.generate(spec_id, provider, v2_client)
+                    self._owned_spec(spec_id, client)
+                    version = generator.generate(spec_id, provider, client)
                     self._json(HTTPStatus.CREATED, {"rtl_version": version.to_dict()})
                     return
                 if path.startswith("/api/m1/specs/") and path.endswith("/rtl"):
                     spec_id = path.removeprefix("/api/m1/specs/").removesuffix("/rtl")
-                    self._owned_spec(spec_id)
-                    self._create_rtl(spec_id, payload)
+                    self._owned_spec(spec_id, client)
+                    self._create_rtl(spec_id, payload, client)
                     return
                 if path.startswith("/api/m1/rtl/") and path.endswith("/verify"):
                     version_id = path.removeprefix("/api/m1/rtl/").removesuffix("/verify")
-                    self._owned_version(version_id)
-                    run_id = service.submit_verification(version_id, v2_client)
+                    self._owned_version(version_id, client)
+                    run_id = service.submit_verification(version_id, client)
                     self._json(HTTPStatus.ACCEPTED, {"run_id": run_id, "state": "submitted"})
                     return
                 if path.startswith("/api/m1/rtl/") and path.endswith("/simulate"):
                     version_id = path.removeprefix("/api/m1/rtl/").removesuffix("/simulate")
-                    self._owned_version(version_id)
-                    run_id = service.submit_simulation(version_id, v2_client)
+                    self._owned_version(version_id, client)
+                    run_id = service.submit_simulation(version_id, client)
                     self._json(HTTPStatus.ACCEPTED, {"run_id": run_id, "state": "submitted"})
                     return
                 if path.startswith("/api/m1/rtl/") and path.endswith("/gds"):
                     version_id = path.removeprefix("/api/m1/rtl/").removesuffix("/gds")
-                    self._owned_version(version_id)
+                    self._owned_version(version_id, client)
                     pdk = payload.get("pdk")
                     if not isinstance(pdk, str):
                         raise ValueError("pdk is required")
-                    run_id = service.submit_rtl_to_gds(version_id, pdk, v2_client)
+                    run_id = service.submit_rtl_to_gds(version_id, pdk, client)
                     self._json(HTTPStatus.ACCEPTED, {"run_id": run_id, "state": "submitted", "pdk": pdk})
                     return
                 self._error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "resource not found")
@@ -165,10 +212,17 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     V2Unavailable, V2ClientError) as exc:
                 self._handle_error(exc)
 
-        def _health(self) -> dict[str, Any]:
+        def _client(self) -> Any:
+            header = self.headers.get("Authorization", "")
+            token = header[7:].strip() if header.lower().startswith("bearer ") else None
+            if hasattr(v2_client, "with_token"):
+                return v2_client.with_token(token)
+            return v2_client
+
+        def _health(self, client: Any) -> dict[str, Any]:
             try:
-                health = v2_client.health()
-                session = v2_client.session()
+                health = client.health()
+                session = client.session()
             except V2Unavailable as exc:
                 return {"app": "m1_rtl_to_gds", "status": "unavailable", "identity": None,
                         "reason": str(exc)}
@@ -179,8 +233,8 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                 "v2": health,
             }
 
-        def _create_spec(self, payload: dict[str, Any]) -> None:
-            owner_id = self._owner_id()
+        def _create_spec(self, payload: dict[str, Any], client: Any) -> None:
+            owner_id = self._owner_id(client)
             if "owner_id" in payload:
                 raise ValueError("owner_id is derived from the v2 identity")
             raw_spec = payload.get("spec")
@@ -220,75 +274,30 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
             )
             self._json(HTTPStatus.CREATED, {"session": session.to_dict()})
 
-        def _register_teaching_package(self, session: Any) -> None:
+        def _register_teaching_package(self, session: Any, client: Any) -> None:
             if session.spec is None or session.state.value != "frozen":
                 return
-            if session.spec.top == "counter":
-                oracle = """module counter_tb;
-reg clk = 0;
-reg rst_n = 0;
-reg enable = 0;
-wire [7:0] q;
-counter dut(.clk(clk), .rst_n(rst_n), .enable(enable), .q(q));
-always #1 clk = ~clk;
-initial begin
-  #2 rst_n = 1; enable = 1;
-  #2 if (q !== 8'h01) $fatal(1, \"counter mismatch\");
-  $display(\"TB_SUMMARY total=1 errors=0\");
-  $display(\"PASS\");
-  $finish;
-end
-endmodule
-"""
-                oracle_ref = self._upload_oracle(oracle)
-                service.register_verification_package(
-                    session.spec_id,
-                    VerificationPackage(
-                        verification_id="counter-v1",
-                        spec_id=session.spec_id,
-                        compile_checks=("verilator-lint", "yosys-check"),
-                        simulation_oracle_refs=(f"source:{oracle_ref}",),
-                        simulation_top="counter_tb",
-                    ),
-                )
-            elif session.spec.top == "sequence_detector":
-                oracle = """module sequence_detector_tb;
-reg clk = 0;
-reg rst_n = 0;
-reg din = 0;
-wire hit;
-sequence_detector dut(.clk(clk), .rst_n(rst_n), .din(din), .hit(hit));
-always #1 clk = ~clk;
-task tick(input bit value);
-begin din = value; #2; end
-endtask
-initial begin
-  #2 rst_n = 1;
-  tick(1); tick(0); tick(1);
-  if (!hit) $fatal(1, \"sequence mismatch\");
-  $display(\"TB_SUMMARY total=1 errors=0\");
-  $display(\"PASS\");
-  $finish;
-end
-endmodule
-"""
-                oracle_ref = self._upload_oracle(oracle)
-                service.register_verification_package(
-                    session.spec_id,
-                    VerificationPackage(
-                        verification_id="sequence-detector-v1",
-                        spec_id=session.spec_id,
-                        compile_checks=("verilator-lint", "yosys-check"),
-                        simulation_oracle_refs=(f"source:{oracle_ref}",),
-                        simulation_top="sequence_detector_tb",
-                    ),
-                )
+            package = oracle_for_top(session.spec.top)
+            if package is None:
+                return
+            verification_id, oracle, simulation_top = package
+            oracle_ref = self._upload_oracle(oracle, client)
+            service.register_verification_package(
+                session.spec_id,
+                VerificationPackage(
+                    verification_id=verification_id,
+                    spec_id=session.spec_id,
+                    compile_checks=("verilator-lint", "yosys-check"),
+                    simulation_oracle_refs=(f"source:{oracle_ref}",),
+                    simulation_top=simulation_top,
+                ),
+            )
 
-        def _upload_oracle(self, source: str) -> str:
-            record = v2_client.upload_rtl(source)
+        def _upload_oracle(self, source: str, client: Any) -> str:
+            record = client.upload_rtl(source)
             return record["input_id"]
 
-        def _create_rtl(self, spec_id: str, payload: dict[str, Any]) -> None:
+        def _create_rtl(self, spec_id: str, payload: dict[str, Any], client: Any) -> None:
             source = payload.get("rtl_source")
             generator = payload.get("generator")
             if not isinstance(source, str) or not source.strip():
@@ -299,21 +308,21 @@ endmodule
             if parent is not None and not isinstance(parent, str):
                 raise ValueError("parent_version_id must be text")
             version = service.create_rtl_version_from_v2(
-                spec_id, source, generator, v2_client, parent_version_id=parent,
+                spec_id, source, generator, client, parent_version_id=parent,
             )
             self._json(HTTPStatus.CREATED, {"rtl_version": version.to_dict()})
 
-        def _owned_spec(self, spec_id: str) -> None:
+        def _owned_spec(self, spec_id: str, client: Any) -> None:
             session = service.get_session(spec_id)
-            if session.owner_id != self._owner_id():
+            if session.owner_id != self._owner_id(client):
                 raise AuthorizationError("spec belongs to another v2 identity")
 
-        def _owned_version(self, version_id: str) -> None:
+        def _owned_version(self, version_id: str, client: Any) -> None:
             version = service.get_rtl_version(version_id)
-            self._owned_spec(version.spec_id)
+            self._owned_spec(version.spec_id, client)
 
-        def _owner_id(self) -> str:
-            session = v2_client.session()
+        def _owner_id(self, client: Any) -> str:
+            session = client.session()
             user = session.get("user") if isinstance(session, dict) else None
             owner_id = user.get("id") if isinstance(user, dict) else None
             if not isinstance(owner_id, str) or not owner_id:

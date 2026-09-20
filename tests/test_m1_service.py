@@ -382,9 +382,42 @@ def test_successful_gds_run_registers_metadata_only_evidence() -> None:
          "store_key": "plan.json" if kind == "protocol" else f"{kind}.bin"}
         for kind in ("gds", "def", "odb", "netlist", "report", "snapshot", "protocol")
     ]
-    evidence = service.record_gds_evidence(version.version_id, "run-gds-1", artifacts, pdk="nangate45")
+    metrics = [{"name": "area_um2", "value": 1.0, "complete": True}]
+    evidence = service.record_gds_evidence(
+        version.version_id, "run-gds-1", artifacts, pdk="nangate45", metrics=metrics
+    )
     assert evidence.complete is True
     assert evidence.toolchain_digest == "a" * 64
+
+
+def test_successful_gds_evidence_requires_complete_metrics() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
+    artifacts = [
+        {"artifact_id": f"artifact-{kind}", "kind": kind, "sha256": "a" * 64,
+         "metadata": ({"format": "toolchain-snapshot"} if kind == "snapshot" else {}),
+         "store_key": "plan.json" if kind == "protocol" else f"{kind}.bin"}
+        for kind in ("gds", "def", "odb", "netlist", "report", "snapshot", "protocol")
+    ]
+
+    with pytest.raises(ValueError, match="complete metrics"):
+        service.record_gds_evidence(
+            version.version_id, "run-gds-1", artifacts, pdk="nangate45", metrics=[]
+        )
+
+
+def test_service_lists_only_the_owner_specifications() -> None:
+    service = M1Service.in_memory()
+    first = service.assess_spec("user-1", spec=spec_ir())
+    service.assess_spec("user-2", spec=spec_ir())
+
+    assert [item.spec_id for item in service.list_sessions("user-1")] == [first.spec_id]
 
 
 def test_m1_submits_a_typed_task_to_v2_and_returns_only_the_kernel_run_id() -> None:

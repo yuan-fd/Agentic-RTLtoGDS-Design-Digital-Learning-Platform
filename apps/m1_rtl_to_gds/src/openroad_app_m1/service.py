@@ -436,7 +436,7 @@ class M1Service:
 
     def record_gds_evidence(
         self, version_id: str, run_id: str, artifacts: list[dict[str, Any]],
-        *, pdk: str,
+        *, pdk: str, metrics: list[dict[str, Any]],
     ) -> EvidenceRef:
         evidence_id = f"evidence:{run_id}"
         if evidence_id in self._evidence:
@@ -445,6 +445,8 @@ class M1Service:
         by_kind = {item.get("kind"): item for item in artifacts}
         if not required.issubset(by_kind):
             raise ValueError("successful GDS run is missing required artifacts")
+        if not metrics or any(item.get("complete") is not True for item in metrics):
+            raise ValueError("successful GDS run requires complete metrics")
         snapshot = next(
             item for item in artifacts
             if item.get("metadata", {}).get("format") == "toolchain-snapshot"
@@ -483,6 +485,18 @@ class M1Service:
             return self._evidence[evidence_id]
         except KeyError as exc:
             raise KeyError(f"unknown evidence: {evidence_id}") from exc
+
+    def list_sessions(self, owner_id: str) -> tuple[M1Session, ...]:
+        return tuple(
+            session for session in self._sessions.values()
+            if session.owner_id == owner_id
+        )
+
+    def list_evidence(self, owner_id: str) -> tuple[EvidenceRef, ...]:
+        return tuple(
+            evidence for evidence in self._evidence.values()
+            if evidence.owner_id == owner_id
+        )
 
     def observe_run(self, run_id: str, status: str) -> None:
         if status not in {"succeeded", "failed", "cancelled", "timed_out"}:

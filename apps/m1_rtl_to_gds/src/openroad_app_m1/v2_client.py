@@ -31,12 +31,24 @@ class V2Client:
         self.token = token
         self.timeout = timeout
 
+    def with_token(self, token: str | None) -> "V2Client":
+        return V2Client(self.base_url, token=token, timeout=self.timeout)
+
     def health(self) -> dict[str, Any]:
         return self._call("GET", "/kernel/health")
 
     def session(self) -> dict[str, Any] | None:
         payload = self._call("GET", "/kernel/auth/session")
         return payload.get("session")
+
+    def login(self, username: str, password: str) -> dict[str, Any]:
+        return self._call(
+            "POST", "/kernel/auth/login",
+            payload={"username": username, "password": password},
+        )
+
+    def logout(self) -> dict[str, Any]:
+        return self._call("POST", "/kernel/auth/logout", payload={})
 
     def plugins(self) -> list[dict[str, Any]]:
         payload = self._call("GET", "/kernel/plugins")

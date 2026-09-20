@@ -6,6 +6,7 @@ from openroad_platform_contracts.evidence_exchange import EvidenceRef
 from openroad_platform_contracts.teaching_catalog import (
     CapabilityStatus,
     CourseExercise,
+    CourseLabRecord,
     PdkCapability,
     ScriptProposal,
 )
@@ -72,6 +73,27 @@ def test_evidence_ref_requires_hash_bound_artifacts() -> None:
 
     assert evidence.complete is True
     assert evidence.to_dict()["artifact_ids"] == ["artifact:gds-1", "artifact:report-1"]
+
+
+def test_course_lab_record_requires_spec_rtl_oracle_and_recipe_refs() -> None:
+    record = CourseLabRecord(
+        exercise=CourseExercise(
+            exercise_id="course-counter",
+            title="Counter",
+            category="sequential",
+            level="intro",
+            description="Counter exercise",
+            supported_pdks=("nangate45",),
+            verification_id="course-counter-v1",
+        ),
+        spec_ref="spec:course-counter-v1",
+        reference_rtl_ref="source:course-counter-reference-v1",
+        oracle_ref="source:course-counter-oracle-v1",
+        recipe_id="course-counter-nangate45-v1",
+        teaching_notes="Teach reset, enable and overflow.",
+    )
+
+    assert record.to_dict()["recipe_id"] == "course-counter-nangate45-v1"
 
 
 def test_script_proposal_rejects_absolute_and_parent_paths() -> None:
