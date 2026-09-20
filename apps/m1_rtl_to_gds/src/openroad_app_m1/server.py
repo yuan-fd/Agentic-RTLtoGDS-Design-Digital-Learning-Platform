@@ -13,6 +13,7 @@ from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 
 from .generator import CodexCLIProvider, DirectLLMGenerator
 from .catalog import course_records, pdk_capabilities
+from .netlist import render_netlist_svg
 from .oracles import oracle_for_top
 from .service import M1Service
 from .v2_client import V2ClientError, V2Unavailable
@@ -102,9 +103,25 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                             "preview": client.artifact_preview(prefix, artifact_id)
                         })
                         return
+                    if path.endswith("/netlist"):
+                        netlist_path = path.removesuffix("/netlist")
+                        prefix, artifact_id = netlist_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
+                        excerpt = client.artifact_excerpt(prefix, artifact_id)
+                        content = render_netlist_svg(excerpt.get("text", ""))
+                        self._json(HTTPStatus.OK, {
+                            "status": "ready" if content else "unavailable",
+                            "reason": None if content else "netlist excerpt has no renderable cells",
+                            "content": content,
+                            "artifact_id": artifact_id,
+                        })
+                        return
                     if path.endswith("/timeline"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/timeline")
                         self._json(HTTPStatus.OK, {"timeline": client.timeline(run_id)})
+                        return
+                    if path.endswith("/logs"):
+                        run_id = path.removeprefix("/api/m1/runs/").removesuffix("/logs")
+                        self._json(HTTPStatus.OK, client.logs(run_id))
                         return
                     if path.endswith("/artifacts"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/artifacts")

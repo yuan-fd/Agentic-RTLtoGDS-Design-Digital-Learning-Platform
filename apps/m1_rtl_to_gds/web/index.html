@@ -16,7 +16,17 @@
     <nav class="topnav" aria-label="Primary navigation">
       <a class="active" href="#studio">M1 Studio</a>
     </nav>
-    <span class="identity" id="identityState">v2 session unavailable</span>
+    <div class="auth-controls" id="authControls">
+      <form id="loginForm" class="login-form">
+        <label class="sr-only" for="usernameInput">Username</label>
+        <input id="usernameInput" name="username" autocomplete="username" placeholder="username">
+        <label class="sr-only" for="passwordInput">Password</label>
+        <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="password">
+        <button class="button quiet" type="submit">Log in</button>
+      </form>
+      <button class="button quiet" id="logoutButton" type="button" hidden>Log out</button>
+      <span class="identity" id="identityState">v2 session unavailable</span>
+    </div>
   </header>
 
   <main id="app" class="shell">
@@ -58,6 +68,11 @@
           <button class="button quiet" id="generateButton" type="button" disabled>Generate RTL</button>
           <button class="button quiet" id="newVersionButton" type="button" disabled>Save new RTL version</button>
           <span class="field-note">Every edit creates a new version and invalidates prior verification evidence.</span>
+        </div>
+        <div class="version-history" aria-labelledby="versionHistoryTitle">
+          <div class="panel-heading compact"><h3 id="versionHistoryTitle">RTL versions</h3><span id="versionCount">0</span></div>
+          <ol id="versionList" class="version-list"><li class="empty-list">No versions yet.</li></ol>
+          <pre id="versionDiff" class="diff-output" aria-live="polite">Select two versions to inspect their hashes.</pre>
         </div>
       </section>
 
@@ -115,6 +130,8 @@
         </ul>
         <ul class="artifact-list" id="metricsList"></ul>
         <p class="field-note">Artifact hashes and evidence status will be shown only from a completed v2 run.</p>
+        <h3>EvidenceRef</h3>
+        <pre id="evidenceMetadata" class="diff-output">No EvidenceRef registered.</pre>
       </section>
     </section>
 
@@ -127,12 +144,21 @@
         <li><span>4</span><div><strong>RTL-to-GDS</strong><small>ORFS with selected PDK</small></div></li>
         <li><span>5</span><div><strong>Inspect evidence</strong><small>Artifacts, reports and measured QoR</small></div></li>
       </ol>
+      <div class="run-detail-grid">
+        <section><h3>Run events</h3><ol id="timelineEvents" class="event-list"><li>No run selected.</li></ol></section>
+        <section><h3>Logs</h3><pre id="runLogs" class="log-output">No run selected.</pre></section>
+      </div>
     </section>
 
     <section class="outputs" aria-label="Measured outputs">
       <article class="output-panel"><div class="panel-heading"><h2>Netlist</h2><span class="status-pill neutral" id="netlistStatus">Unavailable</span></div><pre class="empty-output" id="netlistOutput">A verified run is required before the netlist can be read.</pre></article>
       <article class="output-panel"><div class="panel-heading"><h2>Layout</h2><span class="status-pill neutral" id="layoutStatus">Unavailable</span></div><div class="empty-output" id="layoutOutput">GDS / DEF renderings will cite their v2 artifact hash.</div></article>
       <article class="output-panel"><div class="panel-heading"><h2>QoR</h2><span class="status-pill neutral" id="qorStatus">No measurement</span></div><div class="empty-output" id="qorOutput">No area, timing, power or DRC values are available.</div></article>
+    </section>
+
+    <section class="panel catalog-panel" aria-labelledby="catalogTitle">
+      <div class="panel-heading"><div><p class="eyebrow">COURSE LAB</p><h2 id="catalogTitle">Exercise and PDK readiness</h2></div><span class="state-label" id="catalogState">Loading</span></div>
+      <div class="catalog-grid"><ol id="courseCatalog" class="course-list"><li>Loading course records…</li></ol><div><table class="pdk-table"><thead><tr><th>Exercise</th><th>PDK</th><th>Status</th><th>Reason</th></tr></thead><tbody id="pdkCatalog"><tr><td colspan="4">Loading PDK records…</td></tr></tbody></table></div></div>
     </section>
   </main>
   <script src="app.js" defer></script>

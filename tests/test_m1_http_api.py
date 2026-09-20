@@ -66,6 +66,9 @@ class FakeV2:
     def timeline(self, run_id):
         return [{"run_id": run_id, "event_type": "stage.started"}]
 
+    def logs(self, run_id):
+        return {"logs": [{"stream": "stdout", "text": "run started"}]}
+
     def artifacts(self, run_id):
         return [{"artifact_id": "artifact-1", "kind": "gds", "sha256": "a" * 64}]
 
@@ -244,6 +247,25 @@ def test_m1_http_api_proxies_v2_artifact_excerpt():
         )
         assert status == 200
         assert excerpt["excerpt"]["text"].startswith("module counter")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_m1_http_api_proxies_logs_and_renders_netlist_from_v2_excerpt():
+    server, fake, base = running_server()
+    fake.artifact_excerpt = lambda _run_id, _artifact_id: {
+        "artifact_id": "artifact-1",
+        "text": "module top;\nAND2_X1 u0 (.A(a), .B(b), .Y(y));\nendmodule",
+    }
+    try:
+        status, logs = request(base, "GET", "/api/m1/runs/run-42/logs")
+        assert status == 200
+        assert logs["logs"][0]["text"] == "run started"
+        status, preview = request(base, "GET", "/api/m1/runs/run-42/artifacts/artifact-1/netlist")
+        assert status == 200
+        assert preview["status"] == "ready"
+        assert "AND2_X1" in preview["content"]
     finally:
         server.shutdown()
         server.server_close()
