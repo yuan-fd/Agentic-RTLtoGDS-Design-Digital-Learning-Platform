@@ -39,6 +39,53 @@ class SimulationStatus(str, Enum):
     INVALIDATED = "invalidated"
 
 
+@dataclass(frozen=True)
+class M1RunOutcome:
+    run_id: str
+    candidate_id: str
+    pdk: str
+    status: str
+    reason: str
+    artifact_ids: tuple[str, ...] = ()
+
+    def validate(self) -> None:
+        _id("run_id", self.run_id)
+        _id("candidate_id", self.candidate_id)
+        _id("pdk", self.pdk)
+        if self.status != "gds_incomplete":
+            raise ValueError("M1RunOutcome status must be gds_incomplete")
+        if not isinstance(self.reason, str) or not self.reason.strip():
+            raise ValueError("M1RunOutcome reason must be non-empty")
+        if not isinstance(self.artifact_ids, tuple):
+            raise ValueError("M1RunOutcome artifact_ids must be a tuple")
+        for artifact_id in self.artifact_ids:
+            _id("artifact_id", artifact_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        return {
+            "run_id": self.run_id,
+            "candidate_id": self.candidate_id,
+            "pdk": self.pdk,
+            "status": self.status,
+            "reason": self.reason,
+            "artifact_ids": list(self.artifact_ids),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "M1RunOutcome":
+        result = cls(
+            run_id=str(payload["run_id"]),
+            candidate_id=str(payload["candidate_id"]),
+            pdk=str(payload["pdk"]),
+            status=str(payload["status"]),
+            reason=str(payload["reason"]),
+            artifact_ids=tuple(str(item) for item in payload.get("artifact_ids", ())),
+        )
+        result.validate()
+        return result
+
+
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 

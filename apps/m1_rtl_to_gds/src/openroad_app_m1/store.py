@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from .models import M1Session, RTLVersion
+from .models import M1RunOutcome, M1Session, RTLVersion
 from openroad_platform_contracts.rtl_frontend import VerificationPackage
 from openroad_platform_contracts.evidence_exchange import EvidenceRef
 
@@ -33,6 +33,10 @@ class M1Store:
         self.connection.execute(
             "CREATE TABLE IF NOT EXISTS m1_run_owners "
             "(run_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL)"
+        )
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS m1_run_outcomes "
+            "(run_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
         )
         self.connection.commit()
 
@@ -86,6 +90,31 @@ class M1Store:
                 "SELECT owner_id FROM m1_run_owners WHERE run_id = ?", (run_id,)
             ).fetchone()
         return None if row is None else str(row["owner_id"])
+
+    def put_run_outcome(self, outcome: M1RunOutcome, payload: str) -> None:
+        outcome.validate()
+        with self._lock:
+            self.connection.execute(
+                "INSERT OR REPLACE INTO m1_run_outcomes(run_id, payload) VALUES (?, ?)",
+                (outcome.run_id, payload),
+            )
+            self.connection.commit()
+
+    def run_outcome_payload(self, run_id: str) -> str:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT payload FROM m1_run_outcomes WHERE run_id = ?", (run_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(run_id)
+        return str(row["payload"])
+
+    def all_run_outcome_payloads(self) -> tuple[str, ...]:
+        with self._lock:
+            rows = self.connection.execute(
+                "SELECT payload FROM m1_run_outcomes ORDER BY run_id"
+            ).fetchall()
+        return tuple(str(row["payload"]) for row in rows)
 
     def session_payload(self, spec_id: str) -> str:
         with self._lock:

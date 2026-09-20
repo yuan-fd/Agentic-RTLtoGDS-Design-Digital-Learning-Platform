@@ -43,7 +43,13 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     self._json(HTTPStatus.OK, self._health(client))
                     return
                 if path == "/api/auth/session":
-                    self._json(HTTPStatus.OK, {"session": client.session()})
+                    try:
+                        session = client.session()
+                    except V2ClientError as exc:
+                        if exc.status != HTTPStatus.UNAUTHORIZED:
+                            raise
+                        session = None
+                    self._json(HTTPStatus.OK, {"session": session})
                     return
                 if path == "/api/m1/specs":
                     owner_id = self._owner_id(client)
@@ -145,14 +151,19 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     observation = client.run(run_id)
                     run = observation.get("run", observation)
                     service.observe_run(run_id, run.get("status"))
+                    evidence_payload = None
                     if run.get("status") == "succeeded" and run.get("task_id", "").startswith("m1-gds-"):
                         version_id = run["task_id"].removeprefix("m1-gds-").rsplit("-", 1)[0]
-                        service.record_gds_evidence(
+                        evidence = service.record_gds_evidence(
                             version_id, run_id, client.artifacts(run_id),
                             pdk=run["task_id"].rsplit("-", 1)[1],
                             metrics=client.metrics(run_id),
                         )
-                    self._json(HTTPStatus.OK, {"run": run})
+                        evidence_payload = evidence.to_dict()
+                    self._json(HTTPStatus.OK, {
+                        "run": run,
+                        "evidence": evidence_payload,
+                    })
                     return
                 if path.startswith("/api/m1/evidence/"):
                     evidence_id = path.removeprefix("/api/m1/evidence/")

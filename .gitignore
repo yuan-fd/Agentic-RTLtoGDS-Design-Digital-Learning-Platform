@@ -19,6 +19,9 @@ node_modules/
 .tools/
 .local/
 
+# Independent acceptance output is generated from a clean checkout.
+acceptance/reports/
+
 # EDA runs are immutable runtime artifacts, not source files.
 var/
 runs/

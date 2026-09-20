@@ -12,7 +12,7 @@ from typing import Any
 from openroad_platform_contracts.rtl_frontend import SpecIR, VerificationPackage
 from openroad_platform_contracts.evidence_exchange import EvidenceRef
 
-from .models import M1Session, M1State, RTLVersion, SimulationStatus, VerificationStatus
+from .models import M1RunOutcome, M1Session, M1State, RTLVersion, SimulationStatus, VerificationStatus
 from .store import M1Store
 
 
@@ -44,6 +44,11 @@ class M1Service:
             evidence.evidence_id: evidence
             for evidence in (EvidenceRef.from_dict(json.loads(payload))
                              for payload in store.all_evidence_payloads())
+        }
+        self._run_outcomes = {
+            outcome.run_id: outcome
+            for outcome in (M1RunOutcome.from_dict(json.loads(payload))
+                            for payload in store.all_run_outcome_payloads())
         }
 
     @classmethod
@@ -439,24 +444,42 @@ class M1Service:
     def record_gds_evidence(
         self, version_id: str, run_id: str, artifacts: list[dict[str, Any]],
         *, pdk: str, metrics: list[dict[str, Any]],
-    ) -> EvidenceRef:
+    ) -> EvidenceRef | M1RunOutcome:
         evidence_id = f"evidence:{run_id}"
         if evidence_id in self._evidence:
             return self._evidence[evidence_id]
+        if run_id in self._run_outcomes:
+            return self._run_outcomes[run_id]
         required = {"gds", "def", "odb", "netlist", "report"}
         by_kind = {item.get("kind"): item for item in artifacts}
-        if not required.issubset(by_kind):
-            raise ValueError("successful GDS run is missing required artifacts")
+        missing = sorted(required - set(by_kind))
         if not metrics or any(item.get("complete") is not True for item in metrics):
-            raise ValueError("successful GDS run requires complete metrics")
-        snapshot = next(
-            item for item in artifacts
-            if item.get("metadata", {}).get("format") == "toolchain-snapshot"
-        )
-        protocol = next(
-            item for item in artifacts
-            if item.get("store_key") == "plan.json"
-        )
+            missing.append("metrics")
+        snapshot = next((item for item in artifacts
+                         if item.get("metadata", {}).get("format") == "toolchain-snapshot"), None)
+        protocol = next((item for item in artifacts if item.get("store_key") == "plan.json"), None)
+        if snapshot is None:
+            missing.append("toolchain_snapshot")
+        if protocol is None:
+            missing.append("protocol_digest")
+        if missing:
+            artifact_ids = tuple(
+                f"artifact:{item['kind']}:{item['artifact_id']}"
+                for item in artifacts
+                if isinstance(item.get("kind"), str) and isinstance(item.get("artifact_id"), str)
+            )
+            outcome = M1RunOutcome(
+                run_id=run_id,
+                candidate_id=version_id,
+                pdk=pdk,
+                status="gds_incomplete",
+                reason="missing " + ", ".join(dict.fromkeys(missing)),
+                artifact_ids=artifact_ids,
+            )
+            outcome.validate()
+            self._run_outcomes[run_id] = outcome
+            self.store.put_run_outcome(outcome, json.dumps(outcome.to_dict(), sort_keys=True))
+            return outcome
         artifact_ids = tuple(
             f"artifact:{kind}:{by_kind[kind]['artifact_id']}"
             for kind in ("gds", "def", "odb", "netlist", "report")
@@ -487,6 +510,15 @@ class M1Service:
             return self._evidence[evidence_id]
         except KeyError as exc:
             raise KeyError(f"unknown evidence: {evidence_id}") from exc
+
+    def get_run_outcome(self, run_id: str) -> M1RunOutcome:
+        try:
+            return self._run_outcomes[run_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown M1 run outcome: {run_id}") from exc
+
+    def run_outcome(self, run_id: str) -> M1RunOutcome | None:
+        return self._run_outcomes.get(run_id)
 
     def list_sessions(self, owner_id: str) -> tuple[M1Session, ...]:
         return tuple(

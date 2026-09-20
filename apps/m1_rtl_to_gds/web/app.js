@@ -213,7 +213,7 @@
     setStage("stageEvidenceStatus", "Unavailable", "neutral");
   }
 
-  function renderRun(run) {
+  function renderRun(run, evidence = null) {
     setText("runState", run.run_id + ": " + run.status);
     setText("runStateDetail", run.status);
     setStatus("workbenchAvailability", run.status === "succeeded" ? "Measured" : run.status,
@@ -223,8 +223,9 @@
     setStage("stageInputStatus", version ? "Ready" : "Unavailable", version ? "good" : "neutral");
     setStage("stageOrfsStatus", active ? "Running" : terminal ? run.status : "Unavailable",
       active ? "warn" : terminal && run.status === "succeeded" ? "good" : "neutral");
-    setStage("stageEvidenceStatus", run.status === "succeeded" ? "Ready" : "Unavailable",
-      run.status === "succeeded" ? "good" : "neutral");
+    const evidenceIncomplete = evidence && evidence.status === "gds_incomplete";
+    setStage("stageEvidenceStatus", evidenceIncomplete ? "gds incomplete" : run.status === "succeeded" ? "Ready" : "Unavailable",
+      evidenceIncomplete ? "warn" : run.status === "succeeded" ? "good" : "neutral");
   }
 
   async function refreshVersion() {
@@ -245,7 +246,7 @@
     renderVersionList();
   }
 
-  async function refreshEvidence(id) {
+  async function refreshEvidence(id, run = null, evidence = null) {
     const [timeline, artifactsReply, metricsReply, logsReply] = await Promise.all([
       requestJson("/api/m1/runs/" + encodeURIComponent(id) + "/timeline"),
       requestJson("/api/m1/runs/" + encodeURIComponent(id) + "/artifacts"),
@@ -296,28 +297,36 @@
         setStatus("layoutStatus", "Unavailable");
       }
     }
-    try {
-      const evidence = await requestJson("/api/m1/evidence/evidence:" + encodeURIComponent(id));
-      setText("evidenceMetadata", JSON.stringify(evidence.evidence, null, 2));
-    } catch (error) {
-      setText("evidenceMetadata", "No succeeded EvidenceRef: " + error.message);
+    if (run && run.task_id && run.task_id.startsWith("m1-gds-")) {
+      try {
+        const evidence = await requestJson("/api/m1/evidence/evidence:" + encodeURIComponent(id));
+        setText("evidenceMetadata", JSON.stringify(evidence.evidence, null, 2));
+      } catch (error) {
+        setText("evidenceMetadata", "No succeeded EvidenceRef: " + error.message);
+      }
     }
-    setStage("stageEvidenceStatus", artifacts.length ? "Ready" : "Unavailable", artifacts.length ? "good" : "neutral");
+    const incomplete = evidence && evidence.status === "gds_incomplete";
+    setStage("stageEvidenceStatus", incomplete ? "gds incomplete" : artifacts.length ? "Ready" : "Unavailable", incomplete ? "warn" : artifacts.length ? "good" : "neutral");
   }
 
   async function pollRun(id) {
-    const run = (await requestJson("/api/m1/runs/" + encodeURIComponent(id))).run;
-    renderRun(run);
+    const observation = await requestJson("/api/m1/runs/" + encodeURIComponent(id));
+    const run = observation.run;
+    renderRun(run, observation.evidence);
     if (terminalStates.has(run.status)) {
-      await refreshEvidence(id);
+      await refreshEvidence(id, run, observation.evidence);
       await refreshVersion();
+      if (observation.evidence && observation.evidence.status !== "succeeded") {
+        setText("evidenceMetadata", JSON.stringify(observation.evidence, null, 2));
+      }
       const callout = $("evidenceMessage");
       clearNode(callout);
-      callout.className = "callout" + (run.status === "succeeded" ? "" : " unavailable");
+      const incomplete = observation.evidence && observation.evidence.status !== "succeeded";
+      callout.className = "callout" + (run.status === "succeeded" && !incomplete ? "" : " unavailable");
       const title = document.createElement("strong");
-      title.textContent = runKind + " " + run.status;
+      title.textContent = incomplete ? observation.evidence.status : runKind + " " + run.status;
       const detail = document.createElement("span");
-      detail.textContent = "Run " + id + " is recorded by v2.";
+      detail.textContent = incomplete ? observation.evidence.reason : "Run " + id + " is recorded by v2.";
       callout.append(title, detail);
       return;
     }
@@ -422,6 +431,9 @@
   $("studioTab").addEventListener("click", () => selectTab($("studioTab"), $("studioPanel"), $("workbenchTab"), $("workbenchPanel")));
   $("workbenchTab").addEventListener("click", () => selectTab($("workbenchTab"), $("workbenchPanel"), $("studioTab"), $("studioPanel")));
   $("refreshButton").addEventListener("click", () => refresh().catch(showError));
+  $("specInput").addEventListener("input", () => {
+    if (!specSession) $("freezeButton").disabled = !$('specInput').value.trim();
+  });
   $("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     try {

@@ -390,7 +390,7 @@ def test_successful_gds_run_registers_metadata_only_evidence() -> None:
     assert evidence.toolchain_digest == "a" * 64
 
 
-def test_successful_gds_evidence_requires_complete_metrics() -> None:
+def test_incomplete_gds_evidence_requires_complete_metrics() -> None:
     service = M1Service.in_memory()
     session = service.assess_spec("user-1", spec=spec_ir())
     frozen = service.freeze_spec(session.spec_id)
@@ -406,10 +406,35 @@ def test_successful_gds_evidence_requires_complete_metrics() -> None:
         for kind in ("gds", "def", "odb", "netlist", "report", "snapshot", "protocol")
     ]
 
-    with pytest.raises(ValueError, match="complete metrics"):
-        service.record_gds_evidence(
-            version.version_id, "run-gds-1", artifacts, pdk="nangate45", metrics=[]
-        )
+    outcome = service.record_gds_evidence(
+        version.version_id, "run-gds-1", artifacts, pdk="nangate45", metrics=[]
+    )
+    assert outcome.status == "gds_incomplete"
+    assert "metrics" in outcome.reason
+
+
+def test_incomplete_gds_run_is_recorded_without_success_evidence() -> None:
+    service = M1Service.in_memory()
+    session = service.assess_spec("user-1", spec=spec_ir())
+    frozen = service.freeze_spec(session.spec_id)
+    version = service.create_rtl_version(
+        frozen.spec_id, "module counter; endmodule", "direct_llm", source_ref="input:rtl-1"
+    )
+    service.record_verification(version.version_id, VerificationStatus.PASSED, "run-verify-1")
+    service.record_simulation(version.version_id, SimulationStatus.PASSED, "run-sim-1")
+
+    outcome = service.record_gds_evidence(
+        version.version_id,
+        "run-gds-incomplete",
+        [{"artifact_id": "artifact-log", "kind": "log", "sha256": "a" * 64}],
+        pdk="nangate45",
+        metrics=[],
+    )
+
+    assert outcome.status == "gds_incomplete"
+    assert "gds" in outcome.reason
+    assert service.list_evidence("user-1") == ()
+    assert service.get_run_outcome("run-gds-incomplete").to_dict() == outcome.to_dict()
 
 
 def test_service_lists_only_the_owner_specifications() -> None:

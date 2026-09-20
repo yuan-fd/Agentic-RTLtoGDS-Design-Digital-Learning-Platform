@@ -28,6 +28,30 @@ ssh -L 18101:127.0.0.1:8101 -L 18700:127.0.0.1:8700 user@server
 
 ## 启动
 
+先启动 v2 gateway 和 worker。v2 必须使用认证模式，并将 KLayout renderer
+配置给 gateway；不配置时，GDS 仍可执行，但 UI 会如实显示 preview unavailable：
+
+```bash
+V2_ROOT=/share/home/yuanwenjie/openroad-platform-v2
+V2_PYTHONPATH="$V2_ROOT/contracts/src:$V2_ROOT/core/runtime/src:$V2_ROOT/core/registry/src:$V2_ROOT/core/evaluator/src:$V2_ROOT/core/identity/src:$V2_ROOT/core/client/src:$V2_ROOT/core/provenance/src:$V2_ROOT/gateway/src:$V2_ROOT/apps/plan_executor/src"
+export PYTHONPATH="$V2_PYTHONPATH"
+export OPENROAD_PLATFORM_PREVIEW_COMMAND="/share/home/yuanwenjie/bin/klayout -b -r $V2_ROOT/tools/render-artifact.py"
+V2_PLUGINS_ROOT="$(bash scripts/prepare_v2_plugins.sh)"
+python3 -m openroad_platform_gateway \
+  --state-root /var/lib/openroad-teaching/v2 \
+  --plugins-root "$V2_PLUGINS_ROOT" \
+  --admissions-root /share/home/yuanwenjie/openroad-platform-v2/admissions \
+  --host 127.0.0.1 --port 8700
+python3 -m openroad_platform_gateway.worker \
+  --state-root /var/lib/openroad-teaching/v2 \
+  --plugins-root "$V2_PLUGINS_ROOT" \
+  --admissions-root /share/home/yuanwenjie/openroad-platform-v2/admissions
+```
+
+第一次启动时先让 gateway 完成数据库初始化，再启动 worker。随后通过
+`POST /kernel/auth/register` 创建第一个管理员账号；之后只使用
+`/kernel/auth/login` 获得的 v2 token 启动 M1。
+
 ```bash
 export OPENROAD_V2_URL=http://127.0.0.1:8700
 export M1_STATE_ROOT=/var/lib/openroad-teaching
