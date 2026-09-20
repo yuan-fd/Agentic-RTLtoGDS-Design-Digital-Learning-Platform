@@ -38,7 +38,13 @@ for item in sys.argv[3:]:
     checks.append({'check': name, 'status': value, 'detail': detail})
 payload = {'checks': checks, 'functional_acceptance': 'PASS' if status == 'PASS' else 'FAIL', 'production_deployment_readiness': 'FAIL'}
 (output / 'audit-report.json').write_text(json.dumps(payload, indent=2) + '\n')
-(output / 'artifact-manifest.json').write_text(json.dumps({'source': 'independent clean checkout', 'checks': checks}, indent=2) + '\n')
+manifest_path = output / 'artifact-manifest.json'
+if manifest_path.is_file():
+    manifest = json.loads(manifest_path.read_text())
+    manifest['architecture_checks'] = checks
+else:
+    manifest = {'source': 'independent clean checkout', 'architecture_checks': checks}
+manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
 lines = ['# Independent Teaching Platform Audit', '', f'Functional acceptance: {payload["functional_acceptance"]}', 'Production deployment readiness: FAIL', '', '## Checks', '']
 lines += [f'- `{x["status"]}` {x["check"]}: {x["detail"]}' for x in checks]
 (output / 'audit-report.md').write_text('\n'.join(lines) + '\n')

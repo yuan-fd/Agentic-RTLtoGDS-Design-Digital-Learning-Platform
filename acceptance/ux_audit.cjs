@@ -83,6 +83,19 @@ fs.mkdirSync(path.join(output, 'browser-screenshots'), { recursive: true });
       const evidence = await workflowPage.locator('#evidenceMetadata').textContent();
       const gdsPassed = evidence.includes('"status": "succeeded"') && await workflowPage.locator('#layoutStatus').textContent().then(value => value.startsWith('Rendered'));
       report.push({ check: 'gds-evidence', status: gdsPassed ? 'PASS' : 'FAIL', detail: gdsPassed ? 'Nangate45 evidence and layout preview are available' : evidence || 'GDS evidence is incomplete' });
+      if (gdsPassed) {
+        const artifactRows = await workflowPage.locator('#artifactList li').evaluateAll(rows => rows.map(row => ({
+          kind: row.firstElementChild && row.firstElementChild.textContent,
+          sha256: row.lastElementChild && row.lastElementChild.textContent,
+        })));
+        const runId = (await workflowPage.locator('#runState').textContent()).split(':', 1)[0];
+        fs.writeFileSync(path.join(output, 'artifact-manifest.json'), JSON.stringify({
+          source: 'independent authenticated browser workflow',
+          run_id: runId,
+          evidence: JSON.parse(evidence),
+          artifacts: artifactRows,
+        }, null, 2) + '\n');
+      }
     }
     await workflowPage.close();
   } catch (error) {
