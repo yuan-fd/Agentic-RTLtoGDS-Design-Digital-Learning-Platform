@@ -317,7 +317,9 @@ class M1Service:
 
     def submit_rtl_to_gds(self, version_id: str, pdk: str, v2_client: Any) -> str:
         task = self.build_rtl_to_gds_request(version_id, pdk, v2_client)
-        return self._submit_task(task, v2_client)
+        run_id = self._submit_task(task, v2_client)
+        self.store.put_run_owner(run_id, self._session(self.get_rtl_version(version_id).spec_id).owner_id)
+        return run_id
 
     def build_rtl_to_gds_request(self, version_id: str, pdk: str, v2_client: Any) -> dict[str, Any]:
         version = self.get_rtl_version(version_id)
@@ -497,6 +499,24 @@ class M1Service:
             evidence for evidence in self._evidence.values()
             if evidence.owner_id == owner_id
         )
+
+    def assert_run_owner(self, run_id: str, owner_id: str) -> None:
+        stored_owner = self.store.run_owner(run_id)
+        if stored_owner is not None:
+            if stored_owner != owner_id:
+                raise PermissionError("run belongs to another v2 identity")
+            return
+        for version in self._versions.values():
+            if run_id in {version.verification_run_id, version.simulation_run_id}:
+                if self._session(version.spec_id).owner_id == owner_id:
+                    return
+                raise PermissionError("run belongs to another v2 identity")
+        for evidence in self._evidence.values():
+            if evidence.run_id == run_id:
+                if evidence.owner_id == owner_id:
+                    return
+                raise PermissionError("run belongs to another v2 identity")
+        raise KeyError(f"unknown M1 run: {run_id}")
 
     def observe_run(self, run_id: str, status: str) -> None:
         if status not in {"succeeded", "failed", "cancelled", "timed_out"}:

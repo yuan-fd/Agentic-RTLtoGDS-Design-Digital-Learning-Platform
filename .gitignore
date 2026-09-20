@@ -17,6 +17,7 @@ credentials.*
 node_modules/
 .external-src/
 .tools/
+.local/
 
 # EDA runs are immutable runtime artifacts, not source files.
 var/

@@ -34,9 +34,9 @@ PDKCapability、ScriptProposal 和 EvidenceRef。浏览器不接收模型 API ke
 | --- | --- | --- |
 | Teaching Hub | 入口、题库、历史和 Evidence Exchange 视图 | 基础层 |
 | M1：LLM → RTL → GDS | 从冻结规格到真实 GDS 的完整教学实验 | 第一条完整切片 |
-| M2：Direct LLM vs RTLScout | 相同 SpecIR、验证包和后端协议下比较两个独立生成器 | M1 后 |
-| M3：Fixed Baseline vs ORFS-Agent | 固定协议下展示全部观测、失败、预算和 QoR 曲线 | M1 后 |
-| M4：Flow / Recipe Scripting Lab | 仅执行已登记且经用户确认的 Tcl/Python patch | M1 后 |
+| M2：Direct LLM vs RTLScout | 相同 SpecIR、验证包和后端协议下比较两个独立生成器 | 独立最小切片 |
+| M3：Fixed Baseline vs ORFS-Agent | 固定协议下展示全部观测、失败、预算和 QoR 曲线 | 独立最小切片 |
+| M4：Flow / Recipe Scripting Lab | 仅执行已登记且经用户确认的 Tcl/Python patch | 独立最小切片 |
 
 第一阶段先完成 M1：一个固定 Course Lab 题目和一个自然语言单时钟 FSM，
 在 Nangate45 上真实跑通 RTL-to-GDS。生成、验证、工具链、PDK、评估器或
@@ -83,3 +83,29 @@ python3 -m pytest -q
 旧 Workbench、旧 Runtime 与研究入口已从 active 主干移除，保存在 Git 标签
 `archive/pre-teaching-platform` 中，不作为兼容服务运行。教学模块只能通过
 HTTP 访问 v2，不能导入 sibling app，也不能打开 v2 数据库。
+
+## 固定部署与独立验收
+
+启动入口是 `scripts/start_teaching_platform.sh`。默认状态目录为
+`.local/state/openroad-teaching`；管理员创建系统目录后可设置
+`M1_STATE_ROOT=/var/lib/openroad-teaching`。v2 和 worker 继续只监听
+`127.0.0.1`，M1 默认监听 `127.0.0.1:8101`。
+
+SQLite 在线备份使用：
+
+```bash
+python3 scripts/teaching_platform_ops.py backup \
+  --database .local/state/openroad-teaching/m1.sqlite \
+  --output .local/state/openroad-teaching/backups/$(date +%Y%m%d-%H%M%S)
+```
+
+独立验收目录 `acceptance/` 会从当前 release commit 创建 clean checkout，
+运行全量测试和浏览器四种 viewport 检查，并分别输出：
+
+```text
+Functional acceptance: PASS/FAIL
+Production deployment readiness: PASS/FAIL
+```
+
+临时公网 IP 只能作为教师查看演示，不能被报告为生产部署；正式分享需要
+HTTPS、每用户 v2 session、owner isolation、备份、限流和可回滚服务配置。

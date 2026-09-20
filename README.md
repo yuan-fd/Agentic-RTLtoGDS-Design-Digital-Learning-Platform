@@ -36,9 +36,9 @@ development only.
 | --- | --- | --- |
 | Teaching Hub | Navigation, exercise catalog, history and Evidence Exchange read model | foundation |
 | M1 · LLM → RTL → GDS | Complete guided flow from a frozen specification to real GDS | first vertical slice |
-| M2 · Direct LLM vs RTLScout | Same SpecIR, verification package and RTL-to-GDS protocol | planned after M1 |
-| M3 · Fixed baseline vs ORFS-Agent | Full observation and budget comparison under a frozen protocol | planned after M1 |
-| M4 · Flow / Recipe Scripting Lab | Confirmed, allowlisted Tcl/Python recipe proposals | planned after M1 |
+| M2 · Direct LLM vs RTLScout | Same SpecIR, verification package and RTL-to-GDS protocol | independent minimum slice |
+| M3 · Fixed baseline vs ORFS-Agent | Full observation and budget comparison under a frozen protocol | independent minimum slice |
+| M4 · Flow / Recipe Scripting Lab | Confirmed, allowlisted Tcl/Python recipe proposals | independent minimum slice |
 
 The first product milestone is M1: one fixed Course Lab exercise and one
 natural-language single-clock FSM must complete through Nangate45 to GDS. A
@@ -79,7 +79,11 @@ produce an explicit unavailable state.
 ```text
 packages/contracts/       teaching and execution boundary contracts
 apps/m1_rtl_to_gds/       independent M1 teaching application
+apps/m2_rtl_comparison/   independent generator comparison application
+apps/m3_orfs_comparison/  independent backend comparison application
+apps/m4_script_lab/       independent allowlisted scripting application
 integrations/             admitted external tool intake records
+acceptance/               clean-checkout UX and architecture audits
 docs/                     product specification, module catalog and governance
 tests/                    contract and regression tests
 ```
@@ -118,6 +122,32 @@ ssh -L 18101:127.0.0.1:8101 -L 18700:127.0.0.1:8700 user@server
 
 Then open `http://127.0.0.1:18101`. The v2 token stays on the server; no-auth
 mode is for local development only.
+
+The fixed state root defaults to `.local/state/openroad-teaching` for a
+user-owned server account. Set `M1_STATE_ROOT=/var/lib/openroad-teaching` when
+an administrator has created the system directory. Back up the live database
+with:
+
+```bash
+python3 scripts/teaching_platform_ops.py backup \
+  --database .local/state/openroad-teaching/m1.sqlite \
+  --output .local/state/openroad-teaching/backups/$(date +%Y%m%d-%H%M%S)
+```
+
+Run the independent release checks from a clean checkout. The UX runner needs
+an externally installed Playwright and Chromium; it never modifies product
+code:
+
+```bash
+CHROMIUM_EXECUTABLE=/path/to/chromium \
+PLAYWRIGHT_NODE_MODULES=/path/to/playwright/node_modules \
+M1_URL=http://127.0.0.1:8101 \
+  bash acceptance/run_ux_audit.sh
+bash acceptance/run_architecture_audit.sh
+```
+
+The audit reports functional acceptance and production deployment readiness as
+separate conclusions. A temporary public-IP demo is not production readiness.
 
 The second command includes historical/integration checks that depend on local
 toolchain fixtures. A complete run must report those environmental failures

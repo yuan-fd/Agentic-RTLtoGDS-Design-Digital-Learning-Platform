@@ -128,7 +128,9 @@ def request(base, method, path, payload=None, *, raw=False):
 
 def running_server():
     fake = FakeV2()
-    server = build_server("127.0.0.1", 0, M1Service.in_memory(), fake, llm_provider=FakeLLM())
+    service = M1Service.in_memory()
+    service.store.put_run_owner("run-42", "user-1")
+    server = build_server("127.0.0.1", 0, service, fake, llm_provider=FakeLLM())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, fake, f"http://127.0.0.1:{server.server_address[1]}"

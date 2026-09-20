@@ -30,6 +30,10 @@ class M1Store:
             "CREATE TABLE IF NOT EXISTS m1_evidence "
             "(evidence_id TEXT PRIMARY KEY, payload TEXT NOT NULL)"
         )
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS m1_run_owners "
+            "(run_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL)"
+        )
         self.connection.commit()
 
     def put_session(self, session: M1Session, payload: str) -> None:
@@ -67,6 +71,21 @@ class M1Store:
                 (evidence.evidence_id, payload),
             )
             self.connection.commit()
+
+    def put_run_owner(self, run_id: str, owner_id: str) -> None:
+        with self._lock:
+            self.connection.execute(
+                "INSERT OR REPLACE INTO m1_run_owners(run_id, owner_id) VALUES (?, ?)",
+                (run_id, owner_id),
+            )
+            self.connection.commit()
+
+    def run_owner(self, run_id: str) -> str | None:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT owner_id FROM m1_run_owners WHERE run_id = ?", (run_id,)
+            ).fetchone()
+        return None if row is None else str(row["owner_id"])
 
     def session_payload(self, spec_id: str) -> str:
         with self._lock:

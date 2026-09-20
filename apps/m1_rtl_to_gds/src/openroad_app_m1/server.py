@@ -90,6 +90,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                         prefix, artifact_id = excerpt_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
                         if not prefix or not artifact_id:
                             raise ValueError("run_id and artifact_id are required")
+                        self._owned_run(prefix, client)
                         self._json(HTTPStatus.OK, {
                             "excerpt": client.artifact_excerpt(prefix, artifact_id)
                         })
@@ -99,6 +100,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                         prefix, artifact_id = preview_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
                         if not prefix or not artifact_id:
                             raise ValueError("run_id and artifact_id are required")
+                        self._owned_run(prefix, client)
                         self._json(HTTPStatus.OK, {
                             "preview": client.artifact_preview(prefix, artifact_id)
                         })
@@ -106,6 +108,7 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                     if path.endswith("/netlist"):
                         netlist_path = path.removesuffix("/netlist")
                         prefix, artifact_id = netlist_path.removeprefix("/api/m1/runs/").rsplit("/artifacts/", 1)
+                        self._owned_run(prefix, client)
                         excerpt = client.artifact_excerpt(prefix, artifact_id)
                         content = render_netlist_svg(excerpt.get("text", ""))
                         self._json(HTTPStatus.OK, {
@@ -117,23 +120,28 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
                         return
                     if path.endswith("/timeline"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/timeline")
+                        self._owned_run(run_id, client)
                         self._json(HTTPStatus.OK, {"timeline": client.timeline(run_id)})
                         return
                     if path.endswith("/logs"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/logs")
+                        self._owned_run(run_id, client)
                         self._json(HTTPStatus.OK, client.logs(run_id))
                         return
                     if path.endswith("/artifacts"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/artifacts")
+                        self._owned_run(run_id, client)
                         self._json(HTTPStatus.OK, {"artifacts": client.artifacts(run_id)})
                         return
                     if path.endswith("/metrics"):
                         run_id = path.removeprefix("/api/m1/runs/").removesuffix("/metrics")
+                        self._owned_run(run_id, client)
                         self._json(HTTPStatus.OK, {"metrics": client.metrics(run_id)})
                         return
                     run_id = path.removeprefix("/api/m1/runs/")
                     if not run_id or "/" in run_id:
                         raise ValueError("run_id is required")
+                    self._owned_run(run_id, client)
                     observation = client.run(run_id)
                     run = observation.get("run", observation)
                     service.observe_run(run_id, run.get("status"))
@@ -239,10 +247,15 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
         def _health(self, client: Any) -> dict[str, Any]:
             try:
                 health = client.health()
-                session = client.session()
             except V2Unavailable as exc:
                 return {"app": "m1_rtl_to_gds", "status": "unavailable", "identity": None,
                         "reason": str(exc)}
+            try:
+                session = client.session()
+            except V2ClientError as exc:
+                if exc.status != HTTPStatus.UNAUTHORIZED:
+                    raise
+                session = None
             return {
                 "app": "m1_rtl_to_gds",
                 "status": "ok" if health.get("ok", health.get("status") == "ok") else "unavailable",
@@ -337,6 +350,15 @@ def build_server(host: str, port: int, service: M1Service, v2_client: Any,
         def _owned_version(self, version_id: str, client: Any) -> None:
             version = service.get_rtl_version(version_id)
             self._owned_spec(version.spec_id, client)
+
+        def _owned_run(self, run_id: str, client: Any) -> None:
+            if not run_id or "/" in run_id:
+                raise ValueError("run_id is required")
+            owner_id = self._owner_id(client)
+            try:
+                service.assert_run_owner(run_id, owner_id)
+            except PermissionError as exc:
+                raise AuthorizationError(str(exc)) from exc
 
         def _owner_id(self, client: Any) -> str:
             session = client.session()

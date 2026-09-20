@@ -1,0 +1,8 @@
+{
+  "name": "openroad-teaching-independent-acceptance",
+  "release_boundary": "clean checkout at HEAD",
+  "required_outputs": ["audit-report.md", "audit-report.json", "browser-screenshots", "network-log.json", "console-log.json", "artifact-manifest.json", "test-results.xml"],
+  "status_values": ["PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"],
+  "functional_conclusion": "Counter and Sequence Detector artifact-backed M1 acceptance",
+  "production_conclusion": "Authentication, HTTPS, isolation, backup and rollback readiness"
+}
